@@ -52,6 +52,8 @@ interface P {
   tackleCD: number;
   catchCD: number;
   sidestepT: number;
+  /** sidestep cooldown */
+  sidestepCD: number;
   sideDir: number;
   handoffT: number;
   diveT: number;
@@ -396,7 +398,7 @@ export class MatchEngine {
         const p: P = {
           side, num: i + 1, data: pl, r, name: `${pl.first[0]}. ${pl.last}`,
           x: 0, z: 0, vx: 0, vz: 0, heading: side === 0 ? 0 : Math.PI, tx: 0, tz: 0, gx: 0, gz: 0, urgency: 0,
-          state: 'free', timer: 0, tackleCD: 0, catchCD: 0, sidestepT: 0, sideDir: 1, handoffT: 0, diveT: 0, kickT: 0,
+          state: 'free', timer: 0, tackleCD: 0, catchCD: 0, sidestepT: 0, sidestepCD: 0, sideDir: 1, handoffT: 0, diveT: 0, kickT: 0,
           stamina: 1, slotSide: 1, slotK: 0, av, fx: null, celebrateT: 0, wasDown: false, face: side === 0 ? 0 : Math.PI, loco: 'idle',
         };
         this.players.push(p);
@@ -473,13 +475,29 @@ export class MatchEngine {
   }
 
   // ---------------------------------------------------------------- main loop
+  /** freeze-frame on big hits (seconds of real time) */
+  private hitStopT = 0;
+  /** slow motion while the offload window is open */
+  private timeScale = 1;
+  private offload: null | { c: P; t: P; left: number } = null;
+
   private frame(dt: number) {
-    if (!this.paused) {
-      this.time += dt;
-      if (this.replay) this.updateReplay(dt);
-      else if (!this.waitingBlocking) this.update(dt);
+    if (!this.paused && this.hitStopT > 0) {
+      this.hitStopT -= dt;
+      this.render(0);
+      return;
     }
-    this.render(this.paused ? 0 : dt);
+    const sdt = dt * this.timeScale;
+    if (!this.paused) {
+      this.time += sdt;
+      if (this.replay) this.updateReplay(dt);
+      else if (!this.waitingBlocking) this.update(sdt);
+    }
+    this.render(this.paused ? 0 : sdt);
+  }
+
+  private pop(text: string, tone: 'good' | 'bad' | 'big') {
+    this.emit({ type: 'pop', text, tone });
   }
 
   private update(dt: number) {
@@ -493,6 +511,7 @@ export class MatchEngine {
       }
     }
     this.phaseT += dt;
+    this.tickOffload(dt);
     // Once the 9 has played the ball, the ruck breaks up and those players rejoin the game.
     if (this.phase === 'play' && this.atBaseT < 0) this.releaseRuck();
     if (!this.cfg.drill && (this.phase === 'play' || this.phase === 'ruck' || this.phase === 'maul')) {
@@ -557,6 +576,8 @@ export class MatchEngine {
       phaseNum: this.phaseCount,
       ruck: this.ruck ? (this.ruck.att === 0 ? 'attack' : 'defend') : null,
       canDrop: this.canDropGoal(),
+      nearDef: !!(c && this.ball.carrier === c && c.side === 0 && this.phase === 'play' && this.nearestOpponent(c, 3.2)),
+      offload: !!this.offload,
       scrum: this.scrum ? { bal: this.scrum.bal, t: this.scrum.t, dur: this.scrum.dur, choose: this.scrum.stage === 'choose', userFeed: this.scrum.feed === 0 } : null,
       mph: Math.round((this.ball.carrier ? Math.hypot(this.ball.carrier.vx, this.ball.carrier.vz) : c ? Math.hypot(c.vx, c.vz) : 0) * 2.237),
     };
@@ -583,7 +604,8 @@ export class MatchEngine {
     const live = this.phase === 'play' || this.phase === 'kickoff';
     switch (a.type) {
       case 'pass':
-        if (userHasBall && live) this.doPass(c!, a.long, a.dir);
+        if (this.offload) this.tryOffload(a.dir);
+        else if (userHasBall && live) this.doPass(c!, a.long, a.dir);
         break;
       case 'scrumPush':
         if (this.scrum && this.scrum.stage === 'push') this.scrum.user = Math.min(3.2, this.scrum.user + 0.42);
@@ -598,8 +620,9 @@ export class MatchEngine {
         if (userHasBall && live && this.canDropGoal()) this.dropGoal(c!);
         break;
       case 'sidestep':
-        if (c && userHasBall && c.sidestepT <= 0) {
+        if (c && userHasBall && c.sidestepT <= 0 && c.sidestepCD <= 0) {
           c.sidestepT = 0.35;
+          c.sidestepCD = 1.5;
           c.sideDir = this.input.moveX !== 0 ? Math.sign(this.input.moveX) * this.camRightSign() : c.z > 0 ? -1 : 1;
           c.fx = c.sideDir * Math.cos(c.heading) > 0 ? 'sidestepR' : 'sidestepL';
         }
@@ -640,8 +663,9 @@ export class MatchEngine {
         this.addToRuck();
         break;
       case 'dodge':
-        if (c && userHasBall && c.sidestepT <= 0) {
+        if (c && userHasBall && c.sidestepT <= 0 && c.sidestepCD <= 0) {
           c.sidestepT = 0.4;
+          c.sidestepCD = 1.5;
           c.sideDir = a.dir * this.camRightSign();
           c.fx = c.sideDir * Math.cos(c.heading) > 0 ? 'sidestepR' : 'sidestepL';
         }
@@ -791,6 +815,8 @@ export class MatchEngine {
     // Realistic pace: ~7.5 m/s cruising for an average back, a bit more when sprinting.
     let s = 4.6 + (p.r.pace / 100) * 2.4; // ~6.3 m/s (14 mph) for an average back, ~7.8 m/s sprinting
     if (this.ball.carrier === p) s *= 0.97;
+    // Tired legs: below half stamina players lose up to 15% of their pace.
+    s *= 0.85 + 0.15 * Math.min(1, p.stamina * 2);
     if (p === this.controlled && p.side === 0) s *= 1.04;
     return s;
   }
@@ -801,6 +827,7 @@ export class MatchEngine {
     const { fx, fz, rx, rz } = this.camAxes();
     for (const p of this.players) {
       p.tackleCD -= dt;
+      p.sidestepCD -= dt;
       p.catchCD -= dt;
       p.sidestepT -= dt;
       p.handoffT -= dt;
@@ -840,7 +867,7 @@ export class MatchEngine {
         dvz = (tz / n) * spd;
         p.stamina = clamp(p.stamina - 0.1 * dt, 0, 1);
       } else if (userDriven) {
-        const sprinting = inp.sprint && p.stamina > 0.05;
+        const sprinting = (inp.sprint || inp.sprintHold) && p.stamina > 0.05;
         const spd = max * (sprinting ? 1.24 : 1) * Math.min(1, joy * 1.15);
         if (joy > 0.05) {
           const mx = inp.moveX / Math.max(joy, 1);
@@ -871,7 +898,27 @@ export class MatchEngine {
         dvz += p.sideDir * 7;
         dvx += dirOf(p.side) * 2;
       }
-      const acc = p.state === 'bound' ? 4 : 7.5;
+      // Momentum: ~0.4s to reach top speed, ~0.3s to stop; sharp turns bleed speed,
+      // less so for agile players (backs with pace and hands) than for big forwards.
+      const { acc: accStat, agi } = moveStats(p);
+      const cur = Math.hypot(p.vx, p.vz);
+      const want = Math.hypot(dvx, dvz);
+      let acc: number;
+      if (p.state === 'bound') acc = 4;
+      else {
+        const slowing = want < cur - 0.2;
+        acc = slowing ? 9.5 : 7.5 * accStat;
+        if (cur > 2.5 && want > 0.5) {
+          const cos = (p.vx * dvx + p.vz * dvz) / (cur * want);
+          const turn = Math.acos(clamp(cos, -1, 1)); // 0 .. PI
+          if (turn > 0.6) {
+            const pen = clamp((turn - 0.6) / 2, 0, 1) * (0.55 - agi * 0.3);
+            dvx *= 1 - pen;
+            dvz *= 1 - pen;
+            acc *= 0.65 + agi * 0.35;
+          }
+        }
+      }
       p.vx += (dvx - p.vx) * Math.min(1, dt * acc);
       p.vz += (dvz - p.vz) * Math.min(1, dt * acc);
       p.x += p.vx * dt;
@@ -972,6 +1019,7 @@ export class MatchEngine {
       if (this.lineBreakFrom === null) this.lineBreakFrom = c.x;
       else if (Math.abs(c.x - this.lineBreakFrom) > 8) {
         this.say(line('lineBreak'), 'good');
+        if (c.side === 0) this.pop('LINE BREAK!', 'good');
         this.lineBreakFrom = 1e9;
       }
     } else if (this.lineBreakFrom !== 1e9) this.lineBreakFrom = null;
@@ -1250,10 +1298,15 @@ export class MatchEngine {
 
   // ---------------------------------------------------------------- tackles
   private attemptTackle(t: P, c: P, dive: boolean) {
+    if (this.offload || c.state !== 'free') return;
     t.tackleCD = 0.5;
     if (!dive) t.fx = 'tackle';
     const evasion = c.r.strength * 0.45 + c.r.pace * 0.3 + c.r.handling * 0.25;
     let p = 0.62 + (t.r.tackling - evasion) / 110;
+    // Fresh legs win contests: a tired carrier is easier to bring down, a tired tackler misses more.
+    p += (1 - c.stamina) * 0.12 - (1 - t.stamina) * 0.1;
+    // Gang tackle: a second defender arriving makes it stick.
+    if (this.teams[t.side].some((o) => o !== t && o.state === 'free' && dist(o.x, o.z, c.x, c.z) < 2.2)) p += 0.1;
     if (dive) p += 0.08;
     if (c.handoffT > 0) p -= 0.12 + (c.r.strength - t.r.strength) / 200;
     if (c.sidestepT > 0) p -= 0.2 * (c.r.pace / 90);
@@ -1280,7 +1333,11 @@ export class MatchEngine {
     if (t.side === 0) this.stats.tackles++;
     audio.thud(big ? 1 : 0.7);
     if (t.side === 0 || c.side === 0) haptic(big ? 'bighit' : 'tackle');
-    if (big) this.say(line('bigHit'), t.side === 0 ? 'good' : 'bad');
+    if (big) {
+      this.say(line('bigHit'), t.side === 0 ? 'good' : 'bad');
+      this.pop('BIG HIT!', 'big');
+      this.hitStopT = 0.06;
+    }
     c.state = 'down';
     c.timer = 1.5; // tackled players are back on their feet after 1.5s
     this.particles.dust(c.x, c.z, big ? 1.4 : 0.7);
@@ -1304,6 +1361,56 @@ export class MatchEngine {
       return;
     }
 
+    // The user's carrier gets a split-second, in slow motion, to offload in the tackle.
+    if (c.side === 0 && c === this.controlled && !this.cfg.drill) {
+      this.offload = { c, t, left: 0.55 };
+      this.timeScale = 0.35;
+      this.emit({ type: 'hud', hud: this.hud() });
+      return;
+    }
+    // CPU ball players with good hands sometimes get the ball away in contact.
+    if (c.side === 1 && c.r.handling > 78 && rand.chance(0.12)) {
+      const tgt = this.passTarget(c, c.z < 0 ? 1 : -1, false) ?? this.passTarget(c, c.z < 0 ? -1 : 1, false);
+      if (tgt && dist(tgt.x, tgt.z, c.x, c.z) < 7) {
+        this.pop('OFFLOAD!', 'bad');
+        this.doPass(c, false, 0);
+        return;
+      }
+    }
+    this.afterContact(t, c);
+  }
+
+  /** The offload window ran out or was used. */
+  private tickOffload(dt: number) {
+    const o = this.offload;
+    if (!o) return;
+    o.left -= dt / Math.max(0.05, this.timeScale);
+    if (o.left <= 0) {
+      this.offload = null;
+      this.timeScale = 1;
+      this.emit({ type: 'hud', hud: this.hud() });
+      if (this.ball.carrier === o.c) this.afterContact(o.t, o.c);
+    }
+  }
+
+  private tryOffload(dir: -1 | 0 | 1) {
+    const o = this.offload!;
+    this.offload = null;
+    this.timeScale = 1;
+    const c = o.c;
+    const chance = clamp(0.5 + (c.r.handling - 70) / 80 + (c.r.strength - o.t.r.tackling) / 200 + this.userAssist(), 0.25, 0.85);
+    if (!rand.chance(chance)) {
+      this.pop('KNOCK-ON', 'bad');
+      this.knockOn(c);
+      return;
+    }
+    if (this.doPass(c, false, dir)) {
+      this.pop('OFFLOAD!', 'good');
+      haptic('tackle');
+    } else this.afterContact(o.t, c);
+  }
+
+  private afterContact(t: P, c: P) {
     // High tackle
     if (rand.chance(0.03)) {
       this.whistle();
@@ -1473,6 +1580,8 @@ export class MatchEngine {
 
   private knockOn(p: P) {
     this.whistle();
+    haptic('tackle');
+    if (!this.offload) this.pop('KNOCK-ON', p.side === 0 ? 'bad' : 'good');
     this.say(line('knockOn'), p.side === 0 ? 'bad' : 'good', `Scrum ${this.teamShort(other(p.side))}`);
     const b = this.ball;
     b.state = 'dead';
@@ -2164,6 +2273,7 @@ export class MatchEngine {
     const winner = rand.chance(pTurn) ? def : att;
     if (winner !== att) {
       this.say(line('turnover'), winner === 0 ? 'good' : 'bad');
+      this.pop('TURNOVER!', winner === 0 ? 'good' : 'bad');
       haptic('tackle');
     }
     // Time up: the team in possession kicks it dead if it's not behind.
@@ -3121,6 +3231,7 @@ export class MatchEngine {
     this.kickRing.scale.setScalar(1 + Math.sin(this.time * 6) * 0.06);
   }
 
+  private camZoom = 1;
   private cpos = new THREE.Vector3();
   private clook = new THREE.Vector3();
   private craw = new THREE.Vector3();
@@ -3202,9 +3313,16 @@ export class MatchEngine {
         // Low broadcast camera: ~12m behind and 7m above the carrier, looking down the pitch to the try line.
         // Steady broadcast view behind your team: follows the ball, only partly sideways, no zooming.
         // Broadcast view from behind your team: far enough back and high enough to read the whole line.
-        pos = this.cpos.set(focus.x - 20, 12, focus.z * 0.5);
-        look = this.clook.set(focus.x + 12, 0, focus.z * 0.75);
-        void tight;
+        // Lead a few metres in the direction of attack, pull back when the ball is wide,
+        // tighten in for rucks and mauls.
+        const att = dirOf(this.possession());
+        const lead = att * 4;
+        const wide = clamp((Math.abs(focus.z) - 10) / 22, 0, 1);
+        const zoom = (tight ? 0.84 : 1) * (1 + wide * 0.22);
+        this.camZoom += (zoom - this.camZoom) * Math.min(1, dt * 1.5);
+        const zz = this.camZoom;
+        pos = this.cpos.set(focus.x + lead * 0.5 - 20 * zz, 12 * zz, focus.z * 0.5);
+        look = this.clook.set(focus.x + lead + 12, 0, focus.z * 0.75);
       }
       if (b.state === 'air' && b.kicker) pos.y += Math.min(4, b.y * 0.25);
       rate = 2.4;
@@ -3218,6 +3336,13 @@ export class MatchEngine {
 }
 
 const REPLAY_SPEED = 0.45;
+/** Acceleration and agility from ratings: wingers are sharp, props are slow to get going. */
+function moveStats(p: P): { acc: number; agi: number } {
+  const r = p.r;
+  const acc = clamp(0.8 + (r.pace - 60) / 120 - (r.strength - 70) / 260, 0.7, 1.25);
+  const agi = clamp((r.pace * 0.6 + r.handling * 0.4 - 55) / 40, 0, 1);
+  return { acc, agi };
+}
 /** Orthonormal basis of the key light (it always shines along (35, -70, -45)). */
 const SHADOW_BASIS = (() => {
   const dir = new THREE.Vector3(35, -70, -45).normalize();

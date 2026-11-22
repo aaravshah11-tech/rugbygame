@@ -86,12 +86,13 @@ type BtnProps = {
   children?: React.ReactNode;
 };
 
-function ActionButton({ label, sub, size, color, pos, onDown, onMove, onUp, children }: BtnProps) {
+function ActionButton({ label, sub, size, color, pos, onDown, onMove, onUp, children, hidden }: BtnProps & { hidden?: boolean }) {
   const [on, setOn] = useState(false);
   const pid = useRef<number | null>(null);
   return (
     <button
-      className={`abtn ${size} c-${color} ${on ? 'on' : ''}`}
+      className={`abtn ${size} c-${color} ${on ? 'on' : ''} ${hidden ? 'ctx-hidden' : ''}`}
+      aria-hidden={hidden}
       style={{ right: pos.right, bottom: pos.bottom }}
       onPointerDown={(e) => {
         if (pid.current !== null) return;
@@ -204,6 +205,7 @@ const GrubIcon = () => (
 );
 
 /** Swipe left/right on the right half of the screen to dodge (sidestep). */
+/** Right-hand swipes with the ball: left/right = quick pass that way, up = sidestep. */
 export function DodgeLayer({ input }: { input: InputState }) {
   const start = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
   return (
@@ -213,11 +215,14 @@ export function DodgeLayer({ input }: { input: InputState }) {
       onPointerUp={(e) => {
         const s0 = start.current;
         start.current = null;
-        if (!s0 || s0.id !== e.pointerId) return;
+        if (!s0 || s0.id !== e.pointerId || performance.now() - s0.t > 500) return;
         const dx = e.clientX - s0.x;
         const dy = e.clientY - s0.y;
-        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3 && performance.now() - s0.t < 500) {
-          input.actions.push({ type: 'dodge', dir: dx > 0 ? 1 : -1 });
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+          input.actions.push({ type: 'pass', long: false, dir: dx > 0 ? 1 : -1 });
+          haptic('light');
+        } else if (-dy > 40 && -dy > Math.abs(dx) * 1.2) {
+          input.actions.push({ type: 'sidestep' });
           haptic('light');
         }
       }}
@@ -233,8 +238,27 @@ const AddPlayerIcon = () => (
   </svg>
 );
 
-export function ActionButtons({ input, attacking, ruck, canDrop = false }: { input: InputState; attacking: boolean; ruck: 'attack' | 'defend' | null; canDrop?: boolean }) {
+export function ActionButtons({
+  input,
+  attacking,
+  ruck,
+  canDrop = false,
+  nearDef = false,
+  offload = false,
+}: {
+  input: InputState;
+  attacking: boolean;
+  ruck: 'attack' | 'defend' | null;
+  canDrop?: boolean;
+  nearDef?: boolean;
+  offload?: boolean;
+}) {
   const passStart = useRef(0);
+  const sprint = {
+    onDown: () => (input.sprintHold = true),
+    onUp: () => (input.sprintHold = false),
+  };
+  useEffect(() => () => void (input.sprintHold = false), [input]);
 
   if (ruck) {
     return (
@@ -250,8 +274,8 @@ export function ActionButtons({ input, attacking, ruck, canDrop = false }: { inp
     return (
       <div className="actions">
         <ActionButton
-          label="Stand"
-          sub="hold to tackle"
+          label="Tackle"
+          sub="hold = chase"
           size="big"
           color="pink"
           pos={{ right: 0, bottom: 34 }}
@@ -265,31 +289,33 @@ export function ActionButtons({ input, attacking, ruck, canDrop = false }: { inp
         </ActionButton>
         <ActionButton label="Dive" size="med" color="gold" pos={{ right: 98, bottom: 0 }} onDown={() => input.actions.push({ type: 'dive' })} />
         <ActionButton label="Switch" size="sm" color="dark" pos={{ right: 110, bottom: 92 }} onDown={() => input.actions.push({ type: 'switch' })} />
+        <ActionButton label="Sprint" size="sm" color="cyan" pos={{ right: 196, bottom: 8 }} {...sprint} />
       </div>
     );
   }
 
-  const pass = (dir: -1 | 1) => ({
-    onDown: () => (passStart.current = performance.now()),
-    onUp: (_e: React.PointerEvent, cancelled: boolean) => {
-      if (cancelled) return;
-      input.actions.push({ type: 'pass', long: performance.now() - passStart.current > 320, dir });
-    },
-  });
-
   return (
     <div className="actions">
-      <ActionButton label="Pass" sub="hold = long" size="big" color="neon" pos={{ right: 104, bottom: 0 }} {...pass(-1)}>
-        <PassIcon dir={-1} />
-      </ActionButton>
-      <ActionButton label="Pass" sub="hold = long" size="big" color="neon" pos={{ right: 0, bottom: 46 }} {...pass(1)}>
+      <ActionButton
+        label={offload ? 'Offload!' : 'Pass'}
+        sub={offload ? 'in the tackle' : 'hold = long'}
+        size="big"
+        color={offload ? 'gold' : 'neon'}
+        pos={{ right: 0, bottom: 40 }}
+        onDown={() => (passStart.current = performance.now())}
+        onUp={(_e, cancelled) => {
+          if (cancelled) return;
+          // dir 0: the engine passes to the side the joystick points, or the best-placed runner
+          input.actions.push({ type: 'pass', long: !offload && performance.now() - passStart.current > 320, dir: 0 });
+        }}
+      >
         <PassIcon dir={1} />
       </ActionButton>
-      <KickButton input={input} kind="punt" pos={{ right: 14, bottom: 146 }} />
-      <KickButton input={input} kind="grubber" pos={{ right: 112, bottom: 96 }} />
-      {canDrop && (
-        <ActionButton label="Drop goal" size="sm" color="cyan" pos={{ right: 96, bottom: 158 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
-      )}
+      <ActionButton label="Sprint" size="med" color="cyan" pos={{ right: 104, bottom: 0 }} {...sprint} />
+      <KickButton input={input} kind="punt" pos={{ right: 14, bottom: 150 }} />
+      <KickButton input={input} kind="grubber" pos={{ right: 112, bottom: 100 }} />
+      <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 200, bottom: 12 }} onDown={() => input.actions.push({ type: 'handoff' })} />
+      <ActionButton label="Drop goal" size="sm" color="cyan" hidden={!canDrop} pos={{ right: 206, bottom: 96 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
     </div>
   );
 }

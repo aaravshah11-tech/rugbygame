@@ -23,7 +23,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null,
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false,
 };
 
 export function MatchScreen({
@@ -51,6 +51,7 @@ export function MatchScreen({
   const [paused, setPaused] = useState(false);
   const [plays, setPlays] = useState(false);
   const [drill, setDrill] = useState<{ text: string; progress: string } | null>(null);
+  const [pops, setPops] = useState<{ id: number; text: string; tone: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
   const [replay, setReplay] = useState(false);
@@ -106,6 +107,12 @@ export function MatchScreen({
         case 'drill':
           setDrill({ text: e.text, progress: e.progress });
           break;
+        case 'pop': {
+          const id = ++commId.current;
+          setPops((p) => [...p.slice(-1), { id, text: e.text, tone: e.tone }]);
+          setTimeout(() => setPops((p) => p.filter((x) => x.id !== id)), 1100);
+          break;
+        }
         case 'drillDone':
           if (finished.current) return;
           finished.current = true;
@@ -223,10 +230,15 @@ export function MatchScreen({
             <span className="rec" /> REPLAY <small>tap to skip</small>
           </button>
         )}
+        {pops.map((p) => (
+          <div key={p.id} className={`pop-text pop-${p.tone}`}>
+            {p.text}
+          </div>
+        ))}
         {hud.scrum && !mini && <ScrumBattle s={hud.scrum} input={input.current} userShort={cfg.user.short} cpuShort={cfg.cpu.short} />}
         {showControls && <Joystick input={input.current} />}
         {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
-        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} canDrop={hud.canDrop} />}
+        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}
         {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} onDone={() => {}} />}

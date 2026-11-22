@@ -66,6 +66,10 @@ export interface HudState {
   ruck: 'attack' | 'defend' | null;
   canDrop: boolean;
   mph: number;
+  /** a defender is close enough for a hand-off */
+  nearDef: boolean;
+  /** offload window open: PASS now to offload in the tackle */
+  offload: boolean;
   /** live scrum push battle: bal -1 (CPU driving) .. +1 (user driving) */
   scrum: null | { bal: number; t: number; dur: number; choose: boolean; userFeed: boolean };
 }
@@ -93,6 +97,7 @@ export type EngineEvent =
   | { type: 'try'; scorer: string; team: string; userScored: boolean }
   | { type: 'replay'; active: boolean }
   | { type: 'drill'; text: string; progress: string }
+  | { type: 'pop'; text: string; tone: 'good' | 'bad' | 'big' }
   | { type: 'drillDone'; score: number; total: number };
 
 export type InputAction =
@@ -116,6 +121,8 @@ export interface InputState {
   moveX: number;
   moveY: number;
   sprint: boolean;
+  /** SPRINT button held */
+  sprintHold: boolean;
   /** TACKLE held: chase the carrier and tackle when in range */
   tackleHold: boolean;
   /** live kick aim while the kick button is held */
@@ -128,6 +135,7 @@ export const createInput = (): InputState => ({
   moveX: 0,
   moveY: 0,
   sprint: false,
+  sprintHold: false,
   tackleHold: false,
   kickAim: { active: false, kind: 'punt', dist: 32, angle: 0 },
   actions: [],

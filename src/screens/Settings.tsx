@@ -78,7 +78,7 @@ export function Settings({ go }: { go: Go }) {
               <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Camera angle</div>
               <Seg<CameraMode>
                 value={s.camera}
-                options={[{ v: 'broadcast', label: 'Broadcast' }, { v: 'sideline', label: 'Sideline' }, { v: 'close', label: 'Close' }]}
+                options={[{ v: 'broadcast', label: 'Broadcast' }, { v: 'close', label: 'Behind' }, { v: 'sideline', label: 'Side-on' }]}
                 onChange={(v) => update((x) => (x.settings.camera = v))}
               />
             </div>
