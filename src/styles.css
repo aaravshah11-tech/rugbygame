@@ -2593,3 +2593,39 @@ input[type='email'] {
   right: auto;
   left: calc(var(--sal, 0px) + 150px);
 }
+
+.kick-target {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  border: 3px solid #ffcf3a;
+  box-shadow: 0 0 12px rgba(255, 207, 58, 0.8);
+  pointer-events: none;
+}
+
+.base-tag {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat, 0px) + 84px);
+  transform: translateX(-50%);
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(11, 15, 23, 0.8);
+  box-shadow: inset 0 0 0 2px #c6ff1a;
+  font-size: 13px;
+  font-style: italic;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.base-tag b {
+  color: #c6ff1a;
+  margin-right: 6px;
+}
+.base-tag.wait {
+  box-shadow: inset 0 0 0 2px #ffb020;
+  color: #ffb020;
+  font-weight: 800;
+  animation: blink 0.8s infinite;
+}

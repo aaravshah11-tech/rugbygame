@@ -113,6 +113,12 @@ export interface HudState {
   wind: { deg: number; kmh: number };
   /** the carrier is the scrum-half (box kick available) */
   isNine: boolean;
+  /** your scrum-half has the ball at the base of a ruck */
+  atBase: boolean;
+  /** ruck ball is ready but your 9 is still getting there */
+  nineWait: boolean;
+  /** lining up a penalty kick to touch: show the kick aim */
+  penTouch: boolean;
   /** offload window open: PASS now to offload in the tackle */
   offload: boolean;
   /** live scrum push battle: bal -1 (CPU driving) .. +1 (user driving) */
@@ -165,7 +171,7 @@ export type EngineEvent =
 
 export type InputAction =
   | { type: 'pass'; long: boolean; dir: -1 | 0 | 1 }
-  | { type: 'kick'; kind: KickKind; dist: number; angle: number; power?: number }
+  | { type: 'kick'; kind: KickKind; dist: number; angle: number; power?: number; tx?: number; tz?: number }
   | { type: 'catch' }
   | { type: 'dropgoal' }
   | { type: 'sidestep' }
@@ -179,6 +185,9 @@ export type InputAction =
   | { type: 'ruckFan' }
   | { type: 'scrumPlay'; play: 'left' | 'right' | 'pick' | 'nine' }
   | { type: 'call'; id: string }
+  | { type: 'basePass'; dir: -1 | 1 }
+  | { type: 'pickGo' }
+  | { type: 'snipe' }
   | { type: 'dodge'; dir: -1 | 1 }
   | { type: 'setplay'; id: SetPlayId };
 

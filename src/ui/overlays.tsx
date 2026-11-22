@@ -59,7 +59,7 @@ export function Commentary({ items }: { items: Comm[] }) {
 }
 
 // ---------------------------------------------------------------- mini-games (swipe gestures)
-type SwipeDir = 'up' | 'down';
+type SwipeDir = 'up' | 'down' | 'any';
 interface MiniSpec {
   title: string;
   hint: string;
@@ -77,7 +77,7 @@ interface MiniSpec {
 const MINI: Record<MiniGameRequest['kind'], MiniSpec> = {
   scrum: { title: 'Scrum', hint: 'Swipe UP on "SET" when the marker is in the green', dir: 'up', timed: true, calls: true },
   scrumDefend: { title: 'Scrum', hint: 'Swipe UP in the green to drive against their put-in', dir: 'up', timed: true, calls: true },
-  lineout: { title: 'Lineout', hint: 'Pick your jumper, then swipe DOWN in the green to throw', dir: 'down', timed: true, pick: true },
+  lineout: { title: 'Lineout throw', hint: 'TAP or SWIPE when the marker hits the green', dir: 'any', timed: true },
   lineoutDefend: { title: 'Contest the lineout', hint: 'Choose a range to contest: guess where they will throw', dir: 'up', timed: false, guess: true },
   ruck: { title: 'Ruck', hint: 'Swipe UP in the green to secure quick ball', dir: 'up', timed: true },
   counterRuck: { title: 'Contest the ruck', hint: 'Swipe UP fast to jackal the ball', dir: 'up', timed: false },
@@ -166,7 +166,7 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
 
   const onSwipe = (dy: number, ms: number) => {
     if (done.current || !ready || spec.guess) return;
-    const okDir = spec.dir === 'up' ? dy > 40 : dy < -40;
+    const okDir = spec.dir === 'any' ? true : spec.dir === 'up' ? dy > 40 : dy < -40;
     if (!okDir) {
       setNudge(spec.dir === 'up' ? 'Swipe UP ↑' : 'Swipe DOWN ↓');
       return;
@@ -201,7 +201,7 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
   };
 
   const calls = ['CROUCH', 'BIND', 'SET'];
-  const arrow = spec.dir === 'up' ? '↑' : '↓';
+  const arrow = spec.dir === 'any' ? 'TAP' : spec.dir === 'up' ? '↑' : '↓';
 
   const handlers = {
     onPointerDown: (e: React.PointerEvent) => {

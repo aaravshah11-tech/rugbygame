@@ -103,6 +103,8 @@ interface Ball {
   kickFromX: number;
   bounced: boolean;
   goalCheck: null | { side: Side; kind: 'drop' | 'conversion' | 'penalty' | 'drill' };
+  /** kicked to touch from a penalty: the kicking team throws in wherever it goes out */
+  penTouch?: boolean;
   wind: boolean;
   grubber: boolean;
   hopT: number;
@@ -243,7 +245,7 @@ export class MatchEngine {
   private waitingBlocking = false;
   private miniId = 0;
   private activeMini: { id: number; kind: MiniGameKind; q: number | null; taps: number; done: boolean } | null = null;
-  private ruck: null | { x: number; z: number; att: Side; t: number; dur: number; progress: number; addAtt: number; addDef: number; contest: number; fan: boolean; userDef: 'none' | 'contest' | 'fan' } = null;
+  private ruck: null | { x: number; z: number; att: Side; t: number; dur: number; progress: number; addAtt: number; addDef: number; contest: number; fan: boolean; userDef: 'none' | 'contest' | 'fan'; nineWait?: boolean } = null;
   private ruckArc: THREE.Mesh | null = null;
   private ruckArcBg: THREE.Mesh | null = null;
   private pendingSetPlay: SetPlayId | null = null;
@@ -703,13 +705,16 @@ export class MatchEngine {
       case 'maul':
         this.updateMaul(dt);
         break;
+      case 'lineout':
+        this.updateLineoutThrow(dt);
+        if (!this.loThrow && (this.ball.state === 'air' || this.ball.state === 'ground')) this.updateBallPhysics(dt);
+        break;
       case 'scrum':
         if (this.scrum) this.updateScrum(dt);
         else if (this.ball.state === 'air' || this.ball.state === 'ground') this.updateBallPhysics(dt);
         break;
       case 'placekick':
       case 'dead':
-      case 'lineout':
         if (this.ball.state === 'air' || this.ball.state === 'ground') this.updateBallPhysics(dt);
         break;
       default:
@@ -753,6 +758,9 @@ export class MatchEngine {
       canDrop: this.canDropGoal(),
       nearDef: !!(c && this.ball.carrier === c && c.side === 0 && this.phase === 'play' && this.nearestOpponent(c, 3.2)),
       offload: !!this.offload,
+      penTouch: !!this.penTouch,
+      atBase: !!(c && this.atBaseT >= 0 && this.ball.carrier === c && c.side === 0 && this.phase === 'play'),
+      nineWait: !!(this.ruck && this.ruck.att === 0 && this.ruck.nineWait),
       catchPrompt: this.catchPrompt(),
       advantage: this.advantage ? (this.advantage.side === 0 ? 'user' : 'cpu') : null,
       sinBin: this.binned.map((b) => {
@@ -819,7 +827,31 @@ export class MatchEngine {
         if (this.scrum && this.scrum.stage === 'choose') this.scrumPlay(a.play);
         break;
       case 'kick':
-        if (userHasBall && live) this.userKick(c!, a.kind, a.dist, a.angle, a.power ?? 0.85);
+        // the landing spot comes from where the user touched the pitch
+        if (this.kickTarget) {
+          a.tx = this.kickTarget.x;
+          a.tz = this.kickTarget.z;
+        } else a.tx = a.tz = undefined;
+        if (this.penTouch) this.penaltyTouchKick(a);
+        else if (userHasBall && live) this.userKick(c!, a.kind, a.dist, a.angle, a.power ?? 0.85, a.tx, a.tz);
+        this.kickTarget = null;
+        break;
+      case 'basePass':
+        if (c && userHasBall && this.atBaseT >= 0) {
+          this.atBaseT = -1;
+          this.doPass(c, false, a.dir, true);
+        }
+        break;
+      case 'pickGo':
+        if (c && userHasBall && this.atBaseT >= 0) this.pickAndGo(c);
+        break;
+      case 'snipe':
+        if (c && userHasBall && this.atBaseT >= 0) {
+          this.atBaseT = -1;
+          c.vx = dirOf(c.side) * 4;
+          c.sidestepCD = 0;
+          this.pop('SNIPE!', 'good');
+        }
         break;
       case 'call':
         this.resolveCall(a.id);
@@ -1485,7 +1517,16 @@ export class MatchEngine {
       // The CPU scrum-half waits for its line to set before passing.
       if (c.side === 1 && this.atBaseT > 1.4 && (this.attackSpread(1) < 3 || this.atBaseT > 3.2)) {
         this.atBaseT = -1;
-        this.doPass(c, rand.chance(0.25), 0);
+        const toLine = FIELD.tryX - c.x * d;
+        const ownHalf = c.x * d < 0;
+        const kickK = { low: 0.5, balanced: 1, territory: 1.8 }[this.tac[1].kicking];
+        if (toLine < 6 && rand.chance(0.45)) this.pickAndGo(c);
+        else if (ownHalf && rand.chance(0.16 * kickK)) {
+          this.kickTo(c, rand.range(20, 30), rand.range(-0.25, 0.25), 'box');
+          this.say('Box kick', 'info');
+        } else if (!this.nearestOpponent(c, 4.5) && rand.chance(0.12)) {
+          c.vx = d * 4; // snipe round the fringe
+        } else this.doPass(c, rand.chance(0.2), 0, true);
       }
       return;
     }
@@ -1721,7 +1762,7 @@ export class MatchEngine {
     return farther[Math.min(1, farther.length - 1)] ?? c[c.length - 1];
   }
 
-  private doPass(passer: P, long: boolean, dirHint: -1 | 0 | 1): boolean {
+  private doPass(passer: P, long: boolean, dirHint: -1 | 0 | 1, spin = false): boolean {
     let side = 0;
     if (dirHint !== 0) side = dirHint * this.camRightSign();
     else if (passer === this.controlled && Math.abs(this.input.moveX) > 0.3) side = Math.sign(this.input.moveX) * this.camRightSign();
@@ -1758,7 +1799,7 @@ export class MatchEngine {
       this.stoppage(() => this.setupScrum(x, z, other(passer.side)));
       return true;
     }
-    const speed = long ? 19 : 15; // crisp, flat passes
+    const speed = spin ? 19 : long ? 19 : 15; // crisp, flat passes; the 9's spin pass is fizzed
     const T = clamp(distTo / speed, 0.25, 1.6);
     // aim at where the receiver will be
     let tx = target.x + target.vx * T;
@@ -1852,6 +1893,7 @@ export class MatchEngine {
     const changed = b.lastSide !== p.side;
     if (changed) this.phaseCount = 0;
     b.grubber = false;
+    b.penTouch = false;
     if (b.state === 'pass' || b.state === 'air') p.fx = 'catch';
     b.state = 'held';
     b.carrier = p;
@@ -1959,6 +2001,77 @@ export class MatchEngine {
   }
 
   private catchPressT = -9;
+  private penTouch: null | { kicker: P } = null;
+  private loGeo = { x: 0, s: 1 };
+  private loThrow: null | { t: number; dur: number; from: { x: number; z: number }; to: { x: number; z: number }; jumper: P; rival: P; wobble: boolean } = null;
+  /** Lineout throw in flight: jumpers lifted, ball arcing in from touch. */
+  private updateLineoutThrow(dt: number) {
+    const lt = this.loThrow;
+    if (!lt) return;
+    lt.t += dt;
+    const u = Math.min(1, lt.t / lt.dur);
+    // lifters get the jumper up early (by 60% of the flight), the rival a touch later
+    const lift = (k: number) => 1.4 * Math.min(1, Math.max(0, (u - k) / 0.45));
+    lt.jumper.av.root.position.y = lift(0.05);
+    lt.rival.av.root.position.y = lift(0.2) * 0.85;
+    const b = this.ball;
+    b.state = 'dead';
+    b.carrier = null;
+    b.x = lt.from.x + (lt.to.x - lt.from.x) * u + (lt.wobble ? Math.sin(u * 9) * 0.25 : 0);
+    b.z = lt.from.z + (lt.to.z - lt.from.z) * u;
+    b.y = 2 + (3.1 - 2) * u + Math.sin(u * Math.PI) * 2.2;
+  }
+  private penaltyTouchKick(a: Extract<InputAction, { type: 'kick' }>) {
+    const k = this.penTouch!.kicker;
+    this.penTouch = null;
+    const d0 = dirOf(0);
+    let dist = a.dist;
+    let aim = 0;
+    if (a.tx !== undefined && a.tz !== undefined) {
+      dist = Math.min(Math.hypot(a.tx - k.x, a.tz - k.z), KICK_MAX.touch);
+      aim = Math.atan2(a.tz - k.z, (a.tx - k.x) * d0);
+    }
+    const pw = a.power ?? 0.85;
+    this.kickTo(k, dist * (pw < 0.6 ? 0.55 + pw * 0.75 : 1), aim, 'touch', false, pw > 1 ? 1 + (pw - 1) * 5 : 1);
+    this.ball.penTouch = true;
+    this.phase = 'play';
+    this.phaseT = 0;
+    this.assignSlots();
+  }
+  /** where the user has pointed on the pitch for the current kick */
+  private kickTarget: { x: number; z: number } | null = null;
+  private raycaster = new THREE.Raycaster();
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  /** The player about to kick: the carrier, or the penalty kicker lining up a kick to touch. */
+  private kickerNow(): P | null {
+    if (this.penTouch) return this.penTouch.kicker;
+    const c = this.controlled;
+    return c && this.ball.carrier === c ? c : null;
+  }
+  /** Point on the pitch under a screen position (for aiming kicks). Returns metres to it from the kicker. */
+  aimKickAt(clientX: number, clientY: number, kind: KickKind): number | null {
+    const k = this.kickerNow();
+    if (!k) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.tmpV2);
+    if (!hit) return null;
+    // keep it within the kick's range
+    const max = KICK_MAX[kind];
+    let dx = hit.x - k.x;
+    let dz = hit.z - k.z;
+    const L = Math.hypot(dx, dz);
+    if (L > max) {
+      dx *= max / L;
+      dz *= max / L;
+    }
+    this.kickTarget = { x: k.x + dx, z: k.z + dz };
+    return Math.min(L, max);
+  }
+  clearKickTarget() {
+    this.kickTarget = null;
+  }
   /** penalty count multiplier by rules mode */
   private strict(): number {
     return { arcade: 0.45, standard: 1, sim: 1.5 }[this.cfg.rules];
@@ -2034,12 +2147,17 @@ export class MatchEngine {
     this.emit({ type: 'hud', hud: this.hud() });
   }
   /** Kick from the picker: power under ~0.6 falls short, over 1 (held too long) sprays it. */
-  private userKick(c: P, kind: KickKind, dist: number, angle: number, power: number) {
+  private userKick(c: P, kind: KickKind, dist: number, angle: number, power: number, tx?: number, tz?: number) {
     if (kind === 'box' && c.num !== 9) kind = 'high';
     const short = power < 0.6 ? 0.55 + power * 0.75 : 1;
     const errMul = power > 1 ? 1 + (power - 1) * 5 : power < 0.35 ? 1.4 : 1;
     let aim = ((angle * Math.PI) / 180) * this.camRightSign();
-    if (kind === 'touch') {
+    const d0 = dirOf(c.side);
+    if (tx !== undefined && tz !== undefined) {
+      // kick to the spot the user touched on the pitch
+      dist = Math.min(Math.hypot(tx - c.x, tz - c.z), KICK_MAX[kind]);
+      aim = Math.atan2(tz - c.z, (tx - c.x) * d0);
+    } else if (kind === 'touch') {
       // Find touch: aim to land just over the nearer touchline.
       const sgn = c.z >= 0 ? 1 : -1;
       const dz = sgn * (FIELD.halfW + 2) - c.z;
@@ -2164,9 +2282,14 @@ export class MatchEngine {
     // touch
     if (Math.abs(b.z) > FIELD.halfW) {
       const kicker = b.kicker;
-      const throwSide = other(b.lastSide);
+      let throwSide = other(b.lastSide);
       let x = b.x;
-      if (kicker && !b.bounced && kicker.x * dirOf(kicker.side) > -28) x = b.kickFromX; // out on the full
+      if (b.penTouch) {
+        // penalty kicked to touch: the kicking side throws in where it went out
+        throwSide = b.lastSide;
+        b.penTouch = false;
+        if (throwSide === 0) this.pop('FOUND TOUCH!', 'good');
+      } else if (kicker && !b.bounced && kicker.x * dirOf(kicker.side) > -28) x = b.kickFromX; // out on the full
       this.whistle();
       this.say('Ball in touch', 'info', `Lineout ${this.teamShort(throwSide)}`);
       const sign = Math.sign(b.z);
@@ -2509,6 +2632,27 @@ export class MatchEngine {
     return free[0] ?? nine;
   }
 
+  /** A forward from the pod picks up from the base and drives. */
+  private pickAndGo(nine: P) {
+    const d = dirOf(nine.side);
+    const fwd = this.teams[nine.side]
+      .filter((p) => p.num <= 8 && p.state === 'free')
+      .sort((p, q) => dist(p.x, p.z, nine.x, nine.z) - dist(q.x, q.z, nine.x, nine.z))[0];
+    this.atBaseT = -1;
+    if (!fwd || dist(fwd.x, fwd.z, nine.x, nine.z) > 7) {
+      this.doPass(nine, false, 0, true);
+      return;
+    }
+    this.place(fwd, nine.x + d * 0.6, nine.z + 0.4);
+    fwd.vx = d * 3.5;
+    this.giveBall(fwd);
+    if (nine.side === 0) {
+      this.controlled = fwd;
+      this.nameFor = null;
+    }
+    this.say('Pick and go', 'info', fwd.name);
+  }
+
   private releaseRuck() {
     let n = 0;
     for (const p of this.players) if (p.state === 'bound') {
@@ -2524,7 +2668,12 @@ export class MatchEngine {
     const nx = x - d * 2.1;
     const nine = this.nineOf(side, nx, z);
     nine.state = 'free';
-    this.place(nine, nx, z);
+    if (dist(nine.x, nine.z, nx, z) > 2.5) this.place(nine, nx, z);
+    else {
+      // already there: settle onto the spot without a jump
+      nine.tx = nine.gx = nx;
+      nine.tz = nine.gz = z;
+    }
     nine.heading = d > 0 ? 0 : Math.PI; // crouched behind the ruck, facing it
     nine.vx = nine.vz = 0;
     this.giveBall(nine);
@@ -2619,7 +2768,7 @@ export class MatchEngine {
     const openWing = open === leftSign ? 11 : 14;
     const blindWing = openWing === 11 ? 14 : 11;
     const backSpots: Record<number, [number, number]> = {
-      9: [1.3, 0.7],
+      9: [2.1, 0],
       10: [6, 8],
       12: [7.5, 14],
       13: [9, 20],
@@ -2660,7 +2809,7 @@ export class MatchEngine {
     for (const [p, t] of spots) {
       p.tx = t.x;
       p.tz = t.z;
-      p.urgency = 0.9;
+      p.urgency = p.num === 9 && p.side === att ? 1 : 0.9; // the scrum-half sprints to the base
       total += dist(p.x, p.z, t.x, t.z);
       count++;
     }
@@ -2676,7 +2825,12 @@ export class MatchEngine {
     this.updateRuckArc(r);
     const spread = this.positionAroundBreakdown(r.x, r.z, r.att);
     const settled = spread < 2.5 || (r.progress >= 1 && r.t > dur + 1.5);
-    if (r.progress >= 1 && settled) this.resolveRuck();
+    // The ball stays in the ruck until the scrum-half gets there (a stand-in takes it if he's miles away).
+    const nine = this.teams[r.att][8];
+    const base = { x: r.x - dirOf(r.att) * 2.1, z: r.z };
+    const nineReady = nine.state !== 'free' || dist(nine.x, nine.z, base.x, base.z) < 1.8 || r.t > dur + 3.5;
+    r.nineWait = r.progress >= 1 && !nineReady;
+    if (r.progress >= 1 && settled && nineReady) this.resolveRuck();
   }
 
   private resolveRuck() {
@@ -3076,6 +3230,9 @@ export class MatchEngine {
     ball.x = lx;
     ball.z = s * 35.6;
     ball.y = 1.3;
+    this.loGeo = { x: lx, s };
+    // hooker ready to throw, ball above the head
+    this.teams[throwSide][1].heading = s > 0 ? -Math.PI / 2 : Math.PI / 2;
     this.controlled = this.teams[0][1];
     ball.lastSide = throwSide;
     this.say('Lineout', 'info', `${this.teamShort(throwSide)} throw`);
@@ -3096,23 +3253,29 @@ export class MatchEngine {
     const pWin = throwSide === 0 ? 0.55 + 0.42 * q : 1 - (0.92 - 0.5 * q);
     const winner: Side = rand.chance(pWin) ? 0 : 1;
     if (winner !== throwSide) this.say('Lineout stolen!', winner === 0 ? 'good' : 'bad');
+    else if (throwSide === 0) this.pop(q > 0.8 ? 'CLEAN TAKE!' : 'TAKEN', 'good');
     const jumper = this.teams[winner][3];
-    // lift the jumper briefly
-    jumper.av.root.position.y = 1.2;
+    const rival = this.teams[other(winner)][3];
     const d = dirOf(winner);
     const distToLine = FIELD.tryX - x * d;
-    this.after(0.6, () => {
+    // the throw: ball flies from the hooker to the lifted jumper
+    const hooker = this.teams[throwSide][1];
+    this.loThrow = { t: 0, dur: 0.7, from: { x: hooker.x, z: hooker.z }, to: { x: jumper.x, z: jumper.z }, jumper, rival, wobble: q < 0.5 };
+    hooker.fx = 'pass';
+    this.after(0.85, () => {
       this.camMode = 'game';
+      this.loThrow = null;
       jumper.av.root.position.y = 0;
+      rival.av.root.position.y = 0;
       // Your throw, your call: off the top, maul or peel.
       if (winner === 0 && throwSide === 0) {
-        jumper.av.root.position.y = 1.2;
+        jumper.av.root.position.y = 1.4;
         this.openCall(
-          'LINEOUT WON — CALL IT',
+          'BALL WON AT THE TOP',
           [
-            { id: 'top', label: 'Off the top', sub: 'quick ball to the 9' },
-            { id: 'maul', label: 'Maul', sub: distToLine < 25 ? 'drive for the line' : 'set the drive' },
-            { id: 'peel', label: 'Peel', sub: 'forward runs round' },
+            { id: 'top', label: 'PASS', sub: 'off the top to the 9' },
+            { id: 'peel', label: 'RUN', sub: 'peel round the tail' },
+            { id: 'maul', label: 'MAUL', sub: distToLine < 25 ? 'drive for the line' : 'set the drive' },
           ],
           distToLine < 22 ? 'maul' : 'top',
           3.5,
@@ -3181,7 +3344,19 @@ export class MatchEngine {
     this.ball.lastSide = side;
     const go = (c: PenaltyChoice) => {
       if (c === 'goal') this.setupPlaceKick(side, 'penalty', px, pz);
-      else if (c === 'touch') {
+      else if (c === 'touch' && side === 0) {
+        // You take the kick: touch the pitch where you want it to go out.
+        const kicker = [...this.teams[0]].sort((a, b) => b.r.kicking - a.r.kicking)[0];
+        this.place(kicker, px, pz);
+        kicker.heading = 0;
+        this.ball.carrier = kicker;
+        this.ball.state = 'held';
+        this.controlled = kicker;
+        this.penTouch = { kicker };
+        this.camMode = 'game';
+        this.say('Kick for touch', 'info', 'Touch the pitch where you want it to go out');
+        this.emit({ type: 'hud', hud: this.hud() });
+      } else if (c === 'touch') {
         this.say('Kick to touch', 'info');
         audio.kick();
         this.after(1, () => this.setupLineout(clamp(px + d * 24, -44, 44), pz >= 0 ? 1 : -1, side));
@@ -3704,7 +3879,6 @@ export class MatchEngine {
 
   private updateArc() {
     const ka = this.input.kickAim;
-    const c = this.controlled;
     const pos = this.arc.geometry.attributes.position as THREE.BufferAttribute;
     if (this.phase === 'placekick' && this.placeSide === 0 && this.ball.state === 'dead') {
       // Aim line for place kicks
@@ -3721,17 +3895,23 @@ export class MatchEngine {
       this.arc.visible = true;
       return;
     }
-    if (!ka.active || !c || this.ball.carrier !== c) {
+    const kk = this.kickerNow();
+    if (!ka.active || !kk) {
       this.arc.visible = false;
       this.kickRing.visible = false;
       return;
     }
     // Preview the actual flight (no skill error): arc + landing ring.
-    const aim = ((ka.angle * Math.PI) / 180) * this.camRightSign();
-    const v = this.kickVelocity(ka.dist, aim, c.side, ka.kind);
-    let x = c.x + dirOf(c.side) * 0.5;
+    let aim = ((ka.angle * Math.PI) / 180) * this.camRightSign();
+    let kdist = ka.dist;
+    if (this.kickTarget) {
+      kdist = Math.hypot(this.kickTarget.x - kk.x, this.kickTarget.z - kk.z);
+      aim = Math.atan2(this.kickTarget.z - kk.z, (this.kickTarget.x - kk.x) * dirOf(kk.side));
+    }
+    const v = this.kickVelocity(kdist, aim, kk.side, ka.kind);
+    let x = kk.x + dirOf(kk.side) * 0.5;
     let y = 0.7;
-    let z = c.z;
+    let z = kk.z;
     let vx = v.vx;
     let vz = v.vz;
     let vy = v.vy;
@@ -3935,7 +4115,13 @@ export class MatchEngine {
       look = this.clook.set(d * FIELD.tryX, 4.5, 0);
       if (flying) look = new THREE.Vector3(b.x, b.y, b.z).lerp(look, 0.4);
       rate = flying ? 3 : 5;
-    } else if (this.camMode === 'setpiece' && (this.phase === 'scrum' || this.phase === 'lineout')) {
+    } else if (this.camMode === 'setpiece' && this.phase === 'lineout') {
+      // from beyond the touchline, behind the thrower, looking down the line of jumpers
+      const { x: lx, s: sg } = this.loGeo;
+      pos = this.cpos.set(lx - 6.5, 4.6, sg * (FIELD.halfW + 9));
+      look = this.clook.set(lx + 1, 1.8, sg * 26);
+      rate = 3.5;
+    } else if (this.camMode === 'setpiece' && this.phase === 'scrum') {
       pos = this.cpos.set(b.x - 9, 4.5, b.z + (b.z > 0 ? -5 : 5));
       look = this.clook.set(b.x + 2, 0.8, b.z);
     } else {
@@ -3974,6 +4160,8 @@ export class MatchEngine {
 }
 
 const REPLAY_SPEED = 0.45;
+/** Longest landing distance for each kick type (metres). */
+const KICK_MAX: Record<KickKind, number> = { punt: 60, box: 38, grubber: 32, chip: 20, high: 44, touch: 62, cross: 50 };
 /** Acceleration and agility from ratings: wingers are sharp, props are slow to get going. */
 function moveStats(p: P): { acc: number; agi: number } {
   const r = p.r;

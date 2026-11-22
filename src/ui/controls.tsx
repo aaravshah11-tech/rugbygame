@@ -199,6 +199,8 @@ export function ActionButtons({
   ruckDef = 'none',
   ruckBall = null,
   onKick,
+  atBase = false,
+  onBoxKick,
 }: {
   input: InputState;
   attacking: boolean;
@@ -209,6 +211,8 @@ export function ActionButtons({
   ruckDef?: 'none' | 'contest' | 'fan';
   ruckBall?: 'quick' | 'slow' | 'danger' | null;
   onKick?: () => void;
+  atBase?: boolean;
+  onBoxKick?: () => void;
 }) {
   const passStart = useRef(0);
   const sprint = {
@@ -274,6 +278,25 @@ export function ActionButtons({
     );
   }
 
+  if (atBase) {
+    // Scrum-half at the base: spin pass either way, box kick, pick and go, or snipe.
+    return (
+      <div className="actions base-actions">
+        <ActionButton label="Pass" sub="spin left" size="big" color="neon" pos={{ right: 104, bottom: 0 }} onDown={() => input.actions.push({ type: 'basePass', dir: -1 })}>
+          <PassIcon dir={-1} />
+        </ActionButton>
+        <ActionButton label="Pass" sub="spin right" size="big" color="neon" pos={{ right: 0, bottom: 40 }} onDown={() => input.actions.push({ type: 'basePass', dir: 1 })}>
+          <PassIcon dir={1} />
+        </ActionButton>
+        <ActionButton label="Box kick" sub="aim it" size="med" color="gold" pos={{ right: 14, bottom: 150 }} onDown={() => onBoxKick?.()}>
+          <KickIcon />
+        </ActionButton>
+        <ActionButton label="Pick & go" size="sm" color="pink" pos={{ right: 112, bottom: 104 }} onDown={() => input.actions.push({ type: 'pickGo' })} />
+        <ActionButton label="Snipe" size="sm" color="cyan" pos={{ right: 200, bottom: 12 }} onDown={() => input.actions.push({ type: 'snipe' })} />
+      </div>
+    );
+  }
+
   return (
     <div className="actions">
       <ActionButton
@@ -311,17 +334,38 @@ export const KICKS: { kind: KickKind; label: string; desc: string; def: number; 
   { kind: 'punt', label: 'Long kick', desc: 'for territory', def: 40, min: 15, max: 58 },
 ];
 
-/** Kick picker: choose a kick, then drag to aim and hold to build power; let go to kick. */
-export function KickPicker({ input, isNine, onClose }: { input: InputState; isNine: boolean; onClose: () => void }) {
-  const [armed, setArmed] = useState<(typeof KICKS)[number] | null>(null);
+/**
+ * Kick picker: choose a kick, then touch the pitch where you want it to land.
+ * Hold to build power (green = right, red = overcooked), drag to move the spot, let go to kick.
+ */
+export function KickPicker({
+  input,
+  isNine,
+  onClose,
+  aimAt,
+  preset,
+}: {
+  input: InputState;
+  isNine: boolean;
+  onClose: () => void;
+  /** screen point -> metres to the landing spot (or null if off the pitch) */
+  aimAt: (x: number, y: number, kind: KickKind) => number | null;
+  /** start already armed with this kick (penalty to touch) and no cancel */
+  preset?: KickKind;
+}) {
+  const [armed, setArmed] = useState<(typeof KICKS)[number] | null>(preset ? KICKS.find((k) => k.kind === preset)! : null);
   const [power, setPower] = useState(0);
-  const [dist, setDist] = useState(0);
-  const st = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
+  const [dist, setDist] = useState<number | null>(null);
+  const st = useRef<{ t: number; id: number } | null>(null);
   const raf = useRef(0);
-  useEffect(() => () => {
-    cancelAnimationFrame(raf.current);
-    input.kickAim.active = false;
-  }, [input]);
+  const target = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (preset) Object.assign(input.kickAim, { active: true, kind: preset, dist: 30, angle: 0 });
+    return () => {
+      cancelAnimationFrame(raf.current);
+      input.kickAim.active = false;
+    };
+  }, [input, preset]);
   if (!armed) {
     return (
       <div className="kick-picker" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -333,7 +377,6 @@ export function KickPicker({ input, isNine, onClose }: { input: InputState; isNi
               onPointerDown={() => {
                 haptic('light');
                 setArmed(k);
-                setDist(k.def);
                 Object.assign(input.kickAim, { active: true, kind: k.kind, dist: k.def, angle: 0 });
               }}
             >
@@ -349,11 +392,19 @@ export function KickPicker({ input, isNine, onClose }: { input: InputState; isNi
     );
   }
   const k = armed;
+  const point = (e: React.PointerEvent) => {
+    const d = aimAt(e.clientX, e.clientY, k.kind);
+    if (d !== null) {
+      target.current = { x: e.clientX, y: e.clientY };
+      setDist(d);
+    }
+  };
   return (
     <div
       className="kick-aim"
       onPointerDown={(e) => {
-        st.current = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+        st.current = { t: performance.now(), id: e.pointerId };
+        point(e);
         const loop = () => {
           if (!st.current) return;
           setPower(Math.min(1.25, (performance.now() - st.current.t) / 1000));
@@ -362,42 +413,42 @@ export function KickPicker({ input, isNine, onClose }: { input: InputState; isNi
         raf.current = requestAnimationFrame(loop);
       }}
       onPointerMove={(e) => {
-        const s0 = st.current;
-        if (!s0 || s0.id !== e.pointerId) return;
-        const d = Math.max(k.min, Math.min(k.max, k.def + (s0.y - e.clientY) / 3));
-        input.kickAim.dist = d;
-        input.kickAim.angle = Math.max(-40, Math.min(40, (e.clientX - s0.x) / 3.5));
-        setDist(d);
+        if (st.current && st.current.id === e.pointerId) point(e);
       }}
       onPointerUp={(e) => {
         const s0 = st.current;
         if (!s0 || s0.id !== e.pointerId) return;
         st.current = null;
         cancelAnimationFrame(raf.current);
+        if (!target.current) return;
         const pw = Math.min(1.25, (performance.now() - s0.t) / 1000);
-        input.actions.push({ type: 'kick', kind: k.kind, dist: input.kickAim.dist, angle: input.kickAim.angle, power: Math.max(0.2, pw) });
+        input.actions.push({ type: 'kick', kind: k.kind, dist: dist ?? k.def, angle: 0, power: Math.max(0.3, pw), tx: NaN, tz: NaN });
         input.kickAim.active = false;
         onClose();
       }}
     >
+      {target.current && st.current && <div className="kick-target" style={{ left: target.current.x, top: target.current.y }} />}
       <div className="kick-aim-hud">
-        <b>{k.label.toUpperCase()}</b> · {Math.round(dist)}m
+        <b>{k.label.toUpperCase()}</b>
+        {dist !== null ? ` · ${Math.round(dist)}m` : ''}
         <div className="kick-power">
           <div className="kick-power-fill" style={{ width: `${(Math.min(power, 1.25) / 1.25) * 100}%`, background: power > 1 ? '#ff3d5e' : power > 0.6 ? '#7dff3a' : '#ffb020' }} />
           <div className="kick-power-zone" />
         </div>
-        <small>Hold to build power · drag to aim · let go to kick</small>
+        <small>{dist === null ? 'Touch the pitch where you want it to land' : 'Hold for power (green zone) · slide to move the spot · let go to kick'}</small>
       </div>
-      <button
-        className="kick-chip cancel kick-aim-cancel"
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          input.kickAim.active = false;
-          onClose();
-        }}
-      >
-        ✕
-      </button>
+      {!preset && (
+        <button
+          className="kick-chip cancel kick-aim-cancel"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            input.kickAim.active = false;
+            onClose();
+          }}
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }
