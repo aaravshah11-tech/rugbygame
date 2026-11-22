@@ -17,6 +17,9 @@ export function detectDevice(): DeviceKind {
  * Production builds always enforce the real device check.
  */
 export function resolveDevice(): DeviceKind {
+  // Inside the Lovable editor's preview frame, show the game on desktop too.
+  // The published site is opened directly (not in that frame), so it stays iPhone/iPad only.
+  if (inLovableEditor()) return 'iphone';
   if (import.meta.env.DEV) {
     const forced = new URLSearchParams(location.search).get('device');
     if (forced === 'iphone' || forced === 'ipad') return forced;
@@ -30,4 +33,16 @@ export function isStandalone(): boolean {
 
 export function isPortrait(): boolean {
   return window.innerHeight > window.innerWidth;
+}
+
+function inLovableEditor(): boolean {
+  if (window.self === window.top) return false;
+  const ancestors = Array.from((location as Location & { ancestorOrigins?: DOMStringList }).ancestorOrigins ?? []);
+  const parent = ancestors[0] ?? document.referrer;
+  try {
+    const host = new URL(parent).hostname;
+    return host === 'lovable.dev' || host.endsWith('.lovable.dev');
+  } catch {
+    return false;
+  }
 }

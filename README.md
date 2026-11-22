@@ -6,7 +6,7 @@ A 3D rugby union game for **iPhone and iPad**, built with Three.js, React and Ty
 
 ```bash
 npm install
-npm run dev        # http://<your-ip>:5173 — open on an iPhone/iPad on the same network
+npm run dev        # http://<your-ip>:8080 — open on an iPhone/iPad on the same network
 npm run build      # production build in dist/
 npm run preview    # serve the production build
 ```
