@@ -183,7 +183,7 @@ export function MatchScreen({
   const showControls = !loading && !howTo && !replay && !tryBanner && hud.phase !== 'dead' && hud.phase !== 'maul' && hud.phase !== 'scrum' && hud.phase !== 'lineout' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
 
   return (
-    <div className="match-root">
+    <div className={`match-root ${profile.settings.leftHanded ? 'left-handed' : ''}`} style={{ ['--btn-scale' as string]: profile.settings.buttonScale ?? 1 }}>
       <div ref={host} className="match-canvas" />
       <div className="vignette" />
       {loading && (

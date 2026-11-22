@@ -5,6 +5,7 @@ import { QuickMatch } from './screens/QuickMatch';
 import { Championship } from './screens/Championship';
 import { WorldCup } from './screens/WorldCup';
 import { SquadBuilder } from './screens/SquadBuilder';
+import { Challenges } from './screens/Challenges';
 import { Training } from './screens/Training';
 import { Settings } from './screens/Settings';
 import { SquadViewer } from './screens/SquadViewer';
@@ -23,6 +24,7 @@ export type Route =
   | { name: 'worldcup' }
   | { name: 'squad'; tab?: string }
   | { name: 'training' }
+  | { name: 'challenges' }
   | { name: 'settings' }
   | { name: 'viewer' }
   | { name: 'comp'; kind: CompKind }
@@ -74,6 +76,9 @@ export function App() {
       break;
     case 'training':
       screen = <Training go={go} />;
+      break;
+    case 'challenges':
+      screen = <Challenges go={go} />;
       break;
     case 'settings':
       screen = <Settings go={go} />;

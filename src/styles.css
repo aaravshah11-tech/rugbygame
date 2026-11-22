@@ -2526,3 +2526,70 @@ input[type='email'] {
   font-size: 18px;
   font-style: italic;
 }
+
+.menu-mini {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.menu-mini button {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 10px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+}
+.menu-mini b {
+  display: block;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 15px;
+}
+.menu-mini small {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.challenge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+.challenge-card.won {
+  box-shadow: inset 0 0 0 2px rgba(198, 255, 26, 0.6);
+}
+
+/* ---------- button size + left-handed layout ---------- */
+.actions {
+  transform: scale(var(--btn-scale, 1));
+  transform-origin: bottom right;
+}
+.left-handed .actions {
+  right: auto;
+  left: calc(var(--sal, 0px) + 14px);
+  transform: scaleX(-1) scale(var(--btn-scale, 1));
+  transform-origin: bottom center;
+}
+.left-handed .actions > * {
+  transform: scaleX(-1);
+}
+.left-handed .actions .abtn.on {
+  transform: scaleX(-1) scale(0.9);
+}
+.left-handed .actions .abtn.ctx-hidden {
+  transform: scaleX(-1) scale(0.8);
+}
+.left-handed .joy-zone {
+  left: auto;
+  right: 0;
+}
+.left-handed .dodge-layer {
+  left: 0;
+  right: 55%;
+}
+.left-handed .catch-btn {
+  right: auto;
+  left: calc(var(--sal, 0px) + 150px);
+}

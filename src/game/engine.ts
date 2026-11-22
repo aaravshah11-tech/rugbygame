@@ -1667,8 +1667,24 @@ export class MatchEngine {
   }
 
   private afterContact(t: P, c: P) {
-    // High tackle
-    if (rand.chance(0.03 * this.strict())) {
+    // HOLD TACKLE: the user's tackler tries to hold the carrier up and win the ball.
+    if (t.side === 0 && t === this.controlled && this.input.tackleHold && !this.cfg.drill) {
+      const chance = clamp(0.3 + (t.r.strength - c.r.strength) / 120 + this.userAssist(), 0.12, 0.6);
+      if (rand.chance(chance)) {
+        this.whistle();
+        this.pop('HELD UP!', 'good');
+        this.say('Held up — turnover', 'good', `Scrum ${this.teamShort(0)}`);
+        this.ms.turnovers[0]++;
+        const x = c.x;
+        const z = c.z;
+        this.ball.carrier = null;
+        this.ball.state = 'dead';
+        this.stoppage(() => this.setupScrum(x, z, 0));
+        return;
+      }
+    }
+    // High tackle (more likely when the carrier is ducking out of a step)
+    if (rand.chance(0.03 * this.strict() * (c.sidestepT > 0 ? 3 : 1))) {
       this.whistle();
       this.say('High tackle!', t.side === 0 ? 'bad' : 'good', `Penalty ${this.teamShort(c.side)}`);
       const x = c.x;
@@ -1797,6 +1813,8 @@ export class MatchEngine {
     if (recv.side !== f.passer.side) {
       if (rand.chance(0.45)) {
         this.say(line('intercept'), recv.side === 0 ? 'good' : 'bad');
+        this.pop('INTERCEPT!', recv.side === 0 ? 'good' : 'bad');
+        this.ms.turnovers[recv.side]++;
         this.giveBall(recv);
         return;
       }

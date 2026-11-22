@@ -86,6 +86,24 @@ export function MainMenu({ go }: { go: Go }) {
             <p>League, then semi-finals and the final</p>
           </button>
         </div>
+        <div className="menu-mini">
+          <button onClick={() => nav({ name: 'worldcup' })}>
+            <b>World Cup</b>
+            <small>pools · knockouts</small>
+          </button>
+          <button onClick={() => nav({ name: 'squad' })}>
+            <b>Squad</b>
+            <small>cards · XP · packs</small>
+          </button>
+          <button onClick={() => nav({ name: 'challenges' })}>
+            <b>Challenges</b>
+            <small>daily scenarios</small>
+          </button>
+          <button onClick={() => nav({ name: 'training' })}>
+            <b>Training</b>
+            <small>tutorials</small>
+          </button>
+        </div>
       </div>
 
       {installTip && !daily && (

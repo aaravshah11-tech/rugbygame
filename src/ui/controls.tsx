@@ -255,7 +255,7 @@ export function ActionButtons({
       <div className="actions">
         <ActionButton
           label="Tackle"
-          sub="hold = chase"
+          sub="hold = hold up"
           size="big"
           color="pink"
           pos={{ right: 0, bottom: 34 }}
