@@ -172,7 +172,7 @@ export class MatchEngine {
   private waitingBlocking = false;
   private miniId = 0;
   private activeMini: { id: number; kind: MiniGameKind; q: number | null; taps: number; done: boolean } | null = null;
-  private ruck: null | { x: number; z: number; att: Side; t: number; dur: number; progress: number; addAtt: number; addDef: number } = null;
+  private ruck: null | { x: number; z: number; att: Side; t: number; dur: number; progress: number; addAtt: number; addDef: number; contest: number; fan: boolean; userDef: 'none' | 'contest' | 'fan' } = null;
   private ruckArc: THREE.Mesh | null = null;
   private ruckArcBg: THREE.Mesh | null = null;
   private pendingSetPlay: SetPlayId | null = null;
@@ -575,6 +575,8 @@ export class MatchEngine {
       phase: this.phase,
       phaseNum: this.phaseCount,
       ruck: this.ruck ? (this.ruck.att === 0 ? 'attack' : 'defend') : null,
+      ruckDef: this.ruck ? this.ruck.userDef : 'none',
+      ruckBall: this.ruck ? this.ruckBall(this.ruck) : null,
       canDrop: this.canDropGoal(),
       nearDef: !!(c && this.ball.carrier === c && c.side === 0 && this.phase === 'play' && this.nearestOpponent(c, 3.2)),
       offload: !!this.offload,
@@ -607,6 +609,27 @@ export class MatchEngine {
         if (this.offload) this.tryOffload(a.dir);
         else if (userHasBall && live) this.doPass(c!, a.long, a.dir);
         break;
+      case 'ruckContest': {
+        const r = this.ruck;
+        if (r && r.att === 1 && r.userDef !== 'fan') {
+          if (r.userDef === 'none') {
+            r.userDef = 'contest';
+            this.addToRuck(); // a jackal goes in over the ball
+          }
+          r.contest = Math.min(1, r.contest + 0.09);
+          haptic('light');
+        }
+        break;
+      }
+      case 'ruckFan': {
+        const r = this.ruck;
+        if (r && r.att === 1 && r.userDef === 'none') {
+          r.userDef = 'fan';
+          r.fan = true;
+          this.say('Fan out', 'info', 'Everyone in the line');
+        }
+        break;
+      }
       case 'scrumPush':
         if (this.scrum && this.scrum.stage === 'push') this.scrum.user = Math.min(3.2, this.scrum.user + 0.42);
         break;
@@ -750,6 +773,14 @@ export class MatchEngine {
     haptic('light');
   }
 
+  /** How the ball is coming: quick (green), slow (amber) or turnover danger (red). */
+  private ruckBall(r: NonNullable<MatchEngine['ruck']>): 'quick' | 'slow' | 'danger' {
+    const defBodies = r.addDef + (r.contest > 0.3 ? 1 : 0);
+    if (defBodies > r.addAtt + 1 || r.contest > 0.55) return 'danger';
+    const dur = r.dur - r.addAtt * 0.35 + r.addDef * 0.25 + r.contest * 0.6;
+    return dur <= 1.35 ? 'quick' : 'slow';
+  }
+
   /** Arc under the ruck that fills as the ball becomes available. */
   private updateRuckArc(r: { x: number; z: number; att: Side; progress: number }) {
     const mk = (color: string, opacity: number, order: number) => {
@@ -760,6 +791,11 @@ export class MatchEngine {
     };
     this.ruckArcBg ??= mk('#13204a', 0.85, 3);
     this.ruckArc ??= mk('#ffffff', 1, 4);
+    const rr = this.ruck;
+    if (rr) {
+      const col = { quick: '#7dff3a', slow: '#ffb020', danger: '#ff3d5e' }[this.ruckBall(rr)];
+      (this.ruckArc.material as THREE.MeshBasicMaterial).color.set(col);
+    }
     const build = (mesh: THREE.Mesh, frac: number, r0: number, r1: number) => {
       // smile-shaped arc on the camera side (-x) of the ruck
       const a0 = Math.PI - 0.95;
@@ -1324,6 +1360,7 @@ export class MatchEngine {
       t.tackleCD = 1.6;
       if (!c.av.busy) c.fx = 'handoff';
       if (rand.chance(0.6)) this.say(line('brokenTackle'), c.side === 0 ? 'good' : 'bad');
+      if (c.side === 0) this.pop('BROKEN TACKLE!', 'good');
     }
   }
 
@@ -1343,6 +1380,8 @@ export class MatchEngine {
     this.particles.dust(c.x, c.z, big ? 1.4 : 0.7);
     c.vx *= 0.3;
     c.vz *= 0.3;
+    // Dominant tackle: the carrier is driven back about a metre towards their own line.
+    if (big) c.vx = -dirOf(c.side) * 6;
     t.state = 'down';
     t.timer = 1.2;
     this.lineBreakFrom = null;
@@ -2112,7 +2151,7 @@ export class MatchEngine {
     const z = c.z;
     this.phase = 'ruck';
     this.phaseT = 0;
-    this.ruck = { x, z, att, t: 0, dur: 1.6, progress: 0, addAtt: 0, addDef: 0 };
+    this.ruck = { x, z, att, t: 0, dur: 1.6, progress: 0, addAtt: 0, addDef: 0, contest: 0, fan: false, userDef: 'none' };
     this.phaseCount++;
     const b = this.ball;
     b.carrier = null;
@@ -2195,7 +2234,7 @@ export class MatchEngine {
     const D = avail(other(att));
     const fb = D.find((p) => p.num === 15);
     const rest = D.filter((p) => p !== fb).sort((p, q) => dist(p.x, p.z, x, z) - dist(q.x, q.z, x, z));
-    const guards = rest.slice(0, 2);
+    const guards = rest.slice(0, this.ruck?.fan ? 0 : 2); // fanning out: nobody guards the ruck
     guards.forEach((p, i) => spots.set(p, { x: x + d * 2.4, z: cz(z + (i ? 1.6 : -1.6)) }));
     const line = rest.slice(2).sort((p, q) => p.z - q.z);
     const n = line.length;
@@ -2221,7 +2260,7 @@ export class MatchEngine {
     const r = this.ruck!;
     r.t += dt;
     // The ball-availability arc fills over the ruck; extra attackers speed it up.
-    const dur = Math.max(0.9, r.dur - r.addAtt * 0.35 + r.addDef * 0.25);
+    const dur = Math.max(0.9, r.dur - r.addAtt * 0.35 + r.addDef * 0.25 + r.contest * 0.6);
     r.progress = Math.min(1, r.progress + dt / dur);
     this.updateRuckArc(r);
     const spread = this.positionAroundBreakdown(r.x, r.z, r.att);
@@ -2244,6 +2283,19 @@ export class MatchEngine {
     // ADD PLAYER: attackers secure the ball, defenders committing make a steal likelier
     if (att === 0) pTurn *= Math.pow(0.45, r.addAtt);
     else pTurn = Math.min(0.55, pTurn + r.addDef * 0.16);
+    // Defending: contesting hard can steal it but risks a penalty; fanning out gives up the steal.
+    if (att === 1) {
+      if (r.fan) pTurn = 0;
+      else if (r.contest > 0) {
+        pTurn = Math.min(0.6, pTurn + r.contest * 0.32);
+        if (rand.chance(r.contest * 0.22)) {
+          this.whistle();
+          this.say('Hands in the ruck!', 'bad', `Penalty ${this.teamShort(1)}`);
+          this.stoppage(() => this.awardPenalty(1, r.x, r.z));
+          return;
+        }
+      }
+    }
     if (att === 0 && q !== null) pTurn = q > 0.7 ? 0.01 : q < 0.3 ? pTurn + 0.12 : pTurn;
     if (att === 1 && q !== null) pTurn = q > 0.7 ? 0.38 : q < 0.3 ? 0.03 : pTurn;
     // penalties at the breakdown

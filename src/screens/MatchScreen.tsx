@@ -23,7 +23,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false,
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null,
 };
 
 export function MatchScreen({
@@ -238,7 +238,7 @@ export function MatchScreen({
         {hud.scrum && !mini && <ScrumBattle s={hud.scrum} input={input.current} userShort={cfg.user.short} cpuShort={cfg.cpu.short} />}
         {showControls && <Joystick input={input.current} />}
         {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
-        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
+        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} ruckDef={hud.ruckDef} ruckBall={hud.ruckBall} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}
         {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} onDone={() => {}} />}

@@ -245,6 +245,8 @@ export function ActionButtons({
   canDrop = false,
   nearDef = false,
   offload = false,
+  ruckDef = 'none',
+  ruckBall = null,
 }: {
   input: InputState;
   attacking: boolean;
@@ -252,6 +254,8 @@ export function ActionButtons({
   canDrop?: boolean;
   nearDef?: boolean;
   offload?: boolean;
+  ruckDef?: 'none' | 'contest' | 'fan';
+  ruckBall?: 'quick' | 'slow' | 'danger' | null;
 }) {
   const passStart = useRef(0);
   const sprint = {
@@ -261,11 +265,34 @@ export function ActionButtons({
   useEffect(() => () => void (input.sprintHold = false), [input]);
 
   if (ruck) {
+    const ballTag = ruckBall && (
+      <div className={`ruck-ball rb-${ruckBall}`}>{ruckBall === 'quick' ? 'QUICK BALL' : ruckBall === 'slow' ? 'SLOW BALL' : 'TURNOVER DANGER'}</div>
+    );
+    if (ruck === 'attack') {
+      return (
+        <div className="actions">
+          {ballTag}
+          <ActionButton label="Add player" sub="faster ball" size="big" color="neon" pos={{ right: 0, bottom: 34 }} onDown={() => input.actions.push({ type: 'addPlayer' })}>
+            <AddPlayerIcon />
+          </ActionButton>
+        </div>
+      );
+    }
     return (
       <div className="actions">
-        <ActionButton label="Add player" size="big" color={ruck === 'attack' ? 'neon' : 'pink'} pos={{ right: 0, bottom: 34 }} onDown={() => input.actions.push({ type: 'addPlayer' })}>
+        {ballTag}
+        <ActionButton
+          label="Contest"
+          sub={ruckDef === 'contest' ? 'tap tap tap!' : 'steal · penalty risk'}
+          size="big"
+          color="pink"
+          hidden={ruckDef === 'fan'}
+          pos={{ right: 0, bottom: 34 }}
+          onDown={() => input.actions.push({ type: 'ruckContest' })}
+        >
           <AddPlayerIcon />
         </ActionButton>
+        <ActionButton label="Fan out" sub="all in the line" size="med" color="cyan" hidden={ruckDef !== 'none'} pos={{ right: 112, bottom: 0 }} onDown={() => input.actions.push({ type: 'ruckFan' })} />
       </div>
     );
   }

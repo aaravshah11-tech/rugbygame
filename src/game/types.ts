@@ -64,6 +64,10 @@ export interface HudState {
   phase: string;
   phaseNum: number;
   ruck: 'attack' | 'defend' | null;
+  /** defending ruck choice so far */
+  ruckDef: 'none' | 'contest' | 'fan';
+  /** ruck ball speed: quick / slow / danger (turnover risk) */
+  ruckBall: 'quick' | 'slow' | 'danger' | null;
   canDrop: boolean;
   mph: number;
   /** a defender is close enough for a hand-off */
@@ -111,6 +115,8 @@ export type InputAction =
   | { type: 'switch' }
   | { type: 'addPlayer' }
   | { type: 'scrumPush' }
+  | { type: 'ruckContest' }
+  | { type: 'ruckFan' }
   | { type: 'scrumPlay'; play: 'left' | 'right' | 'pick' }
   | { type: 'dodge'; dir: -1 | 1 }
   | { type: 'setplay'; id: SetPlayId };

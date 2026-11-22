@@ -2100,3 +2100,22 @@ input[type='email'] {
   75% { opacity: 1; transform: translate(-50%, -52%) scale(1) rotate(-4deg); }
   100% { opacity: 0; transform: translate(-50%, -62%) scale(0.96) rotate(-4deg); }
 }
+
+.ruck-ball {
+  position: absolute;
+  right: 6px;
+  bottom: 186px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: #0b0f17;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.rb-quick { background: #7dff3a; }
+.rb-slow { background: #ffb020; }
+.rb-danger { background: #ff3d5e; color: #fff; animation: blink 0.6s infinite; }
