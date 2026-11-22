@@ -249,9 +249,34 @@ function contrast(bg: string): string {
   return lum > 160 ? '#14182a' : '#ffffff';
 }
 
+/** Teams with a real logo image in public/logos (nations are white artwork, clubs full colour). */
+const LOGO_NATIONS = new Set(['ENG', 'FRA', 'IRE', 'ITA', 'SCO', 'WAL', 'NZL', 'ARG', 'AUS', 'FIJ', 'JPN', 'RSA']);
+const LOGO_CLUBS = new Set(['BTH', 'BRS', 'EXE', 'GLO', 'LEI', 'LDN', 'LDW', 'NEW', 'NOR', 'SAL']);
+
 export function TeamLogo({ id, size = 36 }: { id: string; size?: number }) {
   const n = nationById(id);
   const k = n.kit;
+  if (LOGO_NATIONS.has(id) || LOGO_CLUBS.has(id)) {
+    const club = LOGO_CLUBS.has(id);
+    // White nation artwork sits on the team colour (dark secondary for very light shirts).
+    const lum = (c: string) => {
+      const v = parseInt(c.slice(1), 16);
+      return 0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255);
+    };
+    const disc = club ? '#ffffff' : lum(k.primary) < 150 ? k.primary : [k.secondary, k.accent, k.shorts].sort((x, y) => lum(x) - lum(y))[0];
+    return (
+      <span
+        className="team-logo"
+        aria-label={`${n.name} logo`}
+        style={{
+          width: size, height: size, flex: 'none', borderRadius: '50%', background: disc,
+          display: 'inline-grid', placeItems: 'center', boxShadow: '0 0 0 1.5px rgba(255,255,255,0.18)',
+        }}
+      >
+        <img src={`${import.meta.env.BASE_URL}logos/${id}.png`} alt="" draggable={false} style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
+      </span>
+    );
+  }
   // Very light shirts (England, Fiji) use the secondary colour for the shield.
   const bg = contrast(k.primary) === '#14182a' ? k.secondary : k.primary;
   const rim = contrast(k.primary) === '#14182a' ? k.primary : k.secondary === bg ? k.accent : k.secondary;
