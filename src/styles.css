@@ -2119,3 +2119,231 @@ input[type='email'] {
 .rb-quick { background: #7dff3a; }
 .rb-slow { background: #ffb020; }
 .rb-danger { background: #ff3d5e; color: #fff; animation: blink 0.6s infinite; }
+
+.tactics-drawer {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 10px;
+}
+.tactics-drawer summary {
+  font-weight: 800;
+  font-style: italic;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.subs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+.sub-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  border-radius: 10px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+}
+.sub-row b {
+  min-width: 20px;
+  color: var(--neon, #c6ff1a);
+  font-style: italic;
+}
+.sub-row span {
+  flex: 1;
+  font-size: 13px;
+}
+.sub-row small {
+  opacity: 0.7;
+}
+.sub-row .stam {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+}
+.sub-row:disabled {
+  opacity: 0.4;
+}
+
+/* ---------- kick picker / aim ---------- */
+.kick-picker {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 16, 0.35);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 calc(var(--sar, 0px) + 14px) calc(var(--sab, 0px) + 16px) 0;
+  pointer-events: auto;
+  z-index: 30;
+}
+.kick-chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  gap: 8px;
+  max-width: 470px;
+  animation: popIn 0.18s ease;
+}
+.kick-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 14px;
+  background: #ffcf3a;
+  color: #0b0f17;
+  font: inherit;
+  box-shadow: 0 5px 0 #a47c00, 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+.kick-chip b {
+  font-style: italic;
+  font-weight: 900;
+  font-size: 15px;
+}
+.kick-chip small {
+  font-size: 10px;
+  opacity: 0.8;
+}
+.kick-chip.cancel {
+  background: #2a3142;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  justify-content: center;
+  box-shadow: 0 5px 0 #11151f;
+}
+.kick-aim {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  touch-action: none;
+  pointer-events: auto;
+}
+.kick-aim-hud {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab, 0px) + 22px);
+  transform: translateX(-50%);
+  text-align: center;
+  font-style: italic;
+  font-weight: 800;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  width: min(420px, 70vw);
+}
+.kick-aim-hud small {
+  display: block;
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  opacity: 0.9;
+}
+.kick-power {
+  position: relative;
+  height: 14px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+}
+.kick-power-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.kick-power-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 48%;
+  width: 32%;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #fff;
+}
+.kick-aim-cancel {
+  position: absolute;
+  right: calc(var(--sar, 0px) + 14px);
+  top: calc(var(--sat, 0px) + 60px);
+  width: 48px;
+  height: 48px;
+}
+.catch-btn {
+  position: absolute;
+  right: calc(var(--sar, 0px) + 150px);
+  bottom: calc(var(--sab, 0px) + 120px);
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 0;
+  background: #c6ff1a;
+  color: #0b0f17;
+  font: 900 italic 18px/1 inherit;
+  font-family: inherit;
+  box-shadow: 0 6px 0 #6f9300, 0 10px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+  z-index: 25;
+  animation: popIn 0.15s ease;
+}
+.catch-ring {
+  position: absolute;
+  inset: -16px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  animation: catchRing 0.9s linear infinite;
+}
+@keyframes catchRing {
+  from { transform: scale(1.6); opacity: 0.2; }
+  to { transform: scale(1); opacity: 1; }
+}
+.wind-chip {
+  position: absolute;
+  left: calc(var(--sal, 0px) + 12px);
+  top: calc(var(--sat, 0px) + 78px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(11, 15, 23, 0.72);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 12px;
+  pointer-events: none;
+}
+.wind-chip span {
+  display: inline-block;
+  font-size: 15px;
+  color: #7ad7ff;
+}
+
+.pk-move {
+  position: absolute;
+  left: calc(var(--sal, 0px) + 12px);
+  bottom: calc(var(--sab, 0px) + 16px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  font-weight: 800;
+  font-style: italic;
+  font-size: 12px;
+}
+.pk-move button {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: 900 italic 14px inherit;
+  font-family: inherit;
+  background: #ffcf3a;
+  color: #0b0f17;
+}

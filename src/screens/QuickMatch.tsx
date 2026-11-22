@@ -7,7 +7,8 @@ import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
 import { nationOvr } from '../state/tournaments';
 import { finishQuick } from '../state/outcomes';
-import type { Difficulty, HalfLength } from '../state/types';
+import type { Difficulty, HalfLength, Weather } from '../state/types';
+import { TacticsPanel } from '../ui/tactics';
 import { audio } from '../util/audio';
 
 export function QuickMatch({ go }: { go: Go }) {
@@ -82,7 +83,7 @@ export function QuickMatch({ go }: { go: Go }) {
             <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Half length</div>
             <Seg<HalfLength>
               value={p.settings.halfLength}
-              options={[{ v: 4, label: '4 min' }, { v: 6, label: '6 min' }, { v: 10, label: '10 min' }]}
+              options={[{ v: 3, label: '3 min' }, { v: 5, label: '5 min' }, { v: 8, label: '8 min' }]}
               onChange={(v) => update((x) => (x.settings.halfLength = v))}
             />
           </div>
@@ -90,10 +91,22 @@ export function QuickMatch({ go }: { go: Go }) {
             <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Difficulty</div>
             <Seg<Difficulty>
               value={p.settings.difficulty}
-              options={[{ v: 'easy', label: 'Easy' }, { v: 'medium', label: 'Medium' }, { v: 'hard', label: 'Hard' }]}
+              options={[{ v: 'easy', label: 'Easy' }, { v: 'medium', label: 'Med' }, { v: 'hard', label: 'Hard' }, { v: 'elite', label: 'Elite' }]}
               onChange={(v) => update((x) => (x.settings.difficulty = v))}
             />
           </div>
+          <div>
+            <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Weather</div>
+            <Seg<Weather>
+              value={p.settings.weather}
+              options={[{ v: 'dry', label: 'Dry' }, { v: 'rain', label: 'Rain' }]}
+              onChange={(v) => update((x) => (x.settings.weather = v))}
+            />
+          </div>
+          <details className="tactics-drawer">
+            <summary>Tactics</summary>
+            <TacticsPanel value={p.settings.tactics} onChange={(t) => update((x) => (x.settings.tactics = t))} />
+          </details>
           <button className="btn primary" style={{ marginTop: 'auto', minHeight: 54, fontSize: 20 }} onClick={start}>
             Kick off
           </button>

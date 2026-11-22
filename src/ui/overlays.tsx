@@ -93,7 +93,7 @@ const JUMPERS = [
 export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; difficulty: Difficulty; onDone: () => void }) {
   const spec = MINI[req.kind];
   const [jumper, setJumper] = useState<(typeof JUMPERS)[number] | null>(spec.pick ? null : JUMPERS[1]);
-  const zoneW = { easy: 0.3, medium: 0.22, hard: 0.15 }[difficulty] * (jumper?.zone ?? 1);
+  const zoneW = { easy: 0.3, medium: 0.22, hard: 0.15, elite: 0.08 }[difficulty] * (jumper?.zone ?? 1);
   const zoneC = useRef(0.3 + Math.random() * 0.4);
   const [pos, setPos] = useState(0);
   const posRef = useRef(0);
@@ -298,6 +298,7 @@ export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; en
   const [trail, setTrail] = useState<{ x: number; y: number }[]>([]);
   const [msg, setMsg] = useState('');
   const [gone, setGone] = useState(false);
+  const [distOut, setDistOut] = useState<number | null>(null);
   const pts = useRef<{ x: number; y: number; t: number }[]>([]);
   const active = useRef(false);
 
@@ -377,8 +378,15 @@ export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; en
           ↑
         </div>
         {Math.round(req.windSpeed)} km/h
-        <div className="muted" style={{ fontSize: 10 }}>{Math.round(req.distance)}m out</div>
+        <div className="muted" style={{ fontSize: 10 }}>{Math.round(distOut ?? req.distance)}m out</div>
       </div>
+      {req.kind === 'conversion' && !gone && (
+        <div className="pk-move" onPointerDown={(e) => e.stopPropagation()}>
+          <button onPointerDown={(e) => (e.stopPropagation(), setDistOut(engine.movePlaceKick(-3)))}>Closer</button>
+          <span>Placement</span>
+          <button onPointerDown={(e) => (e.stopPropagation(), setDistOut(engine.movePlaceKick(3)))}>Back</button>
+        </div>
+      )}
       <svg className="swipe-trail" width="100%" height="100%">
         {trail.length > 1 && <polyline points={trail.map((q) => `${q.x},${q.y}`).join(' ')} />}
       </svg>

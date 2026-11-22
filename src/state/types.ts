@@ -1,8 +1,18 @@
 import type { Player, Ratings } from '../data/players';
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'elite';
 export type CameraMode = 'broadcast' | 'sideline' | 'close';
-export type HalfLength = 4 | 6 | 10;
+export type HalfLength = 3 | 5 | 8;
+export type Weather = 'dry' | 'rain';
+export type AttackStyle = 'forwards' | 'balanced' | 'expansive';
+export type DefenceStyle = 'drift' | 'balanced' | 'blitz';
+export type KickStyle = 'low' | 'balanced' | 'territory';
+export type RulesMode = 'arcade' | 'standard' | 'sim';
+export interface Tactics {
+  attack: AttackStyle;
+  defence: DefenceStyle;
+  kicking: KickStyle;
+}
 
 export interface Settings {
   music: number;
@@ -12,6 +22,13 @@ export interface Settings {
   camera: CameraMode;
   halfLength: HalfLength;
   graphics: 'auto' | 'low' | 'medium' | 'high';
+  weather: Weather;
+  tactics: Tactics;
+  rules: RulesMode;
+  autoSwitch: boolean;
+  leftHanded: boolean;
+  /** action button size multiplier */
+  buttonScale: number;
 }
 
 export interface Fixture {

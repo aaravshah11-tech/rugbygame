@@ -7,7 +7,7 @@ import { STAFF } from './store';
 
 export function nationTeam(id: string): TeamSetup {
   const n = nationById(id);
-  return { id, name: n.name, short: n.short, kit: n.kit, players: nationSquad(id).starters };
+  return { id, name: n.name, short: n.short, kit: n.kit, players: nationSquad(id).starters, bench: nationSquad(id).bench };
 }
 
 // Formation links used for chemistry (shirt numbers that sit next to each other).
@@ -65,7 +65,9 @@ export function clubTeam(p: Profile): TeamSetup | null {
   const chemBonus = Math.floor(chem / 25);
   for (const k of ['pace', 'strength', 'passing', 'kicking', 'tackling', 'handling'] as const) boost[k] = (boost[k] ?? 0) + chemBonus;
   // Shift each player's natural position to the slot so in-match roles line up.
-  return { id: CLUB_NATION.id, name: CLUB_NATION.name, short: CLUB_NATION.short, kit: CLUB_NATION.kit, players: ps as Player[], boost };
+  const byId = new Map(p.club.cards.map((c) => [c.id, c]));
+  const bench = p.club.bench.map((id) => (id ? byId.get(id) : undefined)).filter((x): x is Player => !!x);
+  return { id: CLUB_NATION.id, name: CLUB_NATION.name, short: CLUB_NATION.short, kit: CLUB_NATION.kit, players: ps as Player[], bench, boost };
 }
 
 function hexDist(a: string, b: string) {
@@ -99,5 +101,9 @@ export function buildMatch(user: TeamSetup, cpu: TeamSetup, userIsHome: boolean,
     camera: p.settings.camera,
     quality: p.settings.graphics ?? 'auto',
     drill,
+    weather: p.settings.weather ?? 'dry',
+    tactics: p.settings.tactics ?? { attack: 'balanced', defence: 'balanced', kicking: 'balanced' },
+    rules: p.settings.rules ?? 'standard',
+    autoSwitch: p.settings.autoSwitch ?? true,
   };
 }

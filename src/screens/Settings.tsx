@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import type { Go } from '../App';
 import { Seg, TopBar } from '../ui/common';
 import { resetProfile, update, useProfile } from '../state/store';
-import type { CameraMode, Difficulty, HalfLength } from '../state/types';
+import type { CameraMode, Difficulty, HalfLength, RulesMode } from '../state/types';
+import { TacticsPanel } from '../ui/tactics';
 import { currentUser, pullProfile, pushProfile, sendMagicLink, signOut, syncAvailable } from '../state/sync';
 import { audio } from '../util/audio';
 import { haptic } from '../util/haptics';
@@ -70,7 +71,7 @@ export function Settings({ go }: { go: Go }) {
               <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Difficulty</div>
               <Seg<Difficulty>
                 value={s.difficulty}
-                options={[{ v: 'easy', label: 'Easy' }, { v: 'medium', label: 'Medium' }, { v: 'hard', label: 'Hard' }]}
+                options={[{ v: 'easy', label: 'Easy' }, { v: 'medium', label: 'Med' }, { v: 'hard', label: 'Hard' }, { v: 'elite', label: 'Elite' }]}
                 onChange={(v) => update((x) => (x.settings.difficulty = v))}
               />
             </div>
@@ -95,10 +96,38 @@ export function Settings({ go }: { go: Go }) {
               <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Half length</div>
               <Seg<HalfLength>
                 value={s.halfLength}
-                options={[{ v: 4, label: '4 min' }, { v: 6, label: '6 min' }, { v: 10, label: '10 min' }]}
+                options={[{ v: 3, label: '3 min' }, { v: 5, label: '5 min' }, { v: 8, label: '8 min' }]}
                 onChange={(v) => update((x) => (x.settings.halfLength = v))}
               />
             </div>
+          </div>
+          <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h3>Rules &amp; controls</h3>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Rules</div>
+              <Seg<RulesMode>
+                value={s.rules}
+                options={[{ v: 'arcade', label: 'Arcade' }, { v: 'standard', label: 'Standard' }, { v: 'sim', label: 'Simulation' }]}
+                onChange={(v) => update((x) => (x.settings.rules = v))}
+              />
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Arcade: fewer penalties, no cards or TMO. Simulation: strict refereeing, forward passes, more cards.</div>
+            </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Auto-switch defender</div>
+              <Seg<'on' | 'off'> value={s.autoSwitch ? 'on' : 'off'} options={[{ v: 'on', label: 'On' }, { v: 'off', label: 'Off' }]} onChange={(v) => update((x) => (x.settings.autoSwitch = v === 'on'))} />
+            </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Hand</div>
+              <Seg<'r' | 'l'> value={s.leftHanded ? 'l' : 'r'} options={[{ v: 'r', label: 'Right-handed' }, { v: 'l', label: 'Left-handed' }]} onChange={(v) => update((x) => (x.settings.leftHanded = v === 'l'))} />
+            </div>
+            <label>
+              <div className="muted italic" style={{ fontSize: 12 }}>Button size ({Math.round(s.buttonScale * 100)}%)</div>
+              <input type="range" min={0.8} max={1.3} step={0.05} value={s.buttonScale} onChange={(e) => update((x) => (x.settings.buttonScale = +e.target.value))} />
+            </label>
+          </div>
+          <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h3>Tactics</h3>
+            <TacticsPanel value={s.tactics} onChange={(t) => update((x) => (x.settings.tactics = t))} />
           </div>
           <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <h3>Account &amp; save</h3>

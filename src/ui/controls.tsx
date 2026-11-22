@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { InputState } from '../game/types';
+import type { InputState, KickKind } from '../game/types';
 import { haptic } from '../util/haptics';
 
 /** Floating virtual joystick: appears wherever the thumb lands in the bottom-left zone. */
@@ -155,55 +155,6 @@ const TackleIcon = () => (
 );
 
 /** Context buttons: attack set when the user has the ball, defence set otherwise. */
-const KICK_RANGE = { punt: { def: 35, min: 10, max: 55, tap: 35 }, grubber: { def: 15, min: 6, max: 30, tap: 15 } };
-
-/**
- * KICK / GRUB: tap for a default kick straight ahead; hold to show the landing ring,
- * drag up/down to set the distance and left/right to aim, then let go.
- */
-function KickButton({ input, kind, pos }: { input: InputState; kind: 'punt' | 'grubber'; pos: { right: number; bottom: number } }) {
-  const start = useRef({ x: 0, y: 0, t: 0 });
-  const [dist, setDist] = useState<number | null>(null);
-  const r = KICK_RANGE[kind];
-  return (
-    <ActionButton
-      label={kind === 'punt' ? 'Kick' : 'Grub'}
-      sub={dist !== null ? `${Math.round(dist)}m` : kind === 'punt' ? 'hold · drag' : 'grubber'}
-      size={kind === 'punt' ? 'med' : 'sm'}
-      color={kind === 'punt' ? 'gold' : 'white'}
-      pos={pos}
-      onDown={(e) => {
-        start.current = { x: e.clientX, y: e.clientY, t: performance.now() };
-        Object.assign(input.kickAim, { active: true, kind, dist: r.def, angle: 0 });
-        setDist(r.def);
-      }}
-      onMove={(e) => {
-        const d = Math.max(r.min, Math.min(r.max, r.def + (start.current.y - e.clientY) / 3));
-        input.kickAim.dist = d;
-        input.kickAim.angle = Math.max(-35, Math.min(35, (e.clientX - start.current.x) / 3.5));
-        setDist(d);
-      }}
-      onUp={(e, cancelled) => {
-        const moved = Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y);
-        const tap = performance.now() - start.current.t < 220 && moved < 12;
-        const { dist: d, angle } = input.kickAim;
-        input.kickAim.active = false;
-        setDist(null);
-        if (!cancelled) input.actions.push({ type: 'kick', kind, dist: tap ? r.tap : d, angle: tap ? 0 : angle });
-      }}
-    >
-      {kind === 'punt' ? <KickIcon /> : <GrubIcon />}
-    </ActionButton>
-  );
-}
-
-const GrubIcon = () => (
-  <svg viewBox="0 0 40 24" width="30" height="18" aria-hidden>
-    <path d="M4 20 Q10 12 14 20 Q19 14 22 20 Q26 16 28 20" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-    <ellipse cx="33" cy="18" rx="5" ry="3.3" fill="currentColor" />
-  </svg>
-);
-
 /** Swipe left/right on the right half of the screen to dodge (sidestep). */
 /** Right-hand swipes with the ball: left/right = quick pass that way, up = sidestep. */
 export function DodgeLayer({ input }: { input: InputState }) {
@@ -247,6 +198,7 @@ export function ActionButtons({
   offload = false,
   ruckDef = 'none',
   ruckBall = null,
+  onKick,
 }: {
   input: InputState;
   attacking: boolean;
@@ -256,6 +208,7 @@ export function ActionButtons({
   offload?: boolean;
   ruckDef?: 'none' | 'contest' | 'fan';
   ruckBall?: 'quick' | 'slow' | 'danger' | null;
+  onKick?: () => void;
 }) {
   const passStart = useRef(0);
   const sprint = {
@@ -339,10 +292,128 @@ export function ActionButtons({
         <PassIcon dir={1} />
       </ActionButton>
       <ActionButton label="Sprint" size="med" color="cyan" pos={{ right: 104, bottom: 0 }} {...sprint} />
-      <KickButton input={input} kind="punt" pos={{ right: 14, bottom: 150 }} />
-      <KickButton input={input} kind="grubber" pos={{ right: 112, bottom: 100 }} />
+      <ActionButton label="Kick" sub="choose kick" size="med" color="gold" pos={{ right: 14, bottom: 150 }} onDown={() => onKick?.()}>
+        <KickIcon />
+      </ActionButton>
       <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 200, bottom: 12 }} onDown={() => input.actions.push({ type: 'handoff' })} />
       <ActionButton label="Drop goal" size="sm" color="cyan" hidden={!canDrop} pos={{ right: 206, bottom: 96 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
     </div>
+  );
+}
+
+export const KICKS: { kind: KickKind; label: string; desc: string; def: number; min: number; max: number }[] = [
+  { kind: 'box', label: 'Box kick', desc: 'high from the 9', def: 22, min: 12, max: 35 },
+  { kind: 'grubber', label: 'Grubber', desc: 'along the ground', def: 15, min: 6, max: 30 },
+  { kind: 'chip', label: 'Chip', desc: 'over the line, regather', def: 10, min: 5, max: 18 },
+  { kind: 'high', label: 'Up & under', desc: 'high, chase it', def: 25, min: 15, max: 40 },
+  { kind: 'touch', label: 'Touch', desc: 'find the touchline', def: 32, min: 15, max: 55 },
+  { kind: 'cross', label: 'Cross-field', desc: 'to the far wing', def: 30, min: 18, max: 45 },
+  { kind: 'punt', label: 'Long kick', desc: 'for territory', def: 40, min: 15, max: 58 },
+];
+
+/** Kick picker: choose a kick, then drag to aim and hold to build power; let go to kick. */
+export function KickPicker({ input, isNine, onClose }: { input: InputState; isNine: boolean; onClose: () => void }) {
+  const [armed, setArmed] = useState<(typeof KICKS)[number] | null>(null);
+  const [power, setPower] = useState(0);
+  const [dist, setDist] = useState(0);
+  const st = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
+  const raf = useRef(0);
+  useEffect(() => () => {
+    cancelAnimationFrame(raf.current);
+    input.kickAim.active = false;
+  }, [input]);
+  if (!armed) {
+    return (
+      <div className="kick-picker" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="kick-chips">
+          {KICKS.filter((k) => k.kind !== 'box' || isNine).map((k) => (
+            <button
+              key={k.kind}
+              className="kick-chip"
+              onPointerDown={() => {
+                haptic('light');
+                setArmed(k);
+                setDist(k.def);
+                Object.assign(input.kickAim, { active: true, kind: k.kind, dist: k.def, angle: 0 });
+              }}
+            >
+              <b>{k.label}</b>
+              <small>{k.desc}</small>
+            </button>
+          ))}
+          <button className="kick-chip cancel" onPointerDown={onClose}>
+            ✕
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const k = armed;
+  return (
+    <div
+      className="kick-aim"
+      onPointerDown={(e) => {
+        st.current = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+        const loop = () => {
+          if (!st.current) return;
+          setPower(Math.min(1.25, (performance.now() - st.current.t) / 1000));
+          raf.current = requestAnimationFrame(loop);
+        };
+        raf.current = requestAnimationFrame(loop);
+      }}
+      onPointerMove={(e) => {
+        const s0 = st.current;
+        if (!s0 || s0.id !== e.pointerId) return;
+        const d = Math.max(k.min, Math.min(k.max, k.def + (s0.y - e.clientY) / 3));
+        input.kickAim.dist = d;
+        input.kickAim.angle = Math.max(-40, Math.min(40, (e.clientX - s0.x) / 3.5));
+        setDist(d);
+      }}
+      onPointerUp={(e) => {
+        const s0 = st.current;
+        if (!s0 || s0.id !== e.pointerId) return;
+        st.current = null;
+        cancelAnimationFrame(raf.current);
+        const pw = Math.min(1.25, (performance.now() - s0.t) / 1000);
+        input.actions.push({ type: 'kick', kind: k.kind, dist: input.kickAim.dist, angle: input.kickAim.angle, power: Math.max(0.2, pw) });
+        input.kickAim.active = false;
+        onClose();
+      }}
+    >
+      <div className="kick-aim-hud">
+        <b>{k.label.toUpperCase()}</b> · {Math.round(dist)}m
+        <div className="kick-power">
+          <div className="kick-power-fill" style={{ width: `${(Math.min(power, 1.25) / 1.25) * 100}%`, background: power > 1 ? '#ff3d5e' : power > 0.6 ? '#7dff3a' : '#ffb020' }} />
+          <div className="kick-power-zone" />
+        </div>
+        <small>Hold to build power · drag to aim · let go to kick</small>
+      </div>
+      <button
+        className="kick-chip cancel kick-aim-cancel"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          input.kickAim.active = false;
+          onClose();
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/** CATCH: tap just before the high ball arrives for a clean take. */
+export function CatchButton({ input }: { input: InputState }) {
+  return (
+    <button
+      className="catch-btn"
+      onPointerDown={() => {
+        input.actions.push({ type: 'catch' });
+        haptic('light');
+      }}
+    >
+      <span className="catch-ring" />
+      CATCH
+    </button>
   );
 }

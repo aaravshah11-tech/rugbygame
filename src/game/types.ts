@@ -1,6 +1,6 @@
 import type { Kit } from '../data/nations';
 import type { Player, Ratings } from '../data/players';
-import type { CameraMode, Difficulty } from '../state/types';
+import type { CameraMode, Difficulty, RulesMode, Tactics, Weather } from '../state/types';
 import type { QualitySetting } from './view/quality';
 
 export interface TeamSetup {
@@ -9,7 +9,17 @@ export interface TeamSetup {
   short: string;
   kit: Kit;
   players: Player[]; // 15 starters, index = shirt - 1
+  /** replacements available for substitutions */
+  bench?: Player[];
   boost?: Partial<Ratings>;
+}
+
+export interface SquadLine {
+  num: number;
+  name: string;
+  stamina: number;
+  ovr: number;
+  off: boolean;
 }
 
 export type Drill = 'passing' | 'kicking' | 'tackling' | 'setpieces';
@@ -23,6 +33,25 @@ export interface MatchConfig {
   camera: CameraMode;
   quality: QualitySetting;
   drill?: Drill;
+  weather: Weather;
+  tactics: Tactics;
+  rules: RulesMode;
+  autoSwitch: boolean;
+  /** scenario overrides (daily challenges) */
+  challenge?: ChallengeSetup;
+}
+
+export interface ChallengeSetup {
+  id: string;
+  title: string;
+  /** starting score [user, cpu] */
+  score?: [number, number];
+  /** game seconds already played in the second half (0..2400) */
+  secondHalfAt?: number;
+  /** user starts with the ball at this x (metres from halfway, + = attacking) */
+  startX?: number;
+  goal: 'win' | 'tryFromOwn22' | 'holdOut' | 'scoreTries';
+  target?: number;
 }
 
 export type MiniGameKind = 'ruck' | 'counterRuck' | 'scrum' | 'scrumDefend' | 'lineout' | 'lineoutDefend' | 'maul' | 'maulDefend';
@@ -72,6 +101,12 @@ export interface HudState {
   mph: number;
   /** a defender is close enough for a hand-off */
   nearDef: boolean;
+  /** a high ball is dropping onto your player: tap CATCH */
+  catchPrompt: boolean;
+  /** wind as seen on screen: angle (deg, 0 = up the screen) and km/h */
+  wind: { deg: number; kmh: number };
+  /** the carrier is the scrum-half (box kick available) */
+  isNine: boolean;
   /** offload window open: PASS now to offload in the tackle */
   offload: boolean;
   /** live scrum push battle: bal -1 (CPU driving) .. +1 (user driving) */
@@ -106,7 +141,8 @@ export type EngineEvent =
 
 export type InputAction =
   | { type: 'pass'; long: boolean; dir: -1 | 0 | 1 }
-  | { type: 'kick'; kind: 'punt' | 'grubber'; dist: number; angle: number }
+  | { type: 'kick'; kind: KickKind; dist: number; angle: number; power?: number }
+  | { type: 'catch' }
   | { type: 'dropgoal' }
   | { type: 'sidestep' }
   | { type: 'handoff' }
@@ -121,7 +157,10 @@ export type InputAction =
   | { type: 'dodge'; dir: -1 | 1 }
   | { type: 'setplay'; id: SetPlayId };
 
-export type SetPlayId = 'crash' | 'loop' | 'miss' | 'upandunder';
+/** Open-play kicks: punt (long), box (9 only), grubber, chip, high (up-and-under), touch, cross (cross-field). */
+export type KickKind = 'punt' | 'grubber' | 'box' | 'chip' | 'high' | 'touch' | 'cross';
+
+export type SetPlayId = 'crash' | 'loop' | 'miss' | 'switch' | 'upandunder';
 
 export interface InputState {
   moveX: number;
@@ -133,7 +172,7 @@ export interface InputState {
   tackleHold: boolean;
   /** live kick aim while the kick button is held */
   /** live aim while KICK / GRUB is held: distance in metres, angle in degrees (+ = screen right) */
-  kickAim: { active: boolean; kind: 'punt' | 'grubber'; dist: number; angle: number };
+  kickAim: { active: boolean; kind: KickKind; dist: number; angle: number };
   actions: InputAction[];
 }
 

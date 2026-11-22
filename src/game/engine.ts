@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { effectiveRatings, type Player, type Ratings } from '../data/players';
+import { effectiveRatings, playerOvr, type Player, type Ratings } from '../data/players';
 import { FIELD } from './stadium';
 import { createBall } from './model';
 import { buildStadium, type StadiumView } from './view/stadium';
@@ -19,6 +19,7 @@ import type {
   HudState,
   InputAction,
   InputState,
+  KickKind,
   MatchConfig,
   MiniGameKind,
   PenaltyChoice,
@@ -156,6 +157,8 @@ export class MatchEngine {
   private listener: (e: EngineEvent) => void;
   readonly input: InputState;
   private cfg: MatchConfig;
+  /** tactics per side: [user, cpu] */
+  private tac!: [MatchConfig['tactics'], MatchConfig['tactics']];
 
   private phase: Phase = 'pre';
   private phaseT = 0;
@@ -217,6 +220,9 @@ export class MatchEngine {
   private tmpV2 = new THREE.Vector3();
 
   constructor(private host: HTMLElement, cfg: MatchConfig, input: InputState, listener: (e: EngineEvent) => void, asset: PlayerAsset | null) {
+    cfg = { ...cfg, weather: cfg.weather ?? 'dry', rules: cfg.rules ?? 'standard', autoSwitch: cfg.autoSwitch ?? true, tactics: cfg.tactics ?? { attack: 'balanced', defence: 'balanced', kicking: 'balanced' } };
+    const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+    this.tac = [cfg.tactics, { attack: pick(['forwards', 'balanced', 'expansive'] as const), defence: pick(['drift', 'balanced', 'blitz'] as const), kicking: pick(['low', 'balanced', 'territory'] as const) }];
     this.cfg = cfg;
     this.input = input;
     this.listener = listener;
@@ -382,7 +388,7 @@ export class MatchEngine {
 
   // ---------------------------------------------------------------- setup
   private buildTeams(asset: PlayerAsset | null) {
-    const diffMod = { easy: -8, medium: 0, hard: 6 }[this.cfg.difficulty];
+    const diffMod = { easy: -8, medium: 0, hard: 6, elite: 12 }[this.cfg.difficulty];
     const mk = (team: TeamSetup, side: Side) => {
       const kit = asset ? makeTeamKit(team.kit) : null;
       team.players.slice(0, 15).forEach((pl, i) => {
@@ -463,6 +469,37 @@ export class MatchEngine {
     this.cfg.camera = mode;
   }
 
+  setTactics(t: MatchConfig['tactics']) {
+    this.tac[0] = t;
+    this.cfg.tactics = t;
+  }
+
+  /** Your XV and bench for the substitutions screen. */
+  squad(): { field: import('./types').SquadLine[]; bench: { idx: number; name: string; pos: number; ovr: number }[] } {
+    const used = this.subsUsed;
+    return {
+      field: this.teams[0].map((p) => ({ num: p.num, name: p.name, stamina: p.stamina, ovr: Math.round((p.r.pace + p.r.strength + p.r.passing + p.r.tackling + p.r.handling) / 5), off: p.state === 'off' })),
+      bench: (this.cfg.user.bench ?? [])
+        .map((pl, idx) => ({ idx, name: `${pl.first[0]}. ${pl.last}`, pos: pl.position, ovr: Math.round(playerOvr(pl)) }))
+        .filter((b) => !used.has(b.idx)),
+    };
+  }
+
+  private subsUsed = new Set<number>();
+  /** Bring a replacement on for shirt `num`: fresh legs, the new player's ratings and name. */
+  substitute(num: number, benchIdx: number) {
+    const pl = this.cfg.user.bench?.[benchIdx];
+    const p = this.teams[0][num - 1];
+    if (!pl || !p || this.subsUsed.has(benchIdx) || p.state === 'off') return;
+    this.subsUsed.add(benchIdx);
+    p.data = pl;
+    p.r = effectiveRatings(pl, this.cfg.user.boost ?? {});
+    p.name = `${pl.first[0]}. ${pl.last}`;
+    p.stamina = 1;
+    if (this.nameFor === p) this.nameFor = null;
+    this.say('Substitution', 'info', `${p.name} on at ${num}`);
+  }
+
   // ---------------------------------------------------------------- events
   private emit(e: EngineEvent) {
     this.listener(e);
@@ -494,6 +531,21 @@ export class MatchEngine {
       else if (!this.waitingBlocking) this.update(sdt);
     }
     this.render(this.paused ? 0 : sdt);
+  }
+
+  private catchPrompt(): boolean {
+    const b = this.ball;
+    if (b.state !== 'air' || b.vy > 0 || b.y > 9 || b.kicker?.side === 0 && b.kicker === this.controlled) return false;
+    const land = this.predictLanding();
+    if (!land) return false;
+    return this.teams[0].some((p) => p.state === 'free' && dist(p.x, p.z, land.x, land.z) < 3.5);
+  }
+
+  private windHud() {
+    const { fx, fz, rx, rz } = this.camAxes();
+    const up = this.wind.x * fx + this.wind.z * fz;
+    const right = this.wind.x * rx + this.wind.z * rz;
+    return { deg: Math.round((Math.atan2(right, up) * 180) / Math.PI), kmh: Math.round(Math.hypot(this.wind.x, this.wind.z) * 3.6) };
   }
 
   private pop(text: string, tone: 'good' | 'bad' | 'big') {
@@ -580,6 +632,9 @@ export class MatchEngine {
       canDrop: this.canDropGoal(),
       nearDef: !!(c && this.ball.carrier === c && c.side === 0 && this.phase === 'play' && this.nearestOpponent(c, 3.2)),
       offload: !!this.offload,
+      catchPrompt: this.catchPrompt(),
+      wind: this.windHud(),
+      isNine: !!(c && c.num === 9),
       scrum: this.scrum ? { bal: this.scrum.bal, t: this.scrum.t, dur: this.scrum.dur, choose: this.scrum.stage === 'choose', userFeed: this.scrum.feed === 0 } : null,
       mph: Math.round((this.ball.carrier ? Math.hypot(this.ball.carrier.vx, this.ball.carrier.vz) : c ? Math.hypot(c.vx, c.vz) : 0) * 2.237),
     };
@@ -637,7 +692,10 @@ export class MatchEngine {
         if (this.scrum && this.scrum.stage === 'choose') this.scrumPlay(a.play);
         break;
       case 'kick':
-        if (userHasBall && live) this.kickTo(c!, a.dist, (a.angle * Math.PI) / 180 * this.camRightSign(), a.kind);
+        if (userHasBall && live) this.userKick(c!, a.kind, a.dist, a.angle, a.power ?? 0.85);
+        break;
+      case 'catch':
+        this.catchPressT = this.time;
         break;
       case 'dropgoal':
         if (userHasBall && live && this.canDropGoal()) this.dropGoal(c!);
@@ -660,7 +718,7 @@ export class MatchEngine {
         break;
       case 'tackle':
         if (c && live && this.atBaseT < 0 && b.carrier && b.carrier.side === 1 && c.state === 'free') {
-          const reach = { easy: 2.4, medium: 1.9, hard: 1.6 }[this.cfg.difficulty];
+          const reach = { easy: 2.4, medium: 1.9, hard: 1.6, elite: 1.3 }[this.cfg.difficulty];
           if (dist(c.x, c.z, b.carrier.x, b.carrier.z) <= reach) this.attemptTackle(c, b.carrier, false);
         }
         break;
@@ -830,7 +888,7 @@ export class MatchEngine {
     }
     // Defending: you always control the defender best placed to tackle the ball carrier.
     const carrier = b.carrier ?? (b.state === 'pass' && b.pass ? b.pass.target : null);
-    if (carrier && carrier.side === 1 && this.controlled && !(this.input.tackleHold && this.controlled.state === 'free')) {
+    if (this.cfg.autoSwitch && carrier && carrier.side === 1 && this.controlled && !(this.input.tackleHold && this.controlled.state === 'free')) {
       const score = (p: P) => dist(p.x, p.z, carrier.x, carrier.z) + ((carrier.x - p.x) * dirOf(1) > 0 ? 6 : 0); // prefer defenders in front
       const best = this.teams[0].filter((p) => p.state === 'free').sort((p, q) => score(p) - score(q))[0];
       if (best && best !== this.controlled && (this.controlled.state !== 'free' || score(best) + 1.5 < score(this.controlled))) {
@@ -1098,11 +1156,18 @@ export class MatchEngine {
     // Fit the line into the room on that side so nobody gets stacked on the touchline.
     const n = Math.max(1, Math.min(7, this.slotCount[p.slotSide] ?? 7));
     const room = FIELD.halfW - 2.5 - az * p.slotSide - 4;
-    const gap = clamp(room / n, 2.6, 6);
+    // Attack style: forward-dominant = flat and tight, expansive = deeper and wider.
+    const st = this.tac[side].attack;
+    const depthK = st === 'forwards' ? 0.9 : st === 'expansive' ? 1.8 : 1.4;
+    const widthK = st === 'forwards' ? 0.85 : st === 'expansive' ? 1.12 : 1;
+    const gap = clamp((room / n) * widthK, 2.6, 6.5);
     const j = Math.min(k, 6);
     const deep = k >= 7 ? 6 : 0;
-    const x = ax - d * (3 + j * 1.4 + deep);
-    const z = clamp(az + p.slotSide * (4 + (j + 0.5) * gap), -FIELD.halfW + 2.5, FIELD.halfW - 2.5);
+    // forwards (1-8) hang a little flatter as pods, wingers always hold the width
+    const wing = p.num === 11 || p.num === 14;
+    const x = ax - d * (3 + j * depthK + deep + (p.num <= 8 ? -0.6 : 0));
+    const zOff = wing ? Math.max((j + 0.5) * gap + 4, room - 1) : 4 + (j + 0.5) * gap;
+    const z = clamp(az + p.slotSide * zOff, -FIELD.halfW + 2.5, FIELD.halfW - 2.5);
     return { x, z };
   }
 
@@ -1178,7 +1243,12 @@ export class MatchEngine {
     const chasers = new Set(this.atBaseT >= 0 ? [] : sorted.slice(0, this.phase === 'kickoff' ? 2 : 1));
     const fb = defenders.find((p) => p.num === 15);
     const lineDef = defenders.filter((p) => !chasers.has(p) && p !== fb).sort((p, q) => p.z - q.z);
-    const lineX = fx + dAtt * (this.atBaseT >= 0 ? 3.4 : 5);
+    // Line speed: blitz rushes up, drift sits off and slides; harder CPUs get up quicker.
+    const ds = this.tac[def].defence;
+    const lineGap = ds === 'blitz' ? 3.2 : ds === 'drift' ? 6 : 5;
+    const lineX = fx + dAtt * (this.atBaseT >= 0 ? 3.4 : lineGap);
+    const lineUrg = (ds === 'blitz' ? 0.95 : ds === 'drift' ? 0.72 : 0.8) + (def === 1 ? { easy: -0.08, medium: 0, hard: 0.05, elite: 0.1 }[this.cfg.difficulty] : 0);
+    const drift = ds === 'drift' ? 0.5 : ds === 'blitz' ? 0.2 : 0.35;
     // Even lanes centred on the ball, nudged towards the attacker in each lane.
     const n = lineDef.length;
     const spacing = Math.min(6.2, 62 / Math.max(1, n));
@@ -1189,11 +1259,12 @@ export class MatchEngine {
       const even = centre + (i - (n - 1) / 2) * spacing;
       const idx = n > 1 ? Math.round((i * (attackers.length - 1)) / (n - 1)) : 0;
       const a = attackers[idx];
-      const lane = a ? a.z * 0.35 + even * 0.65 : even;
+      const lane = a ? a.z * drift + even * (1 - drift) : even;
       const wing = p.num === 11 || p.num === 14;
-      p.tx = lineX + dAtt * (wing ? 3 : 0);
+      // Wingers sit back a little to cover the kick unless blitzing.
+      p.tx = lineX + dAtt * (wing ? (ds === 'blitz' ? 1.5 : 4) : 0);
       p.tz = clamp(lane, -33, 33);
-      p.urgency = 0.8;
+      p.urgency = clamp(lineUrg, 0.5, 1);
     });
     if (fb && !chasers.has(fb)) {
       fb.tx = clamp(fx + dAtt * 20, -FIELD.tryX + 2, FIELD.tryX - 2);
@@ -1214,7 +1285,7 @@ export class MatchEngine {
     // Holding TACKLE: the controlled defender tackles automatically once in range.
     const uc = this.controlled;
     if (carrier && this.phase === 'play' && this.atBaseT < 0 && uc && this.input.tackleHold && uc.side !== carrier.side && uc.state === 'free' && uc.tackleCD <= 0) {
-      const reach = { easy: 2.2, medium: 1.8, hard: 1.5 }[this.cfg.difficulty];
+      const reach = { easy: 2.2, medium: 1.8, hard: 1.5, elite: 1.2 }[this.cfg.difficulty];
       if (dist(uc.x, uc.z, carrier.x, carrier.z) <= reach) this.attemptTackle(uc, carrier, false);
     }
     // CPU tackles (the user's controlled defender only tackles when the button is pressed)
@@ -1261,6 +1332,16 @@ export class MatchEngine {
       }
     }
     if (Math.abs(c.z) > 28) steerZ -= Math.sign(c.z) * 3;
+    // Target mismatches: run at the slowest defender in front (a prop on a winger).
+    if (c.side === 1 && c.num >= 9) {
+      let weak: P | null = null;
+      for (const o of opp) {
+        if (o.state !== 'free') continue;
+        const ahead = (o.x - c.x) * d;
+        if (ahead > 0 && ahead < 12 && Math.abs(o.z - c.z) < 10 && (!weak || o.r.pace < weak.r.pace)) weak = o;
+      }
+      if (weak && weak.r.pace < c.r.pace - 15) steerZ += Math.sign(weak.z - c.z || 1) * 1.6;
+    }
     const atBase = this.atBaseT >= 0 && this.ball.carrier === c;
     c.tx = atBase ? c.x : c.x + d * 10;
     c.tz = atBase ? c.z : clamp(c.z + steerZ, -33, 33);
@@ -1281,7 +1362,8 @@ export class MatchEngine {
     this.aiDecisionT = 0.45;
     // tactical kick from deep
     const ownDist = FIELD.tryX + c.x * d;
-    if ((c.num === 10 || c.num === 15 || c.num === 9) && ownDist < 32 && nearest < 9 && rand.chance(0.35)) {
+    const kickK = { low: 0.45, balanced: 1, territory: 1.7 }[this.tac[c.side].kicking];
+    if ((c.num === 10 || c.num === 15 || c.num === 9) && ownDist < 32 * (kickK > 1 ? 1.4 : 1) && nearest < 9 && rand.chance(0.35 * kickK)) {
       this.kickTo(c, rand.range(32, 48), rand.range(-0.45, 0.45), 'punt');
       return;
     }
@@ -1329,7 +1411,7 @@ export class MatchEngine {
   }
 
   private userAssist() {
-    return { easy: 0.12, medium: 0.03, hard: -0.04 }[this.cfg.difficulty];
+    return { easy: 0.12, medium: 0.03, hard: -0.04, elite: -0.11 }[this.cfg.difficulty];
   }
 
   // ---------------------------------------------------------------- tackles
@@ -1518,7 +1600,7 @@ export class MatchEngine {
     let tx = target.x + target.vx * T;
     let tz = target.z + target.vz * T;
     let err = (1 - passer.r.passing / 100) * (long ? 2.6 : 1.4);
-    if (passer.side === 0) err *= { easy: 0.4, medium: 0.8, hard: 1 }[this.cfg.difficulty];
+    if (passer.side === 0) err *= { easy: 0.4, medium: 0.8, hard: 1, elite: 1.2 }[this.cfg.difficulty];
     tx += rand.range(-err, err) * 0.6;
     // A pass always travels slightly backwards: aim at the receiver's line, never in front of the passer.
     if ((tx - passer.x) * d > -0.3) tx = passer.x - d * 0.3;
@@ -1661,7 +1743,13 @@ export class MatchEngine {
       return { vx: hx * vh, vy: GRUB_VY, vz: hz * vh };
     }
     // flight time grows with distance; box kicks hang longest
-    const T = type === 'box' ? clamp(1.9 + dist * 0.06, 2.6, 4.2) : type === 'drop' ? clamp(1.3 + dist * 0.035, 1.8, 3.2) : clamp(1.1 + dist * 0.05, 1.5, 4);
+    const T =
+      type === 'box' ? clamp(1.9 + dist * 0.06, 2.6, 4.2)
+      : type === 'drop' ? clamp(1.3 + dist * 0.035, 1.8, 3.2)
+      : type === 'chip' ? clamp(1.3 + dist * 0.05, 1.6, 2.3)
+      : type === 'high' ? clamp(2.8 + dist * 0.04, 3.4, 4.6)
+      : type === 'cross' ? clamp(2.2 + dist * 0.035, 2.6, 3.8)
+      : clamp(1.1 + dist * 0.05, 1.5, 4);
     const y0 = 0.7;
     const y1 = 1.1; // catch height
     const vy = (y1 - y0 + 0.5 * G * T * T) / T;
@@ -1670,8 +1758,8 @@ export class MatchEngine {
   }
 
   /** Kick from player p to land `dist` m away along heading `aim` (radians), with kicker-skill error. */
-  private kickTo(p: P, dist: number, aim: number, type: KickType, exact = false) {
-    const skill = clamp(1.15 - p.r.kicking / 100, 0.1, 0.8);
+  private kickTo(p: P, dist: number, aim: number, type: KickType, exact = false, errMul = 1) {
+    const skill = clamp(1.15 - p.r.kicking / 100, 0.1, 0.8) * errMul;
     const aimErr = exact ? 0 : (rand.next() - 0.5) * 2 * skill * (type === 'grubber' ? 0.09 : 0.11);
     const distErr = exact ? 1 : 1 + (rand.next() - 0.5) * 2 * skill * 0.18;
     const v = this.kickVelocity(dist * distErr, aim + aimErr, p.side, type);
@@ -1701,6 +1789,29 @@ export class MatchEngine {
     for (const pl of this.players) pl.catchCD = pl === p ? 1.2 : 0.35;
     this.setPlay = null;
     if (p.side === 0 && type === 'drop') this.say('Drop goal attempt…', 'info');
+  }
+
+  private catchPressT = -9;
+  /** Kick from the picker: power under ~0.6 falls short, over 1 (held too long) sprays it. */
+  private userKick(c: P, kind: KickKind, dist: number, angle: number, power: number) {
+    if (kind === 'box' && c.num !== 9) kind = 'high';
+    const short = power < 0.6 ? 0.55 + power * 0.75 : 1;
+    const errMul = power > 1 ? 1 + (power - 1) * 5 : power < 0.35 ? 1.4 : 1;
+    let aim = ((angle * Math.PI) / 180) * this.camRightSign();
+    if (kind === 'touch') {
+      // Find touch: aim to land just over the nearer touchline.
+      const sgn = c.z >= 0 ? 1 : -1;
+      const dz = sgn * (FIELD.halfW + 2) - c.z;
+      aim = Math.asin(clamp(dz / Math.max(dist, 1), -0.95, 0.95));
+    }
+    this.kickTo(c, dist * short, aim, kind, false, errMul);
+    if (kind === 'high' || kind === 'box' || kind === 'chip' || kind === 'cross') {
+      // chasers go after it
+      const land = () => this.predictLanding();
+      const t = this.teams[c.side];
+      const chasers = kind === 'cross' ? [t[13], t[10]] : kind === 'chip' ? [c] : [t[10], t[13], t[14]];
+      this.setPlay = { id: 'upandunder', targets: [], routes: new Map(chasers.map((p) => [p, land] as const)), until: this.time + 4 };
+    }
   }
 
   /** Is the user's carrier in range for a drop goal? */
@@ -1848,7 +1959,14 @@ export class MatchEngine {
     const p = best;
     if (b.state === 'air') {
       let pc = 0.92 + (p.r.handling - 70) / 250;
-      if (p.side === 0) pc += this.userAssist();
+      if (p.side === 0) {
+        pc += this.userAssist();
+        // CATCH timing: a press in the last moment = clean take, mashing early = fumble risk.
+        const since = this.time - this.catchPressT;
+        if (since < 0.45) pc = 0.995;
+        else if (since < 1.2) pc -= 0.06;
+      }
+      if (this.cfg.weather === 'rain') pc -= 0.07;
       if (!rand.chance(clamp(pc, 0.55, 0.98))) {
         p.catchCD = 0.6;
         if (rand.chance(0.6) && !this.cfg.drill) {
@@ -2279,7 +2397,7 @@ export class MatchEngine {
     const att = r.att;
     const def = other(att);
     let pTurn = 0.06;
-    if (def === 1) pTurn += { easy: -0.03, medium: 0.01, hard: 0.05 }[this.cfg.difficulty];
+    if (def === 1) pTurn += { easy: -0.03, medium: 0.01, hard: 0.05, elite: 0.09 }[this.cfg.difficulty];
     // ADD PLAYER: attackers secure the ball, defenders committing make a steal likelier
     if (att === 0) pTurn *= Math.pow(0.45, r.addAtt);
     else pTurn = Math.min(0.55, pTurn + r.addDef * 0.16);
@@ -2305,7 +2423,7 @@ export class MatchEngine {
       this.stoppage(() => this.awardPenalty(0, r.x, r.z));
       return;
     }
-    const cpuOff = { easy: 0.06, medium: 0.035, hard: 0.02 }[this.cfg.difficulty];
+    const cpuOff = { easy: 0.06, medium: 0.035, hard: 0.02, elite: 0.005 }[this.cfg.difficulty];
     if (att === 0 && rand.chance(cpuOff)) {
       this.whistle();
       this.say('Offside!', 'good', `Penalty ${this.teamShort(0)}`);
@@ -2341,7 +2459,7 @@ export class MatchEngine {
   private startMaul(x: number, z: number, att: Side, carrier: P) {
     this.phase = 'maul';
     this.phaseT = 0;
-    const cpuPush = { easy: 1.3, medium: 1.9, hard: 2.4 }[this.cfg.difficulty] + (this.teamStrength(1) - 75) / 25;
+    const cpuPush = { easy: 1.3, medium: 1.9, hard: 2.4, elite: 2.9 }[this.cfg.difficulty] + (this.teamStrength(1) - 75) / 25;
     this.maul = { x, z, att, t: 0, dur: 3.4, start: x, carrier, cpuPush, userPush: 0 };
     const b = this.ball;
     b.carrier = carrier;
@@ -2524,7 +2642,7 @@ export class MatchEngine {
     }
     // Push battle: the feeding side has a small edge, a good engage adds to the user's.
     const base = this.players.filter((p) => p.state === 'bound').map((p) => ({ p, x: p.x, z: p.z }));
-    const cpu = { easy: 0.55, medium: 0.72, hard: 0.86 }[this.cfg.difficulty] + (this.teamStrength(1) - this.teamStrength(0)) / 45;
+    const cpu = { easy: 0.55, medium: 0.72, hard: 0.86, elite: 1 }[this.cfg.difficulty] + (this.teamStrength(1) - this.teamStrength(0)) / 45;
     this.scrum = {
       x, z, feed, bal: (q - 0.5) * 0.35, t: 0, dur: 4.2, user: 0, cpu, bias: feed === 0 ? 0.12 : -0.12,
       stage: 'push', chooseT: 0, winner: feed, base,
@@ -2771,11 +2889,22 @@ export class MatchEngine {
       // CPU kicker
       const angleF = Math.abs(z) / Math.max(goalDist, 1);
       let p = 1.08 - goalDist / 58 - angleF * 0.3 + (kicker.r.kicking - 75) / 140;
-      p += { easy: -0.12, medium: 0, hard: 0.06 }[this.cfg.difficulty];
+      p += { easy: -0.12, medium: 0, hard: 0.06, elite: 0.12 }[this.cfg.difficulty];
       const success = rand.chance(clamp(p, 0.12, 0.95));
       const aimErr = success ? rand.range(-0.6, 0.6) : (rand.chance(0.5) ? -1 : 1) * rand.range(4, 9);
       this.after(1.6, () => this.shootPlaceKick(aimErr, 0.62, 0));
     }
+  }
+
+  /** Conversions: move the ball back along the line it was grounded on (wider angle, longer kick). Returns metres out. */
+  movePlaceKick(dm: number): number {
+    const b = this.ball;
+    if (this.phase !== 'placekick' || this.placeKind !== 'conversion' || b.state !== 'dead') return 0;
+    const d = dirOf(this.placeSide);
+    const out = clamp(FIELD.tryX - b.x * d + dm, 5, 35);
+    b.x = d * (FIELD.tryX - out);
+    if (this.placeKicker) this.place(this.placeKicker, b.x - d * 3, b.z - 1.2);
+    return dist(b.x, b.z, d * FIELD.tryX, 0);
   }
 
   /** User drags to aim (degrees relative to the posts). */
@@ -2862,6 +2991,14 @@ export class MatchEngine {
         routes.set(wing, () => ({ x: c.x + d * 3, z: open * 31 }));
         targets = [skip, wing];
         this.say('Miss pass wide', 'info', 'Skip to the outside');
+        break;
+      }
+      case 'switch': {
+        // Switch: the outside centre cuts back on an angle behind the carrier for an inside ball.
+        const r = free(n(13)) ? n(13) : n(12);
+        routes.set(r, () => ({ x: c.x + d * 1.5, z: clamp(c.z - open * 2.5, -33, 33) }));
+        targets = [r];
+        this.say('Switch play', 'info', `${r.name} cuts back inside`);
         break;
       }
       case 'upandunder': {
@@ -3112,6 +3249,9 @@ export class MatchEngine {
       key.position.set(f3.x - 35, f3.y + 70, f3.z + 45);
     }
 
+    // support runner in space calls for the ball (small bubble above the head)
+    this.updateCallIcon(rf);
+
     // selected player: glowing ring + arrow above the head
     const c = this.controlled;
     const showSel = !rf && !!c && c.state !== 'off' && this.phase !== 'placekick' && this.cfg.drill !== 'kicking' && this.camMode !== 'try';
@@ -3283,6 +3423,53 @@ export class MatchEngine {
     this.kickRing.scale.setScalar(1 + Math.sin(this.time * 6) * 0.06);
   }
 
+  private callSprite: THREE.Sprite | null = null;
+  private callT = 0;
+  private callFor: P | null = null;
+  private updateCallIcon(rf: ReplayFrame | null) {
+    const c = this.ball.carrier;
+    let show: P | null = null;
+    if (!rf && c && c.side === 0 && c === this.controlled && this.phase === 'play' && this.atBaseT < 0) {
+      // re-evaluate a few times a second so the bubble doesn't flicker between runners
+      if (this.time - this.callT > 0.35) {
+        this.callT = this.time;
+        const side = Math.abs(this.input.moveX) > 0.3 ? Math.sign(this.input.moveX) * this.camRightSign() : c.z < 0 ? 1 : -1;
+        const t = this.passTarget(c, side, false) ?? this.passTarget(c, -side, false);
+        const free = t && !this.nearestOpponent(t, 4.5);
+        this.callFor = free ? t! : null;
+      }
+      show = this.callFor;
+    }
+    if (!show) {
+      if (this.callSprite) this.callSprite.visible = false;
+      return;
+    }
+    if (!this.callSprite) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 64;
+      const g = cv.getContext('2d')!;
+      g.fillStyle = '#c6ff1a';
+      g.beginPath();
+      g.arc(32, 28, 22, 0, Math.PI * 2);
+      g.moveTo(24, 46);
+      g.lineTo(32, 60);
+      g.lineTo(40, 46);
+      g.fill();
+      g.fillStyle = '#0b0f17';
+      g.font = '900 32px Arial';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText('!', 32, 30);
+      const tex = new THREE.CanvasTexture(cv);
+      this.callSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+      this.callSprite.renderOrder = 6;
+      this.callSprite.scale.set(0.7, 0.7, 1);
+      this.scene.add(this.callSprite);
+    }
+    show.av.headPosition(this.tmpV);
+    this.callSprite.position.set(show.x, this.tmpV.y + 0.75 + Math.sin(this.time * 6) * 0.06, show.z);
+    this.callSprite.visible = true;
+  }
   private camZoom = 1;
   private cpos = new THREE.Vector3();
   private clook = new THREE.Vector3();
@@ -3402,7 +3589,7 @@ const SHADOW_BASIS = (() => {
   const up = new THREE.Vector3().crossVectors(right, dir).normalize();
   return { dir, right, up };
 })();
-type KickType = 'punt' | 'grubber' | 'box' | 'drop';
+type KickType = 'punt' | 'grubber' | 'box' | 'drop' | 'chip' | 'high' | 'touch' | 'cross';
 const GRUB_VY = 3.2;
 const GRUB_REST = 0.45;
 const GRUB_KEEP = 0.8;

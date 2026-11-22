@@ -65,7 +65,7 @@ function freshProfile(): Profile {
   return {
     version: 1,
     coins: 1500,
-    settings: { music: 0.5, sfx: 0.8, haptics: true, difficulty: 'medium', camera: 'broadcast', halfLength: 4, graphics: 'auto' },
+    settings: { music: 0.5, sfx: 0.8, haptics: true, difficulty: 'medium', camera: 'broadcast', halfLength: 5, graphics: 'auto', weather: 'dry', tactics: { attack: 'balanced', defence: 'balanced', kicking: 'balanced' }, rules: 'standard', autoSwitch: true, leftHanded: false, buttonScale: 1 },
     club: starterClub(),
     championship: null,
     worldCup: null,
@@ -83,7 +83,12 @@ function load(): Profile {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const p = JSON.parse(raw) as Profile;
-      if (p.version === 1) return { ...freshProfile(), ...p, settings: { ...freshProfile().settings, ...p.settings } };
+      if (p.version === 1) {
+        const out: Profile = { ...freshProfile(), ...p, settings: { ...freshProfile().settings, ...p.settings } };
+        // older saves used 4/6/10 minute halves
+        if (![3, 5, 8].includes(out.settings.halfLength)) out.settings.halfLength = 5;
+        return out;
+      }
     }
   } catch {
     /* corrupted or unavailable */
@@ -231,7 +236,7 @@ export function claimChallenge(id: string) {
   audio.coin();
 }
 
-const DIFF_MULT = { easy: 0.8, medium: 1, hard: 1.4 } as const;
+const DIFF_MULT = { easy: 0.8, medium: 1, hard: 1.4, elite: 1.8 } as const;
 
 /** Applies a finished match to stats, challenges and coins. Returns coins earned. */
 export function recordMatch(r: MatchResult): number {

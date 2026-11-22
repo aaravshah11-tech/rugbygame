@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
-import { ActionButtons, DodgeLayer, Joystick } from '../ui/controls';
+import { ActionButtons, CatchButton, DodgeLayer, Joystick, KickPicker } from '../ui/controls';
 import { MiniGame, PlaceKickUI, ScoreBug, ScrumBattle, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
+import { TacticsPanel } from '../ui/tactics';
 import { update, useProfile } from '../state/store';
 import type { CameraMode } from '../state/types';
 
@@ -17,13 +18,14 @@ export interface MatchOutcome {
 const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
   { id: 'crash', name: 'Crash Ball', desc: 'Inside centre runs a hard line off you — next pass finds him' },
   { id: 'loop', name: 'Loop Play', desc: 'Pass to 12, fly-half loops round for the return' },
-  { id: 'miss', name: 'Miss Pass Wide', desc: 'Skip 12 to 13, winger hugs the touchline' },
+  { id: 'miss', name: 'Skip Wide', desc: 'Long pass to the outside backs, winger hugs the touchline' },
+  { id: 'switch', name: 'Switch Play', desc: 'Outside centre cuts back for an inside ball' },
   { id: 'upandunder', name: 'Up & Under', desc: 'High hanging kick, back three chase' },
 ];
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null,
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null, catchPrompt: false, wind: { deg: 0, kmh: 0 }, isNine: false,
 };
 
 export function MatchScreen({
@@ -49,8 +51,10 @@ export function MatchScreen({
   const [halftime, setHalftime] = useState(false);
   const [outcome, setOutcome] = useState<MatchOutcome | null>(null);
   const [paused, setPaused] = useState(false);
+  const [pauseTab, setPauseTab] = useState<'menu' | 'tactics' | 'subs'>('menu');
   const [plays, setPlays] = useState(false);
   const [drill, setDrill] = useState<{ text: string; progress: string } | null>(null);
+  const [kickMenu, setKickMenu] = useState(false);
   const [pops, setPops] = useState<{ id: number; text: string; tone: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
@@ -235,10 +239,18 @@ export function MatchScreen({
             {p.text}
           </div>
         ))}
+        {kickMenu && showControls && hud.attacking && !hud.ruck && <KickPicker input={input.current} isNine={hud.isNine} onClose={() => setKickMenu(false)} />}
+        {showControls && hud.catchPrompt && <CatchButton input={input.current} />}
+        {!cfg.drill && hud.wind.kmh > 0 && (
+          <div className="wind-chip">
+            <span style={{ transform: `rotate(${hud.wind.deg}deg)` }}>↑</span>
+            {hud.wind.kmh} km/h
+          </div>
+        )}
         {hud.scrum && !mini && <ScrumBattle s={hud.scrum} input={input.current} userShort={cfg.user.short} cpuShort={cfg.cpu.short} />}
         {showControls && <Joystick input={input.current} />}
         {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
-        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} ruckDef={hud.ruckDef} ruckBall={hud.ruckBall} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
+        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} ruckDef={hud.ruckDef} ruckBall={hud.ruckBall} onKick={() => setKickMenu(true)} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}
         {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} onDone={() => {}} />}
@@ -351,8 +363,28 @@ export function MatchScreen({
 
       {paused && !outcome && (
         <div className="sheet">
-          <div className="card" style={{ textAlign: 'center' }}>
+          <div className="card" style={{ textAlign: 'center', maxHeight: '88vh', overflowY: 'auto' }}>
             <h2>Paused</h2>
+            <div className="tabs" style={{ justifyContent: 'center', marginBottom: 10 }}>
+              {(['menu', 'tactics', 'subs'] as const).map((t) => (
+                <button key={t} className={`tab ${pauseTab === t ? 'on' : ''}`} onClick={() => setPauseTab(t)}>
+                  {t === 'menu' ? 'Match' : t === 'tactics' ? 'Tactics' : 'Subs'}
+                </button>
+              ))}
+            </div>
+            {pauseTab === 'tactics' && (
+              <div style={{ textAlign: 'left', marginBottom: 12 }}>
+                <TacticsPanel
+                  value={profile.settings.tactics}
+                  onChange={(t) => {
+                    update((p) => (p.settings.tactics = t));
+                    engine.current?.setTactics(t);
+                  }}
+                />
+              </div>
+            )}
+            {pauseTab === 'subs' && engine.current && <SubsPanel engine={engine.current} />}
+            {pauseTab === 'menu' && <>
             <p className="muted">Camera</p>
             <div className="seg" style={{ marginBottom: 12 }}>
               {(['broadcast', 'sideline', 'close'] as CameraMode[]).map((m) => (
@@ -364,10 +396,11 @@ export function MatchScreen({
                     engine.current?.setCamera(m);
                   }}
                 >
-                  {m}
+                  {m === 'broadcast' ? 'Broadcast' : m === 'close' ? 'Behind' : 'Side-on'}
                 </button>
               ))}
             </div>
+            </>}
             <div className="row" style={{ justifyContent: 'center' }}>
               <button className="btn primary" onClick={() => pause(false)}>
                 Resume
@@ -427,6 +460,51 @@ export function MatchScreen({
               Continue
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Pick a tired player, then a replacement from the bench. */
+function SubsPanel({ engine }: { engine: MatchEngine }) {
+  const [sel, setSel] = useState<number | null>(null);
+  const [, force] = useState(0);
+  const sq = engine.squad();
+  return (
+    <div style={{ textAlign: 'left', marginBottom: 12 }}>
+      <div className="muted italic" style={{ fontSize: 12, marginBottom: 6 }}>{sel ? `Replace #${sel} with…` : 'Tap a player to take off'}</div>
+      {sel === null ? (
+        <div className="subs-grid">
+          {sq.field.map((f) => (
+            <button key={f.num} className="sub-row" disabled={f.off} onClick={() => setSel(f.num)}>
+              <b>{f.num}</b>
+              <span>{f.name}</span>
+              <i className="stam" style={{ width: `${Math.round(f.stamina * 100)}%`, background: f.stamina < 0.4 ? '#ff3d5e' : f.stamina < 0.7 ? '#ffb020' : '#7dff3a' }} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="subs-grid">
+          {sq.bench.length === 0 && <div className="muted">No replacements left.</div>}
+          {sq.bench.map((b) => (
+            <button
+              key={b.idx}
+              className="sub-row"
+              onClick={() => {
+                engine.substitute(sel, b.idx);
+                setSel(null);
+                force((x) => x + 1);
+              }}
+            >
+              <b>{b.pos}</b>
+              <span>{b.name}</span>
+              <small>OVR {b.ovr}</small>
+            </button>
+          ))}
+          <button className="btn ghost" onClick={() => setSel(null)}>
+            Back
+          </button>
         </div>
       )}
     </div>
