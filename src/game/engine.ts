@@ -132,6 +132,7 @@ export class MatchEngine {
   private ball: Ball;
   private ballMesh: THREE.Mesh;
   private targetRing: THREE.Mesh;
+  private passMarks: [THREE.Sprite, THREE.Sprite];
   private offsideLine: THREE.Mesh;
   private arc: THREE.Line;
   private shadows: THREE.InstancedMesh;
@@ -176,6 +177,7 @@ export class MatchEngine {
   private camModeT = 0;
   private tackleZoomT = 0;
   private exciteBoost = 0;
+  private phaseCount = 0;
   private drillCount = 0;
   private drillScore = 0;
   private drillStage = 0;
@@ -234,6 +236,36 @@ export class MatchEngine {
     this.targetRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#21e6c1', transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.targetRing.position.y = 0.035;
     this.scene.add(this.targetRing);
+
+    // Pass markers: who receives a left / right pass right now.
+    const mark = (dir: -1 | 1) => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const g = c.getContext('2d')!;
+      g.fillStyle = 'rgba(10,14,22,0.75)';
+      g.beginPath();
+      g.arc(64, 64, 56, 0, Math.PI * 2);
+      g.fill();
+      g.lineWidth = 8;
+      g.strokeStyle = '#c6ff1a';
+      g.stroke();
+      g.fillStyle = '#c6ff1a';
+      g.beginPath();
+      g.moveTo(64 + dir * 30, 64);
+      g.lineTo(64 - dir * 18, 34);
+      g.lineTo(64 - dir * 18, 94);
+      g.closePath();
+      g.fill();
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+      sp.scale.setScalar(0.75);
+      sp.renderOrder = 10;
+      sp.visible = false;
+      this.scene.add(sp);
+      return sp;
+    };
+    this.passMarks = [mark(-1), mark(1)];
 
     const offGeo = new THREE.PlaneGeometry(0.25, 70);
     offGeo.rotateX(-Math.PI / 2);
@@ -341,7 +373,7 @@ export class MatchEngine {
     const h = this.host.clientHeight || window.innerHeight;
     this.post.setSize(w, h);
     this.camera.aspect = w / h;
-    this.camera.fov = w / h < 1 ? 66 : 48;
+    this.camera.fov = w / h < 1 ? 70 : 55;
     this.camera.updateProjectionMatrix();
     this.particles?.setViewportHeight(h * this.renderer.getPixelRatio(), this.camera.fov);
   }
@@ -478,6 +510,7 @@ export class MatchEngine {
       stamina: c ? c.stamina : 1,
       timeUp: this.timeUp(),
       phase: this.phase,
+      phaseNum: this.phaseCount,
     };
   }
 
@@ -757,6 +790,14 @@ export class MatchEngine {
       }
     } else if (this.lineBreakFrom !== 1e9) this.lineBreakFrom = null;
 
+    if (c.side === 0 && c === this.controlled && this.atBaseT >= 0) {
+      this.atBaseT += dt;
+      if (Math.hypot(this.input.moveX, this.input.moveY) > 0.5) this.atBaseT = -1; // sniping: the user runs it
+      else if (this.atBaseT > 1.1) {
+        this.atBaseT = -1;
+        this.doPass(c, false, 0);
+      }
+    }
     if (c.side === 1 || c !== this.controlled) this.cpuCarrier(dt, c);
   }
 
@@ -776,17 +817,26 @@ export class MatchEngine {
       if (openRight) right.unshift(left.shift()!);
       else left.unshift(right.shift()!);
     }
-    left.forEach((p, k) => ((p.slotSide = -1), (p.slotK = k)));
-    right.forEach((p, k) => ((p.slotSide = 1), (p.slotK = k)));
+    const byRole = (a: P, b: P) => (a.num <= 8 ? 0 : 1) - (b.num <= 8 ? 0 : 1) || Math.abs(a.z - az) - Math.abs(b.z - az);
+    left.sort(byRole).forEach((p, k) => ((p.slotSide = -1), (p.slotK = k)));
+    right.sort(byRole).forEach((p, k) => ((p.slotSide = 1), (p.slotK = k)));
     void ax;
   }
 
   private attackSlotTarget(p: P, ax: number, az: number, side: Side) {
     const d = dirOf(side);
     const k = p.slotK;
-    const deep = k >= 5 ? 7 : 0;
-    const x = ax - d * (2.8 + Math.min(k, 4) * 1.3 + deep);
-    const z = clamp(az + p.slotSide * (5 + Math.min(k, 5) * 5.2), -FIELD.halfW + 2, FIELD.halfW - 2);
+    if (p.num <= 8 && k < 4) {
+      // forward pods just off the ball
+      const x = ax - d * (2 + (k % 2) * 1.2);
+      const z = clamp(az + p.slotSide * (3 + Math.floor(k / 2) * 3.2), -FIELD.halfW + 2, FIELD.halfW - 2);
+      return { x, z };
+    }
+    // backs: a clean staggered line, 6.5m apart, each a little deeper
+    const j = p.num <= 8 ? k + 3 : k;
+    const deep = j >= 7 ? 6 : 0;
+    const x = ax - d * (3.5 + Math.min(j, 6) * 1.5 + deep);
+    const z = clamp(az + p.slotSide * (6 + Math.min(j, 6) * 6.5), -FIELD.halfW + 2.5, FIELD.halfW - 2.5);
     return { x, z };
   }
 
@@ -854,18 +904,25 @@ export class MatchEngine {
     // Chasers: up to two closest defenders hunt the carrier.
     const hunt = carrier ?? (b.pass ? b.pass.target : null);
     const sorted = [...defenders].sort((p, q) => dist(p.x, p.z, fx, fz) - dist(q.x, q.z, fx, fz));
-    const chasers = new Set(sorted.slice(0, this.phase === 'kickoff' ? 3 : 2));
+    const chasers = new Set(sorted.slice(0, this.phase === 'kickoff' ? 2 : 1));
     const fb = defenders.find((p) => p.num === 15);
     const lineDef = defenders.filter((p) => !chasers.has(p) && p !== fb).sort((p, q) => p.z - q.z);
     const lineX = fx + dAtt * (this.atBaseT >= 0 ? 4 : 3);
+    // Even lanes centred on the ball, nudged towards the attacker in each lane.
+    const n = lineDef.length;
+    const spacing = Math.min(6.2, 62 / Math.max(1, n));
+    let centre = fz;
+    const half = ((n - 1) / 2) * spacing;
+    centre = clamp(centre, -33 + half, 33 - half);
     lineDef.forEach((p, i) => {
-      const idx = lineDef.length > 1 ? Math.round((i * (attackers.length - 1)) / (lineDef.length - 1)) : 0;
+      const even = centre + (i - (n - 1) / 2) * spacing;
+      const idx = n > 1 ? Math.round((i * (attackers.length - 1)) / (n - 1)) : 0;
       const a = attackers[idx];
-      const lane = a ? a.z : fz;
+      const lane = a ? a.z * 0.35 + even * 0.65 : even;
       const wing = p.num === 11 || p.num === 14;
-      p.tx = lineX + dAtt * (wing ? 5 : 0);
-      p.tz = clamp(lane * 0.85 + fz * 0.15, -33, 33);
-      p.urgency = 0.82;
+      p.tx = lineX + dAtt * (wing ? 3 : 0);
+      p.tz = clamp(lane, -33, 33);
+      p.urgency = 0.8;
     });
     if (fb && !chasers.has(fb)) {
       fb.tx = clamp(fx + dAtt * 20, -FIELD.tryX + 2, FIELD.tryX - 2);
@@ -888,7 +945,7 @@ export class MatchEngine {
       for (const p of this.teams[def]) {
         if (p.state !== 'free' || p.tackleCD > 0 || p === this.controlled) continue;
         const d = dist(p.x, p.z, carrier.x, carrier.z);
-        if (d < 1.25) {
+        if (d < 1.1) {
           this.attemptTackle(p, carrier, false);
           if (this.ball.carrier !== carrier) break;
         }
@@ -1003,13 +1060,16 @@ export class MatchEngine {
     if (dive) p += 0.08;
     if (c.handoffT > 0) p -= 0.12 + (c.r.strength - t.r.strength) / 200;
     if (c.sidestepT > 0) p -= 0.2 * (c.r.pace / 90);
-    p += t.side === 0 ? this.userAssist() + 0.08 : -this.userAssist();
+    p += t.side === 0 ? this.userAssist() + 0.08 : -this.userAssist() - 0.06;
+    // Automatic fend: strong carriers driving through contact can bump tacklers off.
+    if (c.side === 0 && c === this.controlled && Math.hypot(this.input.moveX, this.input.moveY) > 0.5) p -= Math.max(0, (c.r.strength - t.r.strength) / 160);
     p = clamp(p, 0.15, 0.95);
     if (rand.chance(p)) {
       this.tackleMade(t, c);
     } else {
       t.state = 'down';
       t.timer = dive ? 1.2 : 0.7;
+      if (!c.av.busy) c.fx = 'handoff';
       if (rand.chance(0.6)) this.say(line('brokenTackle'), c.side === 0 ? 'good' : 'bad');
     }
   }
@@ -1070,9 +1130,20 @@ export class MatchEngine {
   }
 
   // ---------------------------------------------------------------- passing
-  private doPass(passer: P, long: boolean, dirHint: -1 | 0 | 1): boolean {
+  /** Receiver for a pass to world side s (+1 = +z), or undefined if nobody is there. */
+  private passTarget(passer: P, s: number, long: boolean): P | undefined {
     const d = dirOf(passer.side);
-    const mates = this.teams[passer.side].filter((p) => p !== passer && p.state === 'free');
+    const c = this.teams[passer.side]
+      .filter((p) => p !== passer && p.state === 'free')
+      .filter((p) => (p.z - passer.z) * s > 1.2 && (p.x - passer.x) * d < 2.5 && dist(p.x, p.z, passer.x, passer.z) < 30)
+      .sort((a, b) => Math.abs(a.z - passer.z) - Math.abs(b.z - passer.z));
+    if (!c.length) return undefined;
+    if (!long) return c[0];
+    const farther = c.filter((p) => Math.abs(p.z - passer.z) > 8);
+    return farther[Math.min(1, farther.length - 1)] ?? c[c.length - 1];
+  }
+
+  private doPass(passer: P, long: boolean, dirHint: -1 | 0 | 1): boolean {
     let side = 0;
     if (dirHint !== 0) side = dirHint * this.camRightSign();
     else if (passer === this.controlled && Math.abs(this.input.moveX) > 0.3) side = Math.sign(this.input.moveX) * this.camRightSign();
@@ -1083,23 +1154,18 @@ export class MatchEngine {
       target = this.setPlay.targets.shift();
     }
     if (!target) {
-      const pick = (s: number) => {
-        const c = mates
-          .filter((p) => (p.z - passer.z) * s > 1.2 && (p.x - passer.x) * d < 2.5 && dist(p.x, p.z, passer.x, passer.z) < 30)
-          .sort((a, b) => Math.abs(a.z - passer.z) - Math.abs(b.z - passer.z));
-        if (!c.length) return undefined;
-        if (!long) return c[0];
-        const farther = c.filter((p) => Math.abs(p.z - passer.z) > 8);
-        return farther[Math.min(1, farther.length - 1)] ?? c[c.length - 1];
-      };
-      if (side !== 0) target = pick(side);
-      if (!target) {
-        // pick the side with more support space
+      const pick = (s: number) => this.passTarget(passer, s, long);
+      if (side !== 0) {
+        // The user chose a side: never throw it the other way.
+        target = pick(side);
+        if (!target && passer.side === 0 && dirHint !== 0) this.say('No one there!', 'info');
+      } else {
         const sOpen = passer.z < 0 ? 1 : -1;
         target = pick(sOpen) ?? pick(-sOpen);
       }
     }
     if (!target) return false;
+    const d = dirOf(passer.side);
     const distTo = dist(passer.x, passer.z, target.x, target.z);
     const speed = long ? 19 : 14;
     const T = clamp(distTo / speed, 0.25, 1.6);
@@ -1188,6 +1254,7 @@ export class MatchEngine {
   private giveBall(p: P) {
     const b = this.ball;
     const changed = b.lastSide !== p.side;
+    if (changed) this.phaseCount = 0;
     if (b.state === 'pass' || b.state === 'air') p.fx = 'catch';
     b.state = 'held';
     b.carrier = p;
@@ -1652,7 +1719,8 @@ export class MatchEngine {
     const z = c.z;
     this.phase = 'ruck';
     this.phaseT = 0;
-    this.ruck = { x, z, att, t: 0, dur: 2.1 };
+    this.ruck = { x, z, att, t: 0, dur: 1.3 };
+    this.phaseCount++;
     const b = this.ball;
     b.carrier = null;
     b.state = 'dead';
@@ -1678,8 +1746,7 @@ export class MatchEngine {
     this.positionAroundBreakdown(x, z, att);
     const uc = this.controlled;
     if (att === 1 && uc && uc.state === 'free' && (uc.x - x) * d < -1 && Math.abs(uc.z - z) < 8) this.say('Get back onside!', 'info', 'Stay behind the yellow line');
-    // Non-blocking timing bar: secure (attack) or jackal (defence)
-    this.requestMini(att === 0 ? 'ruck' : 'counterRuck', false, 1.7);
+    // Rucks resolve automatically from the players' ratings to keep play flowing.
   }
 
   private positionAroundBreakdown(x: number, z: number, att: Side) {
@@ -2440,6 +2507,18 @@ export class MatchEngine {
       c.av.headPosition(this.tmpV);
       this.selector.place(c.x, c.z, this.tmpV.y, this.time, true);
     } else this.selector.place(0, 0, 0, 0, false);
+    // Pass markers over the players who would receive a left / right pass.
+    const showMarks = !rf && !!c && b.carrier === c && c.side === 0 && (this.phase === 'play' || this.phase === 'kickoff');
+    const crs = this.camRightSign();
+    ([-1, 1] as const).forEach((dir, i) => {
+      const sp = this.passMarks[i];
+      const t = showMarks && c ? this.passTarget(c, dir * crs, false) : undefined;
+      sp.visible = !!t;
+      if (t) {
+        t.av.headPosition(this.tmpV);
+        sp.position.set(t.x, this.tmpV.y + 0.75 + Math.sin(this.time * 5 + i) * 0.06, t.z);
+      }
+    });
     const tgt = !rf && b.state === 'pass' && b.pass ? b.pass.target : null;
     this.targetRing.visible = !!tgt;
     if (tgt) this.targetRing.position.set(tgt.x, 0.035, tgt.z);
@@ -2591,10 +2670,10 @@ export class MatchEngine {
         look = new THREE.Vector3(focus.x + 8, 1, focus.z);
       } else {
         // Low broadcast camera: ~12m behind and 7m above the carrier, looking down the pitch to the try line.
-        const back = tight ? 8.5 : 12;
-        const up = tight ? 5.2 : 7;
-        pos = new THREE.Vector3(focus.x - back, up, focus.z * 0.9);
-        look = new THREE.Vector3(focus.x + 15, 0.6, focus.z * 0.97);
+        const back = tight ? 7.5 : 9.5;
+        const up = tight ? 3.8 : 4.6;
+        pos = new THREE.Vector3(focus.x - back, up, focus.z * 0.85);
+        look = new THREE.Vector3(focus.x + 16, 1.0, focus.z * 0.9);
       }
       if (b.state === 'air') pos.y += Math.min(5, b.y * 0.35);
     }

@@ -11,7 +11,10 @@ export function Joystick({ input }: { input: InputState }) {
   const origin = useRef({ x: 0, y: 0 });
   const R = 56;
 
+  const [sprinting, setSprinting] = useState(false);
   const end = () => {
+    setSprinting(false);
+    input.sprint = false;
     pid.current = null;
     setBase(null);
     setKnob({ x: 0, y: 0 });
@@ -49,6 +52,9 @@ export function Joystick({ input }: { input: InputState }) {
         setKnob({ x: dx, y: dy });
         input.moveX = dx / R;
         input.moveY = -dy / R;
+        const sprint = Math.hypot(dx, dy) > R * 0.9;
+        input.sprint = sprint;
+        setSprinting(sprint);
       }}
       onPointerUp={(e) => e.pointerId === pid.current && end()}
       onPointerCancel={(e) => e.pointerId === pid.current && end()}
@@ -61,7 +67,8 @@ export function Joystick({ input }: { input: InputState }) {
           opacity: base ? 1 : 0.5,
         }}
       >
-        <div className="joy-knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+        <div className={`joy-knob ${sprinting ? 'sprint' : ''}`} style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+        {base && <div className="joy-hint">{sprinting ? 'SPRINT' : ''}</div>}
       </div>
     </div>
   );
@@ -119,34 +126,50 @@ function ActionButton({ label, sub, size, color, pos, onDown, onMove, onUp, chil
   );
 }
 
+// ---------------------------------------------------------------- icons
+const Ball = ({ x = 12, y = 12, r = 0 }: { x?: number; y?: number; r?: number }) => (
+  <g transform={`translate(${x} ${y}) rotate(${r})`}>
+    <ellipse rx="6.5" ry="4.2" fill="currentColor" />
+    <path d="M-3 0 H3 M-1.5 -1.2 V1.2 M0 -1.2 V1.2 M1.5 -1.2 V1.2" stroke="var(--btn-bg, #c6ff1a)" strokeWidth="0.9" />
+  </g>
+);
+const PassIcon = ({ dir }: { dir: -1 | 1 }) => (
+  <svg viewBox="0 0 48 32" width="44" height="30" aria-hidden>
+    <Ball x={dir < 0 ? 33 : 15} y={16} r={dir * -15} />
+    <path d={dir < 0 ? 'M24 16 H6 M12 9 L5 16 L12 23' : 'M24 16 H42 M36 9 L43 16 L36 23'} stroke="currentColor" strokeWidth="3.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const KickIcon = () => (
+  <svg viewBox="0 0 40 32" width="34" height="28" aria-hidden>
+    <path d="M6 28 Q18 2 34 10" stroke="currentColor" strokeWidth="2.6" fill="none" strokeDasharray="3 3" strokeLinecap="round" />
+    <Ball x={32} y={10} r={-30} />
+  </svg>
+);
+const TackleIcon = () => (
+  <svg viewBox="0 0 40 32" width="36" height="28" aria-hidden>
+    <circle cx="11" cy="8" r="4" fill="currentColor" />
+    <path d="M8 13 L20 18 L30 15 M14 15 L10 27 M20 18 L26 27" stroke="currentColor" strokeWidth="3.4" fill="none" strokeLinecap="round" />
+    <circle cx="33" cy="10" r="3.5" fill="currentColor" opacity="0.6" />
+  </svg>
+);
+
 /** Context buttons: attack set when the user has the ball, defence set otherwise. */
 export function ActionButtons({ input, attacking }: { input: InputState; attacking: boolean }) {
-  const passStart = useRef({ x: 0, t: 0 });
-  const [passDir, setPassDir] = useState<-1 | 0 | 1>(0);
   const kickStart = useRef({ x: 0, t: 0 });
+  const passStart = useRef(0);
   const [kickPower, setKickPower] = useState(0);
   const kickRaf = useRef(0);
 
   useEffect(() => () => cancelAnimationFrame(kickRaf.current), []);
 
-  const sprint = (
-    <ActionButton
-      label="Sprint"
-      size="med"
-      color="white"
-      pos={{ right: 168, bottom: 6 }}
-      onDown={() => (input.sprint = true)}
-      onUp={() => (input.sprint = false)}
-    />
-  );
-
   if (!attacking) {
     return (
       <div className="actions">
-        <ActionButton label="Tackle" size="big" color="pink" pos={{ right: 0, bottom: 36 }} onDown={() => input.actions.push({ type: 'tackle' })} />
-        <ActionButton label="Dive" sub="tackle" size="med" color="gold" pos={{ right: 92, bottom: 0 }} onDown={() => input.actions.push({ type: 'dive' })} />
-        <ActionButton label="Switch" size="med" color="cyan" pos={{ right: 96, bottom: 76 }} onDown={() => input.actions.push({ type: 'switch' })} />
-        {sprint}
+        <ActionButton label="Tackle" size="big" color="pink" pos={{ right: 0, bottom: 34 }} onDown={() => input.actions.push({ type: 'tackle' })}>
+          <TackleIcon />
+        </ActionButton>
+        <ActionButton label="Dive" size="med" color="gold" pos={{ right: 98, bottom: 0 }} onDown={() => input.actions.push({ type: 'dive' })} />
+        <ActionButton label="Switch" size="med" color="cyan" pos={{ right: 104, bottom: 80 }} onDown={() => input.actions.push({ type: 'switch' })} />
       </div>
     );
   }
@@ -157,37 +180,27 @@ export function ActionButtons({ input, attacking }: { input: InputState; attacki
     mask: 'radial-gradient(circle, transparent 60%, #000 61%)',
   } as React.CSSProperties;
 
+  const pass = (dir: -1 | 1) => ({
+    onDown: () => (passStart.current = performance.now()),
+    onUp: (_e: React.PointerEvent, cancelled: boolean) => {
+      if (cancelled) return;
+      input.actions.push({ type: 'pass', long: performance.now() - passStart.current > 320, dir });
+    },
+  });
+
   return (
     <div className="actions">
-      <ActionButton
-        label="Pass"
-        sub={passDir === 0 ? 'tap · hold long' : passDir < 0 ? '◀ left' : 'right ▶'}
-        size="big"
-        color="neon"
-        pos={{ right: 0, bottom: 36 }}
-        onDown={(e) => {
-          passStart.current = { x: e.clientX, t: performance.now() };
-          setPassDir(0);
-        }}
-        onMove={(e) => {
-          const dx = e.clientX - passStart.current.x;
-          setPassDir(dx > 18 ? 1 : dx < -18 ? -1 : 0);
-        }}
-        onUp={(e, cancelled) => {
-          if (cancelled) return;
-          const dx = e.clientX - passStart.current.x;
-          const dir = dx > 18 ? 1 : dx < -18 ? -1 : 0;
-          const long = performance.now() - passStart.current.t > 320;
-          input.actions.push({ type: 'pass', long, dir });
-          setPassDir(0);
-        }}
-      />
+      <ActionButton label="Pass" sub="hold = long" size="big" color="neon" pos={{ right: 104, bottom: 0 }} {...pass(-1)}>
+        <PassIcon dir={-1} />
+      </ActionButton>
+      <ActionButton label="Pass" sub="hold = long" size="big" color="neon" pos={{ right: 0, bottom: 46 }} {...pass(1)}>
+        <PassIcon dir={1} />
+      </ActionButton>
       <ActionButton
         label="Kick"
-        sub="hold · drag aim"
         size="med"
         color="gold"
-        pos={{ right: 92, bottom: 0 }}
+        pos={{ right: 14, bottom: 146 }}
         onDown={(e) => {
           kickStart.current = { x: e.clientX, t: performance.now() };
           input.kickAim.active = true;
@@ -205,17 +218,19 @@ export function ActionButtons({ input, attacking }: { input: InputState; attacki
         }}
         onUp={(_e, cancelled) => {
           cancelAnimationFrame(kickRaf.current);
-          const { power, aim } = input.kickAim;
+          const held = performance.now() - kickStart.current.t;
+          const { aim } = input.kickAim;
           input.kickAim.active = false;
           setKickPower(0);
-          if (!cancelled) input.actions.push({ type: 'kick', power: Math.max(0.15, power), aim });
+          // tap = a solid default punt; hold = power meter + drag to aim
+          const power = held < 220 ? 0.7 : Math.max(0.15, input.kickAim.power);
+          if (!cancelled) input.actions.push({ type: 'kick', power, aim });
         }}
       >
         <span className="meter" style={meterStyle} />
+        <KickIcon />
       </ActionButton>
-      <ActionButton label="Step" sub="sidestep" size="sm" color="cyan" pos={{ right: 100, bottom: 80 }} onDown={() => input.actions.push({ type: 'sidestep' })} />
-      <ActionButton label="Fend" sub="hand-off" size="sm" color="dark" pos={{ right: 26, bottom: 132 }} onDown={() => input.actions.push({ type: 'handoff' })} />
-      {sprint}
+      <ActionButton label="Step" size="sm" color="cyan" pos={{ right: 110, bottom: 98 }} onDown={() => input.actions.push({ type: 'sidestep' })} />
     </div>
   );
 }

@@ -62,6 +62,7 @@ export interface HudState {
   stamina: number;
   timeUp: boolean;
   phase: string;
+  phaseNum: number;
 }
 
 export interface EngineResult {

@@ -57,7 +57,7 @@ Production builds ignore both.
 
 **Rules modelled (simplified):** tackles → rucks (timing bar to secure / jackal), mauls (tap to drive), knock-ons and forward passes → scrums (crouch-bind-set timing), touch → lineouts (throw/steal timing), breakdown offside and other penalties (kick at goal / kick to touch / tap & go), tries, conversions, penalty goals, drop goals, 22 drop-outs, and the half ends at the next stoppage after the clock passes 40:00.
 
-**Controls:** joystick bottom-left. Attack: Pass (tap = short, hold = long, swipe the button ◀ ▶ for side), Kick (hold for power, drag to aim; arc preview shown), Step, Fend, Sprint, plus a Set Plays menu. Defence: Tackle, Dive, Switch, Sprint.
+**Controls:** joystick bottom-left (push to the edge to sprint). Attack: ◀ PASS and PASS ▶ (tap short, hold long; arrows above team-mates show who receives), KICK (tap for a long kick, hold for power and drag to aim), STEP, plus a Set Plays menu. Hand-offs are automatic. Defence: TACKLE, DIVE, SWITCH. Rucks resolve automatically and the scrum-half passes on if you don't. A How to play card appears at your first kick-off (and in the pause menu).
 
 **Haptics:** uses the Vibration API where available. iOS Safari has no Vibration API, so on iPhone it falls back to toggling a hidden `<input type="checkbox" switch>`, which produces a system haptic on iOS 18+.
 

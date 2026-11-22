@@ -23,7 +23,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre',
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0,
 };
 
 export function MatchScreen({
@@ -54,6 +54,7 @@ export function MatchScreen({
   const [loading, setLoading] = useState(true);
   const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
   const [replay, setReplay] = useState(false);
+  const [howTo, setHowTo] = useState(false);
   const commId = useRef(0);
   const finished = useRef(false);
 
@@ -122,6 +123,16 @@ export function MatchScreen({
       if (import.meta.env.DEV) (window as unknown as { __engine: MatchEngine }).__engine = eng;
       setLoading(false);
       eng.start();
+      let seen = false;
+      try {
+        seen = localStorage.getItem('tl-howto') === '1';
+      } catch {
+        /* private mode */
+      }
+      if (!cfg.drill && !seen) {
+        eng.setPaused(true);
+        setHowTo(true);
+      }
     });
     const vis = () => {
       if (document.hidden && eng) {
@@ -147,7 +158,7 @@ export function MatchScreen({
   const userIsHome = cfg.userIsHome;
   const userSide = { short: cfg.user.short, color: cfg.user.kit.primary, score: hud.userScore };
   const cpuSide = { short: cfg.cpu.short, color: cfg.cpu.kit.primary, score: hud.cpuScore };
-  const showControls = !loading && !replay && !tryBanner && hud.phase !== 'dead' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
+  const showControls = !loading && !howTo && !replay && !tryBanner && hud.phase !== 'dead' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
 
   return (
     <div className="match-root">
@@ -181,6 +192,13 @@ export function MatchScreen({
         <button className="pause-btn" aria-label="Pause" onClick={() => pause(true)}>
           ❚❚
         </button>
+        {!cfg.drill && !loading && hud.phase !== 'pre' && (
+          <div className={`phase-chip ${hud.attacking ? '' : 'def'}`}>
+            <b>{hud.attacking ? 'Attacking' : 'Defending'}</b>
+            {hud.attacking && hud.phaseNum > 0 && <span>Phase {hud.phaseNum + 1}</span>}
+            {hud.phase === 'ruck' && <span>Ruck</span>}
+          </div>
+        )}
         {showControls && hud.attacking && hud.canAct && !cfg.drill && (
           <button className="setplays-btn" onClick={() => (audio.click(), setPlays(true))}>
             Set Plays
@@ -205,6 +223,49 @@ export function MatchScreen({
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}
         {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} onDone={() => {}} />}
       </div>
+
+      {howTo && (
+        <div className="sheet">
+          <div className="card howto" style={{ textAlign: 'center' }}>
+            <h2>How to play</h2>
+            <div className="howto-grid" style={{ textAlign: 'left' }}>
+              <div>
+                <b>Run</b>Drag anywhere on the left side. Push the stick right to the edge to sprint.
+              </div>
+              <div>
+                <b>◀ Pass · Pass ▶</b>The arrows above your team-mates show who gets the ball. Hold for a long pass.
+              </div>
+              <div>
+                <b>Kick</b>Tap for a long kick. Hold to set the power and drag to aim.
+              </div>
+              <div>
+                <b>Defending</b>Run at the ball carrier and hit TACKLE. SWITCH jumps to the defender nearest the ball.
+              </div>
+              <div>
+                <b>Rucks</b>They happen automatically. Your scrum-half passes on if you don't. Stay behind the yellow line when defending.
+              </div>
+              <div>
+                <b>Score</b>Get the ball over their try line for 5 points, then kick the conversion for 2.
+              </div>
+            </div>
+            <button
+              className="btn primary"
+              style={{ minWidth: 180 }}
+              onClick={() => {
+                try {
+                  localStorage.setItem('tl-howto', '1');
+                } catch {
+                  /* private mode */
+                }
+                setHowTo(false);
+                engine.current?.setPaused(false);
+              }}
+            >
+              Play
+            </button>
+          </div>
+        </div>
+      )}
 
       {plays && (
         <div className="sheet" onClick={() => setPlays(false)}>
@@ -290,6 +351,15 @@ export function MatchScreen({
             <div className="row" style={{ justifyContent: 'center' }}>
               <button className="btn primary" onClick={() => pause(false)}>
                 Resume
+              </button>
+              <button
+                className="btn"
+                onClick={() => {
+                  setPaused(false); // close the pause sheet; the engine stays paused until "Play"
+                  setHowTo(true);
+                }}
+              >
+                How to play
               </button>
               <button
                 className="btn danger"
