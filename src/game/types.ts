@@ -125,6 +125,22 @@ export interface EngineResult {
   userTries: number;
   cpuTries: number;
   user: { tries: number; tackles: number; conversions: number; passes: number; penalties: number; dropGoals: number };
+  match?: MatchStats;
+  /** challenge completed (undefined outside challenges) */
+  challenge?: boolean;
+}
+
+/** Team stats, index 0 = user, 1 = CPU. */
+export interface MatchStats {
+  possession: [number, number];
+  territory: [number, number];
+  tackles: [number, number];
+  missed: [number, number];
+  metres: [number, number];
+  lineBreaks: [number, number];
+  turnovers: [number, number];
+  penalties: [number, number];
+  potm: { name: string; team: string; line: string } | null;
 }
 
 export type CommentaryTone = 'big' | 'good' | 'bad' | 'info';
@@ -144,6 +160,7 @@ export type EngineEvent =
   | { type: 'drill'; text: string; progress: string }
   | { type: 'pop'; text: string; tone: 'good' | 'bad' | 'big' }
   | { type: 'tmo'; stage: 'check' | 'try' | 'notry' }
+  | { type: 'intro'; on: boolean; title: string; sub: string }
   | { type: 'drillDone'; score: number; total: number };
 
 export type InputAction =

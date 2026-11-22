@@ -119,6 +119,26 @@ class AudioEngine {
     src.start();
   }
 
+  /** Crowd groan: a low falling murmur (knock-ons, missed kicks). */
+  groan(strength = 1) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer(2);
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 0.8;
+    const t = ctx.currentTime;
+    f.frequency.setValueAtTime(520, t);
+    f.frequency.exponentialRampToValueAtTime(220, t + 1.6);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.35 * strength, t + 0.2);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+    src.connect(f).connect(g).connect(this.sfx);
+    src.start();
+  }
+
   // ---------- effects ----------
   whistle(long = false) {
     if (!this.ctx) return;

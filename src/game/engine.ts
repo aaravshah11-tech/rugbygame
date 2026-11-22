@@ -123,7 +123,14 @@ const LINES: Record<string, string[]> = {
   brokenTackle: ['Broken tackle!', 'Bounced off him!', 'Stepped him!'],
   intercept: ['Intercepted!', 'Picked off!'],
 };
-const line = (k: string) => rand.pick(LINES[k]);
+const lastLine: Record<string, string> = {};
+/** A random line for the moment, never the same one twice in a row. */
+const line = (k: string) => {
+  const opts = LINES[k].filter((l) => l !== lastLine[k]);
+  const l = rand.pick(opts.length ? opts : LINES[k]);
+  lastLine[k] = l;
+  return l;
+};
 
 export class MatchEngine {
   private renderer: THREE.WebGLRenderer;
@@ -168,6 +175,67 @@ export class MatchEngine {
   private score: [number, number] = [0, 0];
   private tries: [number, number] = [0, 0];
   private stats = { tries: 0, tackles: 0, conversions: 0, passes: 0, penalties: 0, dropGoals: 0 };
+  private ms = { poss: [0, 0], terr: [0, 0], tackles: [0, 0], missed: [0, 0], metres: [0, 0], breaks: [0, 0], turnovers: [0, 0], pens: [0, 0] };
+  private pstats = new Map<P, { tries: number; tackles: number; metres: number; breaks: number }>();
+  private ps(p: P) {
+    let s = this.pstats.get(p);
+    if (!s) this.pstats.set(p, (s = { tries: 0, tackles: 0, metres: 0, breaks: 0 }));
+    return s;
+  }
+  private lastCarrierX: number | null = null;
+  private tickStats(dt: number) {
+    if (this.phase !== 'play' && this.phase !== 'ruck' && this.phase !== 'maul') return;
+    const side = this.possession();
+    this.ms.poss[side] += dt;
+    const b = this.ball;
+    this.ms.terr[b.x * dirOf(0) > 0 ? 0 : 1] += dt;
+    const c = b.carrier;
+    if (c && this.phase === 'play') {
+      if (this.lastCarrierX !== null) {
+        const gain = (c.x - this.lastCarrierX) * dirOf(c.side);
+        if (gain > 0 && gain < 1) {
+          this.ms.metres[c.side] += gain;
+          this.ps(c).metres += gain;
+        }
+      }
+      this.lastCarrierX = c.x;
+    } else this.lastCarrierX = null;
+  }
+
+  /** Possession, territory and the rest for the half-time and full-time screens. */
+  matchStats(): import('./types').MatchStats {
+    const m = this.ms;
+    const pct = (a: number[]) => {
+      const t = a[0] + a[1] || 1;
+      const u = Math.round((a[0] / t) * 100);
+      return [u, 100 - u] as [number, number];
+    };
+    let best: { p: P; score: number } | null = null;
+    for (const [p, st] of this.pstats) {
+      const score = st.tries * 10 + st.tackles * 1.2 + st.metres * 0.12 + st.breaks * 3 + (p.side === 0 ? 0.5 : 0);
+      if (!best || score > best.score) best = { p, score };
+    }
+    const potm = best
+      ? (() => {
+          const st = this.pstats.get(best!.p)!;
+          const bits = [st.tries ? `${st.tries} tr${st.tries > 1 ? 'ies' : 'y'}` : '', st.tackles ? `${st.tackles} tackles` : '', st.metres >= 5 ? `${Math.round(st.metres)}m` : '', st.breaks ? `${st.breaks} line break${st.breaks > 1 ? 's' : ''}` : '']
+            .filter(Boolean)
+            .join(' · ');
+          return { name: best!.p.data ? `${best!.p.data.first} ${best!.p.data.last}` : best!.p.name, team: this.teamShort(best!.p.side), line: bits };
+        })()
+      : null;
+    return {
+      possession: pct(m.poss),
+      territory: pct(m.terr),
+      tackles: [m.tackles[0], m.tackles[1]],
+      missed: [m.missed[0], m.missed[1]],
+      metres: [Math.round(m.metres[0]), Math.round(m.metres[1])],
+      lineBreaks: [m.breaks[0], m.breaks[1]],
+      turnovers: [m.turnovers[0], m.turnovers[1]],
+      penalties: [m.pens[0], m.pens[1]],
+      potm,
+    };
+  }
   private controlled: P | null = null;
   private firstKicker: Side = 1;
   private wind = { x: 0, z: 0 };
@@ -198,7 +266,7 @@ export class MatchEngine {
   private placeSide: Side = 0;
   private camPos = new THREE.Vector3(-20, 12, 0);
   private camLook = new THREE.Vector3();
-  private camMode: 'game' | 'placekick' | 'setpiece' | 'try' | 'kickoff' | 'replay' = 'game';
+  private camMode: 'game' | 'placekick' | 'setpiece' | 'try' | 'kickoff' | 'replay' | 'intro' = 'game';
   private camFocus: P | null = null;
   private camModeT = 0;
   private tackleZoomT = 0;
@@ -444,7 +512,57 @@ export class MatchEngine {
     };
     this.raf = requestAnimationFrame(loop);
     if (this.cfg.drill) this.startDrill();
-    else this.setupKickoff(this.firstKicker, 0);
+    else if (this.cfg.challenge) this.startChallenge();
+    else this.startIntro();
+  }
+
+  private introT = -1;
+  /** Camera sweeps the stadium while the teams line up; tap to skip. */
+  private startIntro() {
+    this.setupKickoff(this.firstKicker, 0);
+    this.timers = [];
+    this.introT = 0;
+    this.camMode = 'intro';
+    audio.cheer(0.5);
+    this.emit({ type: 'intro', on: true, title: `${this.cfg.user.name} v ${this.cfg.cpu.name}`, sub: this.cfg.weather === 'rain' ? 'Rain is falling — hold on to it' : 'Kick-off is moments away' });
+  }
+
+  /** Daily challenge scenarios: set the score, the clock and where play starts. */
+  private startChallenge() {
+    const ch = this.cfg.challenge!;
+    if (ch.score) this.score = [ch.score[0], ch.score[1]];
+    if (ch.secondHalfAt !== undefined) {
+      this.half = 2;
+      this.gameSec = ch.secondHalfAt;
+    }
+    this.emit({ type: 'hud', hud: this.hud() });
+    const d = dirOf(0);
+    if (ch.goal === 'holdOut') {
+      // defend a scrum 8m from your own line
+      this.setupScrum(-d * (FIELD.tryX - 8), 6, 1);
+    } else if (ch.startX !== undefined) {
+      this.setupScrum(d * ch.startX, 0, 0);
+    } else this.setupKickoff(this.firstKicker, 0);
+    this.say(ch.title, 'info', 'Challenge');
+  }
+
+  /** Did the user complete the challenge? (checked at the final whistle) */
+  private challengeResult(): boolean | undefined {
+    const ch = this.cfg.challenge;
+    if (!ch) return undefined;
+    const [u, c] = this.score;
+    const start = ch.score ?? [0, 0];
+    if (ch.goal === 'win') return u > c;
+    if (ch.goal === 'holdOut') return c === start[1];
+    if (ch.goal === 'tryFromOwn22') return this.tries[0] > 0;
+    return this.tries[0] >= (ch.target ?? 1);
+  }
+
+  skipIntro() {
+    if (this.introT < 0) return;
+    this.introT = -1;
+    this.emit({ type: 'intro', on: false, title: '', sub: '' });
+    this.setupKickoff(this.firstKicker, 0);
   }
 
   dispose() {
@@ -566,6 +684,7 @@ export class MatchEngine {
     this.tickOffload(dt);
     this.tickCall(dt);
     this.tickReferee(dt);
+    this.tickStats(dt);
     // Once the 9 has played the ball, the ruck breaks up and those players rejoin the game.
     if (this.phase === 'play' && this.atBaseT < 0) this.releaseRuck();
     if (!this.cfg.drill && (this.phase === 'play' || this.phase === 'ruck' || this.phase === 'maul')) {
@@ -1124,6 +1243,8 @@ export class MatchEngine {
       if (this.lineBreakFrom === null) this.lineBreakFrom = c.x;
       else if (Math.abs(c.x - this.lineBreakFrom) > 8) {
         this.say(line('lineBreak'), 'good');
+        this.ms.breaks[c.side]++;
+        this.ps(c).breaks++;
         if (c.side === 0) this.pop('LINE BREAK!', 'good');
         this.lineBreakFrom = 1e9;
       }
@@ -1453,6 +1574,7 @@ export class MatchEngine {
       t.tackleCD = 1.6;
       if (!c.av.busy) c.fx = 'handoff';
       if (rand.chance(0.6)) this.say(line('brokenTackle'), c.side === 0 ? 'good' : 'bad');
+      this.ms.missed[t.side]++;
       if (c.side === 0) this.pop('BROKEN TACKLE!', 'good');
     }
   }
@@ -1461,6 +1583,8 @@ export class MatchEngine {
     const speed = Math.hypot(t.vx, t.vz) + Math.hypot(c.vx, c.vz);
     const big = t.r.tackling > 78 && (speed > 9 || rand.chance(0.2));
     if (t.side === 0) this.stats.tackles++;
+    this.ms.tackles[t.side]++;
+    this.ps(t).tackles++;
     audio.thud(big ? 1 : 0.7);
     if (t.side === 0 || c.side === 0) haptic(big ? 'bighit' : 'tackle');
     if (big) {
@@ -1553,7 +1677,7 @@ export class MatchEngine {
       return;
     }
     // Knock-on in contact
-    if (rand.chance(0.05 * (1.4 - c.r.handling / 100))) {
+    if (rand.chance(0.05 * (1.4 - c.r.handling / 100) * (this.cfg.weather === 'rain' ? 1.8 : 1))) {
       this.knockOn(c);
       return;
     }
@@ -1726,6 +1850,7 @@ export class MatchEngine {
   private knockOn(p: P) {
     this.whistle();
     haptic('tackle');
+    audio.groan();
     if (!this.offload) this.pop('KNOCK-ON', p.side === 0 ? 'bad' : 'good');
     this.say(line('knockOn'), p.side === 0 ? 'bad' : 'good', `Scrum ${this.teamShort(other(p.side))}`);
     const b = this.ball;
@@ -1855,6 +1980,7 @@ export class MatchEngine {
   /** Repeated penalties earn a yellow card: a back from the offending team sits out 2 minutes. */
   private penaltyAgainst(off: Side) {
     this.pens[off]++;
+    this.ms.pens[off]++;
     if (this.cfg.rules === 'arcade' || this.cfg.drill) return;
     const limit = this.cfg.rules === 'sim' ? 3 : 4;
     if (this.pens[off] >= limit && !this.binned.some((b) => b.p.side === off)) {
@@ -2098,6 +2224,7 @@ export class MatchEngine {
     const side = c.side;
     this.score[side] += 5;
     this.tries[side]++;
+    this.ps(c).tries++;
     if (side === 0) this.stats.tries++;
     this.phase = 'dead';
     this.ball.state = 'dead';
@@ -2232,7 +2359,7 @@ export class MatchEngine {
   }
 
   private result(): EngineResult {
-    return { userScore: this.score[0], cpuScore: this.score[1], userTries: this.tries[0], cpuTries: this.tries[1], user: { ...this.stats } };
+    return { userScore: this.score[0], cpuScore: this.score[1], userTries: this.tries[0], cpuTries: this.tries[1], user: { ...this.stats }, match: this.matchStats(), challenge: this.challengeResult() };
   }
 
   /** Used by "Quit" to finish early. */
@@ -2592,6 +2719,7 @@ export class MatchEngine {
     if (winner !== att) {
       this.say(line('turnover'), winner === 0 ? 'good' : 'bad');
       this.pop('TURNOVER!', winner === 0 ? 'good' : 'bad');
+      this.ms.turnovers[winner]++;
       haptic('tackle');
     }
     // Time up: the team in possession kicks it dead if it's not behind.
@@ -3506,6 +3634,7 @@ export class MatchEngine {
     if (!rf) this.updateArc();
     else this.arc.visible = false;
     this.updateCamera(dt, rf);
+    this.updateRain(dt);
     this.exciteBoost = Math.max(0, this.exciteBoost - dt * 0.25);
     const bx = rf ? rf.bx : b.x;
     const excite = Math.max(this.exciteBoost, this.phase === 'play' || rf ? clamp((Math.abs(bx) - 22) / 26, 0, 1) * 0.8 : 0.1);
@@ -3631,6 +3760,42 @@ export class MatchEngine {
     this.kickRing.scale.setScalar(1 + Math.sin(this.time * 6) * 0.06);
   }
 
+  private rain: THREE.LineSegments | null = null;
+  /** Rain: streaks falling in a box around the camera's target (weather = rain only). */
+  private updateRain(dt: number) {
+    if (this.cfg.weather !== 'rain') return;
+    const N = 1400;
+    if (!this.rain) {
+      const pos = new Float32Array(N * 6);
+      for (let i = 0; i < N; i++) {
+        const x = (Math.random() - 0.5) * 70;
+        const y = Math.random() * 30;
+        const z = (Math.random() - 0.5) * 70;
+        pos.set([x, y, z, x + 0.05, y + 0.7, z], i * 6);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      this.rain = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xbfd6ff, transparent: true, opacity: 0.35, depthWrite: false }));
+      this.rain.frustumCulled = false;
+      this.scene.add(this.rain);
+      this.renderer.toneMappingExposure = 0.85;
+    }
+    const a = this.rain.geometry.attributes.position as THREE.BufferAttribute;
+    const arr = a.array as Float32Array;
+    const fall = 24 * dt;
+    for (let i = 0; i < N; i++) {
+      const o = i * 6;
+      arr[o + 1] -= fall;
+      arr[o + 4] -= fall;
+      if (arr[o + 1] < 0) {
+        arr[o + 1] += 30;
+        arr[o + 4] += 30;
+      }
+    }
+    a.needsUpdate = true;
+    this.rain.position.set(this.camLook.x, 0, this.camLook.z);
+  }
+
   private callSprite: THREE.Sprite | null = null;
   private callT = 0;
   private callFor: P | null = null;
@@ -3718,7 +3883,15 @@ export class MatchEngine {
     let look: THREE.Vector3;
     let rate = 3.2;
     const fp = this.camFocus;
-    if (this.camMode === 'replay' && rf) {
+    if (this.camMode === 'intro') {
+      this.introT += dt;
+      if (this.introT > 5.5) this.skipIntro();
+      const a = -1.2 + this.introT * 0.32;
+      const r = 78 - this.introT * 6;
+      pos = this.cpos.set(Math.cos(a) * r, 34 - this.introT * 3.5, Math.sin(a) * r * 0.8);
+      look = this.clook.set(0, 2, 0);
+      rate = 3;
+    } else if (this.camMode === 'replay' && rf) {
       // low side-on tracking shot
       const side = rf.bz < 15 ? 1 : -1;
       pos = this.cpos.set(rf.bx - 7, 3.2, rf.bz + side * 11);

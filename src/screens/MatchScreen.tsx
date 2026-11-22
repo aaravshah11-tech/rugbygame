@@ -55,6 +55,8 @@ export function MatchScreen({
   const [plays, setPlays] = useState(false);
   const [drill, setDrill] = useState<{ text: string; progress: string } | null>(null);
   const [kickMenu, setKickMenu] = useState(false);
+  const [intro, setIntro] = useState<null | { title: string; sub: string }>(null);
+  const [fullStats, setFullStats] = useState<import('../game/types').MatchStats | null>(null);
   const [tmo, setTmo] = useState<null | 'check' | 'try' | 'notry'>(null);
   const [pops, setPops] = useState<{ id: number; text: string; tone: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,7 @@ export function MatchScreen({
         case 'end':
           if (finished.current) return;
           finished.current = true;
+          if (e.result.match) setFullStats(e.result.match);
           setTimeout(() => setOutcome(onFinish ? onFinish(e.result) : { title: 'Full time', lines: [], coins: 0 }), 1800);
           break;
         case 'try': {
@@ -111,6 +114,9 @@ export function MatchScreen({
           break;
         case 'drill':
           setDrill({ text: e.text, progress: e.progress });
+          break;
+        case 'intro':
+          setIntro(e.on ? { title: e.title, sub: e.sub } : null);
           break;
         case 'tmo':
           setTmo(e.stage);
@@ -186,6 +192,13 @@ export function MatchScreen({
             TRY <span>LINE</span>
           </div>
           <div className="muted italic">Warming up the players…</div>
+        </div>
+      )}
+      {intro && (
+        <div className="intro-card" onPointerDown={() => engine.current?.skipIntro()}>
+          <div className="intro-title">{intro.title}</div>
+          <div className="intro-sub">{intro.sub}</div>
+          <div className="intro-skip">Tap to skip</div>
         </div>
       )}
       <div className="hud">
@@ -385,6 +398,7 @@ export function MatchScreen({
             <div className="result-score">
               {cfg.user.short} {hud.userScore} – {hud.cpuScore} {cfg.cpu.short}
             </div>
+            {engine.current && <StatsTable st={engine.current.matchStats()} user={cfg.user.short} cpu={cfg.cpu.short} />}
             <button
               className="btn primary"
               onClick={() => {
@@ -475,6 +489,7 @@ export function MatchScreen({
                 {cfg.user.short} {hud.userScore} – {hud.cpuScore} {cfg.cpu.short}
               </div>
             )}
+            {fullStats && !cfg.drill && <StatsTable st={fullStats} user={cfg.user.short} cpu={cfg.cpu.short} potm />}
             {outcome.lines.map((l, i) => (
               <div key={i} className="muted">
                 {l}
@@ -542,6 +557,50 @@ function SubsPanel({ engine }: { engine: MatchEngine }) {
           <button className="btn ghost" onClick={() => setSel(null)}>
             Back
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatsTable({ st, user, cpu, potm = false }: { st: import('../game/types').MatchStats; user: string; cpu: string; potm?: boolean }) {
+  const rows: [string, [number, number], string?][] = [
+    ['Possession', st.possession, '%'],
+    ['Territory', st.territory, '%'],
+    ['Tackles made', st.tackles],
+    ['Tackles missed', st.missed],
+    ['Metres gained', st.metres],
+    ['Line breaks', st.lineBreaks],
+    ['Turnovers won', st.turnovers],
+    ['Penalties conceded', st.penalties],
+  ];
+  return (
+    <div className="stats-table">
+      <div className="stats-head">
+        <b>{user}</b>
+        <span />
+        <b>{cpu}</b>
+      </div>
+      {rows.map(([label, [a, b], unit]) => {
+        const t = a + b || 1;
+        return (
+          <div key={label} className="stats-row">
+            <b>{a}{unit}</b>
+            <div>
+              <small>{label}</small>
+              <div className="stats-bar">
+                <i style={{ width: `${(a / t) * 100}%` }} />
+              </div>
+            </div>
+            <b>{b}{unit}</b>
+          </div>
+        );
+      })}
+      {potm && st.potm && (
+        <div className="potm">
+          <small>PLAYER OF THE MATCH</small>
+          <b>{st.potm.name}</b> <span>({st.potm.team})</span>
+          {st.potm.line && <div className="muted">{st.potm.line}</div>}
         </div>
       )}
     </div>
