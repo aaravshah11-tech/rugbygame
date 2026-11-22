@@ -2796,7 +2796,7 @@ export class MatchEngine {
     if (rf) ballPos.set(rf.bx, rf.by, rf.bz);
     else if (b.state === 'held' && b.carrier && this.atBaseT >= 0 && this.phase === 'play') {
       const c = b.carrier;
-      ballPos.set(c.x + Math.cos(c.heading) * 0.55, 0.14, c.z + Math.sin(c.heading) * 0.55);
+      ballPos.set(c.x + Math.cos(c.face) * 0.62, 0.14, c.z + Math.sin(c.face) * 0.62);
     } else if (b.state === 'held' && b.carrier && b.carrier.state !== 'down') {
       b.carrier.av.handPosition(ballPos);
       ballPos.y = Math.max(0.3, ballPos.y);

@@ -439,41 +439,26 @@ const POSES: Partial<Record<AnimName, KeyPose[]>> = {
     { t: 0.5, p: { bones: { LArm: [['x', -170]], RArm: [['x', -170]], LUpLeg: [['x', 10]], RUpLeg: [['x', 8]], LLeg: [['x', 20]], RLeg: [['x', 30]], Head: [['x', -40]] }, hips: { dy: -0.82, dz: 0.3, rot: [['x', 88]] } } },
   ],
   // scrum-half crouched at the back of the ruck, hands on the ball, looking up at the line
-  base: [
-    {
-      t: 0,
-      p: merge(CROUCH, {
+  base: (() => {
+    // Deep, wide squat behind the ruck: knees bent hard, back almost flat, both hands down on
+    // the ball between his feet, head up scanning the line. A slight rock sells "ready to pass".
+    const pose = (lean: number, headY: number, dy: number): PoseDef =>
+      merge(CROUCH, {
         bones: {
-          LUpLeg: [['x', -80]], RUpLeg: [['x', -55]], LLeg: [['x', 100]], RLeg: [['x', 70]],
-          Spine: [['x', 50]], Chest: [['x', 10]], Head: [['x', -45]],
-          LArm: [['x', -55], ['z', -10]], RArm: [['x', -55], ['z', 10]], LForeArm: [['x', -15]], RForeArm: [['x', -15]],
+          LUpLeg: [['x', -95], ['z', 22]], RUpLeg: [['x', -95], ['z', -22]],
+          LLeg: [['x', 120]], RLeg: [['x', 120]],
+          Spine: [['x', lean]], Chest: [['x', 18]], Neck: [['x', -20]], Head: [['x', -50], ['y', headY]],
+          LArm: [['x', -38], ['z', -14]], RArm: [['x', -38], ['z', 14]],
+          LForeArm: [['x', -8]], RForeArm: [['x', -8]],
         },
-        hips: { dy: -0.42, rot: [['x', 20]] },
-      }),
-    },
-    {
-      t: 0.8,
-      p: merge(CROUCH, {
-        bones: {
-          LUpLeg: [['x', -80]], RUpLeg: [['x', -55]], LLeg: [['x', 100]], RLeg: [['x', 70]],
-          Spine: [['x', 48]], Chest: [['x', 10]], Head: [['x', -40], ['y', 15]],
-          LArm: [['x', -55], ['z', -10]], RArm: [['x', -55], ['z', 10]], LForeArm: [['x', -15]], RForeArm: [['x', -15]],
-        },
-        hips: { dy: -0.42, rot: [['x', 20]] },
-      }),
-    },
-    {
-      t: 1.6,
-      p: merge(CROUCH, {
-        bones: {
-          LUpLeg: [['x', -80]], RUpLeg: [['x', -55]], LLeg: [['x', 100]], RLeg: [['x', 70]],
-          Spine: [['x', 50]], Chest: [['x', 10]], Head: [['x', -45]],
-          LArm: [['x', -55], ['z', -10]], RArm: [['x', -55], ['z', 10]], LForeArm: [['x', -15]], RForeArm: [['x', -15]],
-        },
-        hips: { dy: -0.42, rot: [['x', 20]] },
-      }),
-    },
-  ],
+        hips: { dy, rot: [['x', 25]] },
+      });
+    return [
+      { t: 0, p: pose(62, -12, -0.58) },
+      { t: 0.7, p: pose(66, 14, -0.6) },
+      { t: 1.4, p: pose(62, -12, -0.58) },
+    ];
+  })(),
   bind: [
     { t: 0, p: BIND_POSE(45, -65, -65) },
     { t: 0.6, p: BIND_POSE(48, -55, -75) },
