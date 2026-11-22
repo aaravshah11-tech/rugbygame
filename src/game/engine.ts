@@ -167,8 +167,8 @@ export class MatchEngine {
   private ruck: null | { x: number; z: number; att: Side; t: number; dur: number; progress: number; addAtt: number; addDef: number } = null;
   private ruckArc: THREE.Mesh | null = null;
   private ruckArcBg: THREE.Mesh | null = null;
-  private idleStickT = 0;
   private pendingSetPlay: SetPlayId | null = null;
+  private slotCount: Record<number, number> = { [-1]: 7, [1]: 7 };
   private maul: null | { x: number; z: number; att: Side; t: number; dur: number; start: number; carrier: P; cpuPush: number; userPush: number } = null;
   private setPlay: null | { id: SetPlayId; targets: P[]; routes: Map<P, () => { x: number; z: number }>; until: number } = null;
   private slotTimer = 0;
@@ -703,14 +703,15 @@ export class MatchEngine {
       this.controlled = b.pass.target;
       return;
     }
-    const joy = Math.hypot(this.input.moveX, this.input.moveY);
-    this.idleStickT = joy > 0.12 || this.input.tackleHold ? 0 : this.idleStickT + 1 / 60;
-    const carrier = b.carrier;
-    if (carrier && carrier.side === 1 && this.idleStickT > 0.5 && this.controlled) {
-      const best = this.teams[0]
-        .filter((p) => p.state === 'free')
-        .sort((p, q) => dist(p.x, p.z, carrier.x, carrier.z) - dist(q.x, q.z, carrier.x, carrier.z))[0];
-      if (best && best !== this.controlled && dist(best.x, best.z, carrier.x, carrier.z) + 3 < dist(this.controlled.x, this.controlled.z, carrier.x, carrier.z)) this.controlled = best;
+    // Defending: you always control the defender best placed to tackle the ball carrier.
+    const carrier = b.carrier ?? (b.state === 'pass' && b.pass ? b.pass.target : null);
+    if (carrier && carrier.side === 1 && this.controlled && !(this.input.tackleHold && this.controlled.state === 'free')) {
+      const score = (p: P) => dist(p.x, p.z, carrier.x, carrier.z) + ((carrier.x - p.x) * dirOf(1) > 0 ? 6 : 0); // prefer defenders in front
+      const best = this.teams[0].filter((p) => p.state === 'free').sort((p, q) => score(p) - score(q))[0];
+      if (best && best !== this.controlled && (this.controlled.state !== 'free' || score(best) + 1.5 < score(this.controlled))) {
+        this.controlled = best;
+        this.nameFor = null;
+      }
     }
     if (!this.controlled || this.controlled.state !== 'free' || this.phase !== 'play') {
       const free = this.teams[0].filter((p) => p.state === 'free');
@@ -723,7 +724,7 @@ export class MatchEngine {
   private maxSpeed(p: P) {
     // Quick, arcade-feel running: ~9.5 m/s for an average back.
     // Realistic pace: ~7.5 m/s cruising for an average back, a bit more when sprinting.
-    let s = 3.9 + (p.r.pace / 100) * 2.3; // ~5.5 m/s (12 mph) for an average back
+    let s = 4.6 + (p.r.pace / 100) * 2.4; // ~6.3 m/s (14 mph) for an average back, ~7.8 m/s sprinting
     if (this.ball.carrier === p) s *= 0.97;
     if (p === this.controlled && p.side === 0) s *= 1.04;
     return s;
@@ -805,7 +806,7 @@ export class MatchEngine {
         dvz += p.sideDir * 7;
         dvx += dirOf(p.side) * 2;
       }
-      const acc = p.state === 'bound' ? 4 : 6;
+      const acc = p.state === 'bound' ? 4 : 7.5;
       p.vx += (dvx - p.vx) * Math.min(1, dt * acc);
       p.vz += (dvz - p.vz) * Math.min(1, dt * acc);
       p.x += p.vx * dt;
@@ -939,6 +940,7 @@ export class MatchEngine {
     // Keep everyone in the order they're already standing in, so nobody crosses behind the ball.
     left.forEach((p, k) => ((p.slotSide = -1), (p.slotK = k)));
     right.forEach((p, k) => ((p.slotSide = 1), (p.slotK = k)));
+    this.slotCount = { [-1]: left.length, [1]: right.length };
     void ax;
   }
 
@@ -946,10 +948,14 @@ export class MatchEngine {
     const d = dirOf(side);
     const k = p.slotK;
     // A clean staggered line, ~6m apart, each player a little deeper; extras form a second wave.
+    // Fit the line into the room on that side so nobody gets stacked on the touchline.
+    const n = Math.max(1, Math.min(7, this.slotCount[p.slotSide] ?? 7));
+    const room = FIELD.halfW - 2.5 - az * p.slotSide - 4;
+    const gap = clamp(room / n, 2.6, 6);
     const j = Math.min(k, 6);
     const deep = k >= 7 ? 6 : 0;
     const x = ax - d * (3 + j * 1.4 + deep);
-    const z = clamp(az + p.slotSide * (5 + j * 6), -FIELD.halfW + 2.5, FIELD.halfW - 2.5);
+    const z = clamp(az + p.slotSide * (4 + (j + 0.5) * gap), -FIELD.halfW + 2.5, FIELD.halfW - 2.5);
     return { x, z };
   }
 
@@ -982,11 +988,16 @@ export class MatchEngine {
         p.urgency = 1;
         continue;
       }
-      const t = this.attackSlotTarget(p, fx, fz, att);
+      // Project the line ahead with the carrier so support runners keep pace; at the base of a
+      // ruck they sit a couple of metres deeper, ready to run onto the pass.
+      const lead = carrier ? clamp(carrier.vx * dAtt, 0, 9) * 0.9 : 0;
+      // At the base the line starts 2m deep and moves up ~3.5 m/s towards the gain line, so the
+      // backs are already running when the scrum-half's pass arrives.
+      const baseRun = this.atBaseT >= 0 ? Math.min(this.atBaseT * 3.5, 4.5) - 2 : 0;
+      const t = this.attackSlotTarget(p, fx + dAtt * (lead + baseRun), fz, att);
       p.tx = t.x;
       p.tz = t.z;
-      const behind = (fx - p.x) * dAtt;
-      p.urgency = behind < 1 ? 0.75 : 0.95;
+      p.urgency = 0.95;
     }
 
     // ----- defence
@@ -1258,7 +1269,7 @@ export class MatchEngine {
     const d = dirOf(passer.side);
     const c = this.teams[passer.side]
       .filter((p) => p !== passer && p.state === 'free')
-      .filter((p) => (p.z - passer.z) * s > 1.2 && (p.x - passer.x) * d < 2.5 && dist(p.x, p.z, passer.x, passer.z) < 30)
+      .filter((p) => (p.z - passer.z) * s > 1.2 && (p.x - passer.x) * d < 1.5 && dist(p.x, p.z, passer.x, passer.z) < 30)
       .sort((a, b) => Math.abs(a.z - passer.z) - Math.abs(b.z - passer.z));
     if (!c.length) return undefined;
     if (!long) return c[0];
@@ -1290,7 +1301,7 @@ export class MatchEngine {
     if (!target) return false;
     const d = dirOf(passer.side);
     const distTo = dist(passer.x, passer.z, target.x, target.z);
-    const speed = long ? 14 : 11; // slower, readable passes
+    const speed = long ? 19 : 15; // crisp, flat passes
     const T = clamp(distTo / speed, 0.25, 1.6);
     // aim at where the receiver will be
     let tx = target.x + target.vx * T;
@@ -1298,6 +1309,8 @@ export class MatchEngine {
     let err = (1 - passer.r.passing / 100) * (long ? 2.6 : 1.4);
     if (passer.side === 0) err *= { easy: 0.4, medium: 0.8, hard: 1 }[this.cfg.difficulty];
     tx += rand.range(-err, err) * 0.6;
+    // A pass always travels slightly backwards: aim at the receiver's line, never in front of the passer.
+    if ((tx - passer.x) * d > -0.3) tx = passer.x - d * 0.3;
     tz += rand.range(-err, err);
     const forward = (tx - passer.x) * d > 1.2;
     this.ball.state = 'pass';
@@ -1327,11 +1340,12 @@ export class MatchEngine {
     }
     if (u < 1) return;
     // arrival: who can catch it?
-    const reach = 1.7;
+    // The intended receiver has a generous reach; anyone else must be right on the ball.
+    const tDist = dist(f.target.x, f.target.z, b.x, b.z);
     const cands = this.players
-      .filter((p) => p.state === 'free' && dist(p.x, p.z, b.x, b.z) < reach)
+      .filter((p) => p.state === 'free' && dist(p.x, p.z, b.x, b.z) < (p === f.target ? 2.6 : 0.9))
       .sort((p, q) => dist(p.x, p.z, b.x, b.z) - dist(q.x, q.z, b.x, b.z));
-    const recv = cands.includes(f.target) ? f.target : cands[0];
+    const recv = cands.includes(f.target) && tDist < 2.6 ? f.target : cands[0];
     if (!recv) {
       // nobody there: ball falls loose
       const vx = (f.tx - f.fx) / f.T;
@@ -1359,7 +1373,7 @@ export class MatchEngine {
       return;
     }
     const pressure = this.nearestOpponent(recv, 2) ? 0.06 : 0;
-    let pc = 0.95 + (recv.r.handling - 75) / 300 - (f.long ? 0.04 : 0) - pressure;
+    let pc = (recv.side === 0 ? 0.985 : 0.96) + (recv.r.handling - 75) / 400 - (f.long ? 0.02 : 0) - pressure * 0.5;
     if (recv.side === 0) pc += this.userAssist();
     if (rand.chance(clamp(pc, 0.6, 0.995)) || this.cfg.drill === 'passing') {
       if (recv.side === 0) this.stats.passes++;
@@ -1854,7 +1868,7 @@ export class MatchEngine {
     const z = c.z;
     this.phase = 'ruck';
     this.phaseT = 0;
-    this.ruck = { x, z, att, t: 0, dur: 2.2, progress: 0, addAtt: 0, addDef: 0 };
+    this.ruck = { x, z, att, t: 0, dur: 1.6, progress: 0, addAtt: 0, addDef: 0 };
     this.phaseCount++;
     const b = this.ball;
     b.carrier = null;
@@ -1963,11 +1977,11 @@ export class MatchEngine {
     const r = this.ruck!;
     r.t += dt;
     // The ball-availability arc fills over the ruck; extra attackers speed it up.
-    const dur = Math.max(1.2, r.dur - r.addAtt * 0.45 + r.addDef * 0.25);
+    const dur = Math.max(0.9, r.dur - r.addAtt * 0.35 + r.addDef * 0.25);
     r.progress = Math.min(1, r.progress + dt / dur);
     this.updateRuckArc(r);
     const spread = this.positionAroundBreakdown(r.x, r.z, r.att);
-    const settled = spread < 2.5 || r.progress >= 1 && r.t > dur + 1.2;
+    const settled = spread < 3 || (r.progress >= 1 && r.t > dur + 0.6);
     if (r.progress >= 1 && settled) this.resolveRuck();
   }
 
