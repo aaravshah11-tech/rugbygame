@@ -32,7 +32,7 @@ const DRILLS: { id: Drill; name: string; desc: string; tips: string[]; accent: s
     id: 'setpieces',
     name: 'Set Pieces',
     desc: 'Scrum, lineout, ruck and maul timing.',
-    tips: ['Scrum: tap on SET in the green', 'Lineout: release the throw in the green', 'Ruck: tap in the green for quick ball', 'Maul: tap as fast as you can'],
+    tips: ['Scrum: swipe UP on SET in the green', 'Lineout: pick a jumper, swipe DOWN to throw', 'Defending: swipe UP to contest rucks and lineouts', 'Maul: swipe UP again and again'],
     accent: 'var(--cyan)',
   },
 ];

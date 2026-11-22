@@ -106,6 +106,8 @@ export interface InputState {
   moveX: number;
   moveY: number;
   sprint: boolean;
+  /** TACKLE held: chase the carrier and tackle when in range */
+  tackleHold: boolean;
   /** live kick aim while the kick button is held */
   kickAim: { active: boolean; power: number; aim: number };
   actions: InputAction[];
@@ -115,6 +117,7 @@ export const createInput = (): InputState => ({
   moveX: 0,
   moveY: 0,
   sprint: false,
+  tackleHold: false,
   kickAim: { active: false, power: 0, aim: 0 },
   actions: [],
 });

@@ -244,10 +244,10 @@ export function MatchScreen({
                 <b>Kick</b>Tap for a long kick. Hold to set the power and drag to aim.
               </div>
               <div>
-                <b>Defending</b>Run at the ball carrier and hit TACKLE. SWITCH jumps to the defender nearest the ball.
+                <b>Defending</b>Hold TACKLE: your player chases the ball carrier and tackles. SWITCH changes player. Swipe UP to contest rucks.
               </div>
               <div>
-                <b>Rucks</b>They happen automatically. Your scrum-half passes on if you don't. Stay behind the yellow line when defending.
+                <b>Set pieces</b>Scrum: swipe UP on SET. Lineout: pick a jumper, swipe DOWN to throw. Rucks form automatically.
               </div>
               <div>
                 <b>Score</b>Get the ball over their try line for 5 points. Conversions: swipe up through the ball. Speed is power, curve it to beat the wind.

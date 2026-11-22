@@ -165,7 +165,18 @@ export function ActionButtons({ input, attacking }: { input: InputState; attacki
   if (!attacking) {
     return (
       <div className="actions">
-        <ActionButton label="Tackle" size="big" color="pink" pos={{ right: 0, bottom: 34 }} onDown={() => input.actions.push({ type: 'tackle' })}>
+        <ActionButton
+          label="Tackle"
+          sub="hold to chase"
+          size="big"
+          color="pink"
+          pos={{ right: 0, bottom: 34 }}
+          onDown={() => {
+            input.tackleHold = true;
+            input.actions.push({ type: 'tackle' });
+          }}
+          onUp={() => (input.tackleHold = false)}
+        >
           <TackleIcon />
         </ActionButton>
         <ActionButton label="Dive" size="med" color="gold" pos={{ right: 98, bottom: 0 }} onDown={() => input.actions.push({ type: 'dive' })} />
