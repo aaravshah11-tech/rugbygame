@@ -3,7 +3,7 @@ import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
 import { ActionButtons, DodgeLayer, Joystick } from '../ui/controls';
-import { MiniGame, PlaceKickUI, ScoreBug, type Comm } from '../ui/overlays';
+import { MiniGame, PlaceKickUI, ScoreBug, ScrumBattle, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { update, useProfile } from '../state/store';
 import type { CameraMode } from '../state/types';
@@ -23,7 +23,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0,
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null,
 };
 
 export function MatchScreen({
@@ -223,6 +223,7 @@ export function MatchScreen({
             <span className="rec" /> REPLAY <small>tap to skip</small>
           </button>
         )}
+        {hud.scrum && !mini && <ScrumBattle s={hud.scrum} input={input.current} userShort={cfg.user.short} cpuShort={cfg.cpu.short} />}
         {showControls && <Joystick input={input.current} />}
         {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
         {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} canDrop={hud.canDrop} />}
@@ -249,7 +250,7 @@ export function MatchScreen({
                 <b>Defending</b>Hold STAND to chase and tackle; DIVE from further out. You switch to the defender nearest the ball.
               </div>
               <div>
-                <b>Set pieces</b>Scrum: swipe UP on SET. Lineout: pick a jumper, swipe DOWN. Maul: swipe UP when the arrow is full.
+                <b>Set pieces</b>Scrum: swipe UP on SET, then keep swiping UP to win the push and call the play. Lineout: pick a jumper, swipe DOWN. Maul: swipe UP when the arrow is full.
               </div>
               <div>
                 <b>Kicks at goal</b>Swipe from the ball to the posts. Speed is power; curve your swipe to beat the wind.

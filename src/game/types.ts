@@ -66,6 +66,8 @@ export interface HudState {
   ruck: 'attack' | 'defend' | null;
   canDrop: boolean;
   mph: number;
+  /** live scrum push battle: bal -1 (CPU driving) .. +1 (user driving) */
+  scrum: null | { bal: number; t: number; dur: number; choose: boolean; userFeed: boolean };
 }
 
 export interface EngineResult {
@@ -103,6 +105,8 @@ export type InputAction =
   | { type: 'dive' }
   | { type: 'switch' }
   | { type: 'addPlayer' }
+  | { type: 'scrumPush' }
+  | { type: 'scrumPlay'; play: 'left' | 'right' | 'pick' }
   | { type: 'dodge'; dir: -1 | 1 }
   | { type: 'setplay'; id: SetPlayId };
 

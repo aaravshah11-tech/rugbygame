@@ -66,6 +66,9 @@ interface P {
   wasDown: boolean;
   /** rendered facing, eased towards `heading` so players turn smoothly */
   face: number;
+  casting?: boolean;
+  /** current locomotion animation, kept with hysteresis so it doesn't flicker */
+  loco: 'idle' | 'walk' | 'run';
 }
 
 interface PassFlight {
@@ -173,6 +176,10 @@ export class MatchEngine {
   private pendingSetPlay: SetPlayId | null = null;
   private useItCalled = false;
   private slotCount: Record<number, number> = { [-1]: 7, [1]: 7 };
+  private scrum: null | {
+    x: number; z: number; feed: Side; bal: number; t: number; dur: number; user: number; cpu: number; bias: number;
+    stage: 'push' | 'choose'; chooseT: number; winner: Side; base: { p: P; x: number; z: number }[];
+  } = null;
   private maul: null | { x: number; z: number; att: Side; t: number; dur: number; start: number; carrier: P; cpuPush: number; userPush: number } = null;
   private setPlay: null | { id: SetPlayId; targets: P[]; routes: Map<P, () => { x: number; z: number }>; until: number } = null;
   private slotTimer = 0;
@@ -205,6 +212,7 @@ export class MatchEngine {
   private recordAcc = 0;
   private replay: { frames: ReplayFrame[]; t: number; done: () => void } | null = null;
   private tmpV = new THREE.Vector3();
+  private tmpV2 = new THREE.Vector3();
 
   constructor(private host: HTMLElement, cfg: MatchConfig, input: InputState, listener: (e: EngineEvent) => void, asset: PlayerAsset | null) {
     this.cfg = cfg;
@@ -389,7 +397,7 @@ export class MatchEngine {
           side, num: i + 1, data: pl, r, name: `${pl.first[0]}. ${pl.last}`,
           x: 0, z: 0, vx: 0, vz: 0, heading: side === 0 ? 0 : Math.PI, tx: 0, tz: 0, gx: 0, gz: 0, urgency: 0,
           state: 'free', timer: 0, tackleCD: 0, catchCD: 0, sidestepT: 0, sideDir: 1, handoffT: 0, diveT: 0, kickT: 0,
-          stamina: 1, slotSide: 1, slotK: 0, av, fx: null, celebrateT: 0, wasDown: false, face: side === 0 ? 0 : Math.PI,
+          stamina: 1, slotSide: 1, slotK: 0, av, fx: null, celebrateT: 0, wasDown: false, face: side === 0 ? 0 : Math.PI, loco: 'idle',
         };
         this.players.push(p);
         this.teams[side].push(p);
@@ -503,9 +511,12 @@ export class MatchEngine {
       case 'maul':
         this.updateMaul(dt);
         break;
+      case 'scrum':
+        if (this.scrum) this.updateScrum(dt);
+        else if (this.ball.state === 'air' || this.ball.state === 'ground') this.updateBallPhysics(dt);
+        break;
       case 'placekick':
       case 'dead':
-      case 'scrum':
       case 'lineout':
         if (this.ball.state === 'air' || this.ball.state === 'ground') this.updateBallPhysics(dt);
         break;
@@ -546,6 +557,7 @@ export class MatchEngine {
       phaseNum: this.phaseCount,
       ruck: this.ruck ? (this.ruck.att === 0 ? 'attack' : 'defend') : null,
       canDrop: this.canDropGoal(),
+      scrum: this.scrum ? { bal: this.scrum.bal, t: this.scrum.t, dur: this.scrum.dur, choose: this.scrum.stage === 'choose', userFeed: this.scrum.feed === 0 } : null,
       mph: Math.round((this.ball.carrier ? Math.hypot(this.ball.carrier.vx, this.ball.carrier.vz) : c ? Math.hypot(c.vx, c.vz) : 0) * 2.237),
     };
   }
@@ -572,6 +584,12 @@ export class MatchEngine {
     switch (a.type) {
       case 'pass':
         if (userHasBall && live) this.doPass(c!, a.long, a.dir);
+        break;
+      case 'scrumPush':
+        if (this.scrum && this.scrum.stage === 'push') this.scrum.user = Math.min(3.2, this.scrum.user + 0.42);
+        break;
+      case 'scrumPlay':
+        if (this.scrum && this.scrum.stage === 'choose') this.scrumPlay(a.play);
         break;
       case 'kick':
         if (userHasBall && live) this.kickTo(c!, a.dist, (a.angle * Math.PI) / 180 * this.camRightSign(), a.kind);
@@ -873,7 +891,7 @@ export class MatchEngine {
         const min = a.state === 'bound' || b.state === 'bound' ? 0.5 : 0.8;
         if (d2 < min * min && d2 > 1e-6) {
           const d = Math.sqrt(d2);
-          const push = (min - d) * 0.5;
+          const push = (min - d) * 0.5 * Math.min(1, dt * 14);
           const ux = dx / d;
           const uz = dz / d;
           a.x -= ux * push;
@@ -885,9 +903,10 @@ export class MatchEngine {
     }
   }
 
+  private axesV = new THREE.Vector3();
   /** Ground-plane camera axes used to map the joystick to world directions. */
   private camAxes() {
-    const f = new THREE.Vector3();
+    const f = this.axesV;
     this.camera.getWorldDirection(f);
     f.y = 0;
     if (f.lengthSq() < 1e-4) f.set(1, 0, 0);
@@ -1959,7 +1978,10 @@ export class MatchEngine {
     // defenders retreat behind the offside line
     const od = dirOf(other(side));
     for (const p of this.teams[other(side)]) {
-      if ((p.x - x) * -od < 2 && p.state === 'free') p.x = x + d * 2 + rand.range(0, 1.5);
+      if ((p.x - x) * -od < 2 && p.state === 'free') {
+        p.tx = p.gx = x + d * 2.5 + rand.range(0, 1.5);
+        p.urgency = 1;
+      }
     }
     if (side === 1 || this.controlled?.side !== 0) {
       this.controlled = null;
@@ -2301,6 +2323,7 @@ export class MatchEngine {
       pack.forEach(([ox, oz], i) => {
         this.place(t[i], mx + d * ox, mz + oz);
         t[i].state = 'bound';
+        t[i].heading = t[i].face = d > 0 ? 0 : Math.PI; // packs face each other
       });
       this.place(t[8], mx - d * (side === feed ? 0.3 : 0.8), mz + (side === feed ? 1.5 : 1.2));
       const open = mz < 0 ? 1 : -1;
@@ -2330,45 +2353,118 @@ export class MatchEngine {
       this.after(1.6, () => this.drillNext());
       return;
     }
-    let winner: Side = feed;
-    if (feed === 0) {
-      if (q < 0.12 && rand.chance(0.5)) {
-        this.whistle();
-        this.say('Early engagement', 'bad', `Penalty ${this.teamShort(1)}`);
-        this.stoppage(() => this.awardPenalty(1, x, z));
-        return;
-      }
-      if (q > 0.9 && rand.chance(0.3)) {
-        this.whistle();
-        this.say('Scrum penalty!', 'good', `Penalty ${this.teamShort(0)}`);
-        this.stoppage(() => this.awardPenalty(0, x, z));
-        return;
-      }
-      if (!rand.chance(0.72 + q * 0.27)) winner = 1;
-    } else {
-      if (q > 0.9 && rand.chance(0.3)) {
-        this.whistle();
-        this.say('Scrum penalty!', 'good', `Penalty ${this.teamShort(0)}`);
-        this.stoppage(() => this.awardPenalty(0, x, z));
-        return;
-      }
-      if (q < 0.12 && rand.chance(0.4)) {
-        this.whistle();
-        this.say('Collapsed scrum', 'bad', `Penalty ${this.teamShort(1)}`);
-        this.stoppage(() => this.awardPenalty(1, x, z));
-        return;
-      }
-      if (rand.chance(q > 0.7 ? 0.3 : 0.04)) winner = 0;
+    // A badly mistimed engage gives the penalty away straight off.
+    if (q < 0.1 && rand.chance(0.5)) {
+      this.whistle();
+      this.say(feed === 0 ? 'Early engagement' : 'Collapsed scrum', 'bad', `Penalty ${this.teamShort(1)}`);
+      this.stoppage(() => this.awardPenalty(1, x, z));
+      return;
     }
-    if (winner !== feed) this.say('Against the head!', winner === 0 ? 'good' : 'bad');
-    this.after(0.4, () => {
-      this.camMode = 'game';
-      for (const p of this.players) if (p.state === 'bound') {
-        p.state = 'down';
-        p.timer = 0.5;
+    // Push battle: the feeding side has a small edge, a good engage adds to the user's.
+    const base = this.players.filter((p) => p.state === 'bound').map((p) => ({ p, x: p.x, z: p.z }));
+    const cpu = { easy: 0.55, medium: 0.72, hard: 0.86 }[this.cfg.difficulty] + (this.teamStrength(1) - this.teamStrength(0)) / 45;
+    this.scrum = {
+      x, z, feed, bal: (q - 0.5) * 0.35, t: 0, dur: 4.2, user: 0, cpu, bias: feed === 0 ? 0.12 : -0.12,
+      stage: 'push', chooseT: 0, winner: feed, base,
+    };
+    this.say('Push!', 'info', 'Swipe up fast to drive');
+    audio.thud(0.6);
+  }
+
+  private updateScrum(dt: number) {
+    const sc = this.scrum!;
+    const d0 = dirOf(0);
+    if (sc.stage === 'push') {
+      sc.t += dt;
+      sc.user *= Math.max(0, 1 - dt * 2.4);
+      // CPU heaves in waves; the user has to keep swiping to match it.
+      const cpu = sc.cpu * (0.85 + Math.sin(sc.t * 2.6) * 0.18);
+      sc.bal = clamp(sc.bal + (sc.user - cpu + sc.bias) * 0.55 * dt, -1, 1);
+      if (Math.random() < dt * 2.5) haptic('tackle');
+      if (Math.abs(sc.bal) >= 1 || sc.t >= sc.dur) this.endScrumPush();
+    } else {
+      sc.chooseT += dt;
+      // No choice made: the 9 takes it at the base as normal.
+      if (sc.chooseT > 3.2) this.scrumPlay('hold');
+    }
+    // Both packs and the ball move with the shove.
+    const off = sc.bal * 1.6 * d0;
+    for (const b of sc.base) {
+      const wob = Math.sin(this.time * 9 + b.x * 3 + b.z * 5) * 0.03;
+      b.p.tx = b.x + off;
+      b.p.tz = b.z + wob;
+      b.p.x += (b.p.tx - b.p.x) * Math.min(1, dt * 5);
+      b.p.z += (b.p.tz - b.p.z) * Math.min(1, dt * 5);
+      b.p.vx = b.p.vz = 0;
+    }
+    this.ball.x = sc.x + off - dirOf(sc.winner) * (sc.stage === 'choose' ? 1.6 : 0);
+    this.ball.z = sc.z + (sc.stage === 'choose' ? 0 : 0.8);
+    this.ball.y = 0.15;
+  }
+
+  private endScrumPush() {
+    const sc = this.scrum!;
+    // The feeding side keeps it unless they are clearly beaten in the shove.
+    const towardsFeeder = sc.feed === 0 ? sc.bal : -sc.bal;
+    const winner: Side = towardsFeeder < -0.5 ? other(sc.feed) : sc.feed;
+    // Driving them all the way back wins a penalty most of the time.
+    if (Math.abs(sc.bal) >= 1 && rand.chance(0.6)) {
+      const pen: Side = sc.bal > 0 ? 0 : 1;
+      this.whistle();
+      this.say(pen === 0 ? 'Scrum penalty!' : 'Scrum penalty against', pen === 0 ? 'good' : 'bad', `Penalty ${this.teamShort(pen)}`);
+      const { x, z } = sc;
+      this.scrum = null;
+      this.stoppage(() => this.awardPenalty(pen, x, z));
+      return;
+    }
+    sc.winner = winner;
+    if (winner !== sc.feed) this.say('Against the head!', winner === 0 ? 'good' : 'bad');
+    else if (Math.abs(sc.bal) > 0.5) this.say(winner === 0 ? 'Going forward!' : 'They are driving', winner === 0 ? 'good' : 'bad');
+    audio.thud(0.9);
+    if (winner === 0 && !this.cfg.drill) {
+      sc.stage = 'choose';
+      sc.chooseT = 0;
+      return;
+    }
+    this.scrumPlay('hold');
+  }
+
+  /** Ball out of the scrum: 9 passes left/right, the 8 picks up, or the 9 waits at the base. */
+  private scrumPlay(play: 'left' | 'right' | 'pick' | 'hold') {
+    const sc = this.scrum!;
+    this.scrum = null;
+    const winner = sc.winner;
+    const d = dirOf(winner);
+    const bx = this.ball.x;
+    const bz = this.ball.z;
+    this.camMode = 'game';
+    const eight = this.teams[winner][7];
+    for (const p of this.players) if (p.state === 'bound' && !(play === 'pick' && p === eight)) {
+      p.state = 'down';
+      p.timer = 0.45;
+    }
+    if (play === 'pick') {
+      eight.state = 'free';
+      this.place(eight, bx - d * 0.4, bz);
+      eight.heading = d > 0 ? 0 : Math.PI;
+      this.giveBall(eight);
+      this.ball.lastSide = winner;
+      this.phase = 'play';
+      this.phaseT = 0;
+      this.atBaseT = -1;
+      this.controlled = eight;
+      this.assignSlots();
+      this.say('No. 8 picks up', 'info');
+      return;
+    }
+    this.ballToNine(winner, bx + d * 0.6, bz);
+    if (play === 'left' || play === 'right') {
+      const nine = this.ball.carrier;
+      if (nine) {
+        this.atBaseT = -1;
+        this.doPass(nine, false, play === 'left' ? -1 : 1);
       }
-      this.ballToNine(winner, x - dirOf(winner) * 2.4, z);
-    });
+    }
   }
 
   // ---------------------------------------------------------------- lineout
@@ -2726,10 +2822,17 @@ export class MatchEngine {
     if (p.state === 'down') return ['lying', 1];
     if (p.state === 'bound') return ['bind', 1];
     if (this.atBaseT >= 0 && this.ball.carrier === p && this.phase === 'play') return ['base', 1];
+    if (this.phase === 'scrum' && p.num === 9 && p.state === 'free' && this.ball.state === 'dead') return ['base', 1];
     if (p.celebrateT > 0) return ['celebrate', 1];
-    if (speed < 0.45) return ['idle', 1];
-    if (speed < 2.8) return ['walk', clamp(speed / 1.6, 0.6, 1.6)];
-    return ['run', clamp(speed / 6.4, 0.75, 1.45)];
+    // Hysteresis: a player has to clearly speed up or slow down before the clip changes.
+    const l = p.loco;
+    if (l === 'idle' && speed > 0.7) p.loco = 'walk';
+    else if (l === 'walk' && speed < 0.3) p.loco = 'idle';
+    else if (l === 'walk' && speed > 3.1) p.loco = 'run';
+    else if (l === 'run' && speed < 2.4) p.loco = speed < 0.3 ? 'idle' : 'walk';
+    if (p.loco === 'idle') return ['idle', 1];
+    if (p.loco === 'walk') return ['walk', clamp(speed / 1.6, 0.6, 1.7)];
+    return ['run', clamp(speed / 6.4, 0.7, 1.45)];
   }
 
   private render(dt: number) {
@@ -2758,13 +2861,23 @@ export class MatchEngine {
         trig = rf.p[o + 5] >= 0 ? ANIMS[rf.p[o + 5]] : null;
       } else {
         const speed = Math.hypot(p.vx, p.vz);
-        if (speed > 0.4 && p.state !== 'down') p.heading = Math.atan2(p.vz, p.vx);
+        const atBase = this.atBaseT >= 0 && this.ball.carrier === p;
+        if (atBase || p.state === 'down') {
+          // keep facing as set
+        } else if (speed > 1.1) p.heading = Math.atan2(p.vz, p.vx);
+        else if (speed > 0.4 && p.state === 'bound') p.heading = Math.atan2(p.vz, p.vx);
         else if (p.state === 'free' && this.phase !== 'play' && this.phase !== 'kickoff') p.heading = p.side === 0 ? 0 : Math.PI;
+        else if (p.state === 'free' && this.ball.carrier !== p) {
+          // standing or shuffling: look at the ball rather than flicking with every small step
+          const bx = this.ball.x - p.x;
+          const bz = this.ball.z - p.z;
+          if (bx * bx + bz * bz > 1) p.heading = Math.atan2(bz, bx);
+        }
         x = p.x;
         z = p.z;
         let dh = p.heading - p.face;
         dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-        p.face += dh * Math.min(1, dt * (speed > 3 ? 12 : 8));
+        p.face += dh * Math.min(1, dt * (speed > 3 ? 10 : 6));
         heading = p.face;
         [base, ts] = this.animFor(p, speed);
         trig = p.fx;
@@ -2815,11 +2928,26 @@ export class MatchEngine {
     if (this.quality.shadows) {
       const fx = this.camLook.x;
       const fz = this.camLook.z;
-      const order = this.players.filter((p) => p.state !== 'off').sort((a, c) => (a.x - fx) ** 2 + (a.z - fz) ** 2 - ((c.x - fx) ** 2 + (c.z - fz) ** 2));
-      order.forEach((p, i) => p.av.setShadow(i < this.quality.shadowCasters));
+      // Players already casting get a head start, so the set doesn't flip back and forth.
+      const score = (p: P) => (p.x - fx) ** 2 + (p.z - fz) ** 2 - (p.casting ? 30 : 0);
+      const order = this.players.filter((p) => p.state !== 'off').sort((a, c) => score(a) - score(c));
+      order.forEach((p, i) => {
+        const on = i < this.quality.shadowCasters;
+        if (on !== p.casting) p.av.setShadow((p.casting = on));
+      });
+      // Move the shadow map in whole texels so shadow edges don't shimmer as the camera pans.
       const key = this.stadium.key;
-      key.target.position.set(fx, 0, fz);
-      key.position.set(fx - 35, 70, fz + 45);
+      const sc = key.shadow.camera as THREE.OrthographicCamera;
+      const texel = (sc.right - sc.left) / key.shadow.mapSize.x || 0.05;
+      // Snap in the light's own right/up axes (the light direction never changes).
+      const L = SHADOW_BASIS;
+      const f3 = this.tmpV2.set(fx, 0, fz);
+      const r = Math.round(f3.dot(L.right) / texel) * texel;
+      const u = Math.round(f3.dot(L.up) / texel) * texel;
+      const fwd = f3.dot(L.dir);
+      f3.copy(L.right).multiplyScalar(r).addScaledVector(L.up, u).addScaledVector(L.dir, fwd);
+      key.target.position.copy(f3);
+      key.position.set(f3.x - 35, f3.y + 70, f3.z + 45);
     }
 
     // selected player: glowing ring + arrow above the head
@@ -2993,13 +3121,41 @@ export class MatchEngine {
     this.kickRing.scale.setScalar(1 + Math.sin(this.time * 6) * 0.06);
   }
 
+  private cpos = new THREE.Vector3();
+  private clook = new THREE.Vector3();
+  private craw = new THREE.Vector3();
+  private camF = new THREE.Vector3();
+  private camFV = new THREE.Vector3();
+  private camFInit = false;
+  private sfA = new THREE.Vector3();
+  private sfB = new THREE.Vector3();
+  private sfOut = new THREE.Vector3();
+  /** Critically damped follow of the camera's target point (SmoothDamp). */
+  private smoothFocus(target: THREE.Vector3, dt: number): THREE.Vector3 {
+    if (!this.camFInit || dt <= 0) {
+      if (!this.camFInit) this.camF.copy(target);
+      this.camFInit = true;
+      return this.sfOut.copy(this.camF);
+    }
+    const T = 0.32;
+    const w = 2 / T;
+    const x = w * dt;
+    const e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const ch = this.sfA.copy(this.camF).sub(target);
+    const temp = this.sfB.copy(this.camFV).addScaledVector(ch, w).multiplyScalar(dt);
+    this.camFV.addScaledVector(temp, -w).multiplyScalar(e);
+    this.camF.copy(target).add(ch.add(temp).multiplyScalar(e));
+    return this.sfOut.copy(this.camF);
+  }
+
   private updateCamera(dt: number, rf: ReplayFrame | null) {
     const b = this.ball;
     this.camModeT += dt;
     this.tackleZoomT = Math.max(0, this.tackleZoomT - dt);
-    const focus = new THREE.Vector3(b.x, 0, b.z);
-    if (b.carrier) focus.set(b.carrier.x, 0, b.carrier.z);
-    else if (b.state === 'pass' && b.pass) focus.set(b.pass.target.x, 0, b.pass.target.z);
+    const raw = this.craw.set(b.x, 0, b.z);
+    if (b.carrier) raw.set(b.carrier.x, 0, b.carrier.z);
+    else if (b.state === 'pass' && b.pass) raw.set(b.pass.target.x, 0, b.pass.target.z);
+    const focus = this.smoothFocus(raw, dt);
     let pos: THREE.Vector3;
     let look: THREE.Vector3;
     let rate = 3.2;
@@ -3007,47 +3163,47 @@ export class MatchEngine {
     if (this.camMode === 'replay' && rf) {
       // low side-on tracking shot
       const side = rf.bz < 15 ? 1 : -1;
-      pos = new THREE.Vector3(rf.bx - 7, 3.2, rf.bz + side * 11);
-      look = new THREE.Vector3(rf.bx + 1, 1.1, rf.bz);
+      pos = this.cpos.set(rf.bx - 7, 3.2, rf.bz + side * 11);
+      look = this.clook.set(rf.bx + 1, 1.1, rf.bz);
       rate = 4;
     } else if (this.camMode === 'try' && fp) {
       // slow orbit around the try scorer
       const a = 0.6 + this.camModeT * 0.35;
-      pos = new THREE.Vector3(fp.x + Math.cos(a) * 5.5, 1.9, fp.z + Math.sin(a) * 5.5);
-      look = new THREE.Vector3(fp.x, 1.0, fp.z);
+      pos = this.cpos.set(fp.x + Math.cos(a) * 5.5, 1.9, fp.z + Math.sin(a) * 5.5);
+      look = this.clook.set(fp.x, 1.0, fp.z);
       rate = 2.5;
     } else if (this.camMode === 'kickoff' && fp) {
       const d = dirOf(fp.side);
-      pos = new THREE.Vector3(fp.x + d * 4.5, 1.7, fp.z + 3.2);
-      look = new THREE.Vector3(fp.x, 1.2, fp.z);
+      pos = this.cpos.set(fp.x + d * 4.5, 1.7, fp.z + 3.2);
+      look = this.clook.set(fp.x, 1.2, fp.z);
       rate = 4;
     } else if (this.camMode === 'placekick') {
       const d = dirOf(this.placeSide);
       const toPost = new THREE.Vector3(d * FIELD.tryX - b.x, 0, -b.z).normalize();
       const flying = b.state === 'air';
-      pos = new THREE.Vector3(b.x, flying ? 2.6 : 1.55, b.z).addScaledVector(toPost, flying ? -5 : -4.2);
+      pos = this.cpos.set(b.x, flying ? 2.6 : 1.55, b.z).addScaledVector(toPost, flying ? -5 : -4.2);
       if (flying) pos.copy(this.camPos).lerp(new THREE.Vector3(b.x, b.y * 0.6 + 2, b.z).addScaledVector(toPost, -9), 0.5);
-      look = new THREE.Vector3(d * FIELD.tryX, 4.5, 0);
+      look = this.clook.set(d * FIELD.tryX, 4.5, 0);
       if (flying) look = new THREE.Vector3(b.x, b.y, b.z).lerp(look, 0.4);
       rate = flying ? 3 : 5;
     } else if (this.camMode === 'setpiece' && (this.phase === 'scrum' || this.phase === 'lineout')) {
-      pos = new THREE.Vector3(b.x - 9, 4.5, b.z + (b.z > 0 ? -5 : 5));
-      look = new THREE.Vector3(b.x + 2, 0.8, b.z);
+      pos = this.cpos.set(b.x - 9, 4.5, b.z + (b.z > 0 ? -5 : 5));
+      look = this.clook.set(b.x + 2, 0.8, b.z);
     } else {
       const mode = this.cfg.camera;
       const tight = this.phase === 'ruck' || this.phase === 'maul' || this.tackleZoomT > 0;
       if (mode === 'sideline') {
-        pos = new THREE.Vector3(focus.x * 0.92, tight ? 16 : 22, focus.z * 0.3 + (tight ? 34 : 44));
-        look = new THREE.Vector3(focus.x, 0, focus.z * 0.6);
+        pos = this.cpos.set(focus.x * 0.92, tight ? 16 : 22, focus.z * 0.3 + (tight ? 34 : 44));
+        look = this.clook.set(focus.x, 0, focus.z * 0.6);
       } else if (mode === 'close') {
-        pos = new THREE.Vector3(focus.x - (tight ? 6.5 : 8), tight ? 3.4 : 4.2, focus.z * 0.92);
-        look = new THREE.Vector3(focus.x + 8, 1, focus.z);
+        pos = this.cpos.set(focus.x - (tight ? 6.5 : 8), tight ? 3.4 : 4.2, focus.z * 0.92);
+        look = this.clook.set(focus.x + 8, 1, focus.z);
       } else {
         // Low broadcast camera: ~12m behind and 7m above the carrier, looking down the pitch to the try line.
         // Steady broadcast view behind your team: follows the ball, only partly sideways, no zooming.
         // Broadcast view from behind your team: far enough back and high enough to read the whole line.
-        pos = new THREE.Vector3(focus.x - 20, 12, focus.z * 0.5);
-        look = new THREE.Vector3(focus.x + 12, 0, focus.z * 0.75);
+        pos = this.cpos.set(focus.x - 20, 12, focus.z * 0.5);
+        look = this.clook.set(focus.x + 12, 0, focus.z * 0.75);
         void tight;
       }
       if (b.state === 'air' && b.kicker) pos.y += Math.min(4, b.y * 0.25);
@@ -3062,6 +3218,13 @@ export class MatchEngine {
 }
 
 const REPLAY_SPEED = 0.45;
+/** Orthonormal basis of the key light (it always shines along (35, -70, -45)). */
+const SHADOW_BASIS = (() => {
+  const dir = new THREE.Vector3(35, -70, -45).normalize();
+  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+  return { dir, right, up };
+})();
 type KickType = 'punt' | 'grubber' | 'box' | 'drop';
 const GRUB_VY = 3.2;
 const GRUB_REST = 0.45;

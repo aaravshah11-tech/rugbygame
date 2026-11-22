@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { TeamLogo } from './logos';
-import type { CommentaryTone, HudState, MiniGameRequest, PlaceKickRequest } from '../game/types';
+import type { CommentaryTone, HudState, InputState, MiniGameRequest, PlaceKickRequest } from '../game/types';
 import type { MatchEngine } from '../game/engine';
 import type { Difficulty } from '../state/types';
 import { haptic } from '../util/haptics';
@@ -397,5 +397,83 @@ export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; en
         </div>
       </div>
     </div>
+  );
+}
+
+/** Scrum push battle (tug of war) and, when the user's pack wins it, the choice of play. */
+export function ScrumBattle({
+  s,
+  input,
+  userShort,
+  cpuShort,
+}: {
+  s: NonNullable<HudState['scrum']>;
+  input: InputState;
+  userShort: string;
+  cpuShort: string;
+}) {
+  const start = useRef<{ y: number; t: number } | null>(null);
+  const [pulse, setPulse] = useState(0);
+  const push = () => {
+    input.actions.push({ type: 'scrumPush' });
+    setPulse((p) => p + 1);
+  };
+  if (s.choose) {
+    const play = (p: 'left' | 'right' | 'pick') => input.actions.push({ type: 'scrumPlay', play: p });
+    return (
+      <div className="scrum-choose">
+        <div className="scrum-choose-title">SCRUM WON — CALL THE PLAY</div>
+        <div className="scrum-choose-row">
+          <button className="scrum-play" onPointerDown={() => play('left')}>
+            <span>◀</span>9 PASS LEFT
+          </button>
+          <button className="scrum-play pick" onPointerDown={() => play('pick')}>
+            <span>▲</span>No. 8 PICK
+          </button>
+          <button className="scrum-play" onPointerDown={() => play('right')}>
+            9 PASS RIGHT<span>▶</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const pct = ((s.bal + 1) / 2) * 100;
+  const left = Math.max(0, 1 - s.t / s.dur);
+  return (
+    <>
+      <div
+        className="swipe-layer"
+        onPointerDown={(e) => {
+          start.current = { y: e.clientY, t: performance.now() };
+        }}
+        onPointerMove={(e) => {
+          const st = start.current;
+          if (st && st.y - e.clientY > 26) {
+            push();
+            start.current = { y: e.clientY, t: performance.now() };
+          }
+        }}
+        onPointerUp={(e) => {
+          const st = start.current;
+          start.current = null;
+          // a quick tap counts as a smaller shove
+          if (st && Math.abs(st.y - e.clientY) < 10 && performance.now() - st.t < 250) push();
+        }}
+      />
+      <div className="scrum-battle">
+        <div className="scrum-teams">
+          <b>{userShort}</b>
+          <span className="scrum-call">{s.bal > 0.35 ? 'DRIVING!' : s.bal < -0.35 ? 'HOLD THEM!' : 'PUSH!'}</span>
+          <b>{cpuShort}</b>
+        </div>
+        <div className="scrum-bar">
+          <div className="scrum-fill" style={{ width: `${pct}%` }} />
+          <div className="scrum-mid" />
+          <div key={pulse} className="scrum-knob" style={{ left: `${pct}%` }} />
+        </div>
+        <div className="scrum-time" style={{ width: `${left * 100}%` }} />
+        <div className="scrum-hint">SWIPE UP FAST TO DRIVE</div>
+      </div>
+    </>
   );
 }

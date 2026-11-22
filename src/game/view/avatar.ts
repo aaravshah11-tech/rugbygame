@@ -225,9 +225,12 @@ export class Avatar {
     this.mixer.update(Math.random() * 2);
   }
 
-  private fadeTo(next: THREE.AnimationAction, dur: number) {
+  private fadeTo(next: THREE.AnimationAction, dur: number, syncFrom?: THREE.AnimationAction | null) {
+    // Walk <-> run keep the same point in the stride so the legs don't snap.
+    const phase = syncFrom && syncFrom.isRunning() ? (syncFrom.time / syncFrom.getClip().duration) % 1 : null;
     for (const a of this.actions.values()) if (a !== next && a.isRunning()) a.fadeOut(dur);
     next.reset().setEffectiveTimeScale(next.timeScale).setEffectiveWeight(1).fadeIn(dur).play();
+    if (phase !== null) next.time = phase * next.getClip().duration;
   }
 
   /** Continuous motion (idle/walk/run/bind/lying/celebrate); crossfades 0.2s. */
@@ -239,8 +242,10 @@ export class Avatar {
       a.setEffectiveTimeScale(timeScale);
       return;
     }
+    const prev = this.base;
     this.base = name;
-    if (!this.oneShot) this.fadeTo(a, 0.2);
+    const gait = (n: AnimName | null) => n === 'walk' || n === 'run';
+    if (!this.oneShot) this.fadeTo(a, gait(prev) && gait(name) ? 0.3 : 0.22, gait(prev) && gait(name) && prev ? this.actions.get(prev) : null);
   }
 
   /** One-off action (pass, kick, tackle…), returning to the base motion afterwards. */
