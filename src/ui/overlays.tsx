@@ -427,7 +427,7 @@ export function ScrumBattle({
     setPulse((p) => p + 1);
   };
   if (s.choose) {
-    const play = (p: 'left' | 'right' | 'pick') => input.actions.push({ type: 'scrumPlay', play: p });
+    const play = (p: 'left' | 'right' | 'pick' | 'nine') => input.actions.push({ type: 'scrumPlay', play: p });
     return (
       <div className="scrum-choose">
         <div className="scrum-choose-title">SCRUM WON — CALL THE PLAY</div>
@@ -437,6 +437,9 @@ export function ScrumBattle({
           </button>
           <button className="scrum-play pick" onPointerDown={() => play('pick')}>
             <span>▲</span>No. 8 PICK
+          </button>
+          <button className="scrum-play pick" onPointerDown={() => play('nine')}>
+            9 BREAK
           </button>
           <button className="scrum-play" onPointerDown={() => play('right')}>
             9 PASS RIGHT<span>▶</span>

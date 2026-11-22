@@ -564,6 +564,8 @@ export class MatchEngine {
     }
     this.phaseT += dt;
     this.tickOffload(dt);
+    this.tickCall(dt);
+    this.tickReferee(dt);
     // Once the 9 has played the ball, the ruck breaks up and those players rejoin the game.
     if (this.phase === 'play' && this.atBaseT < 0) this.releaseRuck();
     if (!this.cfg.drill && (this.phase === 'play' || this.phase === 'ruck' || this.phase === 'maul')) {
@@ -633,6 +635,12 @@ export class MatchEngine {
       nearDef: !!(c && this.ball.carrier === c && c.side === 0 && this.phase === 'play' && this.nearestOpponent(c, 3.2)),
       offload: !!this.offload,
       catchPrompt: this.catchPrompt(),
+      advantage: this.advantage ? (this.advantage.side === 0 ? 'user' : 'cpu') : null,
+      sinBin: this.binned.map((b) => {
+        const left = Math.max(0, b.until - ((this.half - 1) * 2400 + this.gameSec));
+        return { team: this.teamShort(b.p.side), name: b.p.name, left: `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}` };
+      }),
+      call: this.call ? { title: this.call.title, opts: this.call.opts, left: Math.max(0, this.call.timeout - this.call.t) } : null,
       wind: this.windHud(),
       isNine: !!(c && c.num === 9),
       scrum: this.scrum ? { bal: this.scrum.bal, t: this.scrum.t, dur: this.scrum.dur, choose: this.scrum.stage === 'choose', userFeed: this.scrum.feed === 0 } : null,
@@ -693,6 +701,9 @@ export class MatchEngine {
         break;
       case 'kick':
         if (userHasBall && live) this.userKick(c!, a.kind, a.dist, a.angle, a.power ?? 0.85);
+        break;
+      case 'call':
+        this.resolveCall(a.id);
         break;
       case 'catch':
         this.catchPressT = this.time;
@@ -1533,7 +1544,7 @@ export class MatchEngine {
 
   private afterContact(t: P, c: P) {
     // High tackle
-    if (rand.chance(0.03)) {
+    if (rand.chance(0.03 * this.strict())) {
       this.whistle();
       this.say('High tackle!', t.side === 0 ? 'bad' : 'good', `Penalty ${this.teamShort(c.side)}`);
       const x = c.x;
@@ -1594,6 +1605,19 @@ export class MatchEngine {
     if (!target) return false;
     const d = dirOf(passer.side);
     const distTo = dist(passer.x, passer.z, target.x, target.z);
+    // Forward pass: long passes under pressure occasionally drift forward (not in arcade rules).
+    const fpChance = { arcade: 0, standard: 0.025, sim: 0.06 }[this.cfg.rules] * (long ? 1.6 : 0.6) * (this.nearestOpponent(passer, 2.5) ? 1.6 : 1);
+    if (!this.cfg.drill && this.phase === 'play' && rand.chance(fpChance)) {
+      this.whistle();
+      this.pop('FORWARD PASS', passer.side === 0 ? 'bad' : 'good');
+      this.say('Forward pass', passer.side === 0 ? 'bad' : 'good', `Scrum ${this.teamShort(other(passer.side))}`);
+      const x = passer.x;
+      const z = passer.z;
+      this.ball.carrier = null;
+      this.ball.state = 'dead';
+      this.stoppage(() => this.setupScrum(x, z, other(passer.side)));
+      return true;
+    }
     const speed = long ? 19 : 15; // crisp, flat passes
     const T = clamp(distTo / speed, 0.25, 1.6);
     // aim at where the receiver will be
@@ -1792,6 +1816,79 @@ export class MatchEngine {
   }
 
   private catchPressT = -9;
+  /** penalty count multiplier by rules mode */
+  private strict(): number {
+    return { arcade: 0.45, standard: 1, sim: 1.5 }[this.cfg.rules];
+  }
+  private advantage: null | { side: Side; x: number; z: number; startX: number; t: number } = null;
+  private pens: [number, number] = [0, 0];
+  private binned: { p: P; until: number }[] = [];
+  private tickReferee(dt: number) {
+    const a = this.advantage;
+    if (a) {
+      a.t += dt;
+      const c = this.ball.carrier;
+      const gained = c && c.side === a.side ? (c.x - a.startX) * dirOf(a.side) : 0;
+      if (gained >= 10 || this.phase === 'placekick') {
+        this.advantage = null;
+        this.say('Advantage over', 'info');
+      } else if (this.possession() !== a.side || a.t > 5) {
+        // nothing gained: back for the penalty
+        this.advantage = null;
+        this.whistle();
+        this.say('Back for the penalty', a.side === 0 ? 'good' : 'bad', `Penalty ${this.teamShort(a.side)}`);
+        const { x, z, side } = a;
+        this.stoppage(() => this.awardPenalty(side, x, z));
+      }
+    }
+    // sin bin: players return after 2 game minutes (120 of the 2400 game seconds in a half)
+    const now = (this.half - 1) * 2400 + this.gameSec;
+    for (const b of [...this.binned]) {
+      if (now >= b.until) {
+        this.binned = this.binned.filter((x) => x !== b);
+        b.p.state = 'free';
+        this.place(b.p, -dirOf(b.p.side) * 30, 0);
+        this.say('Back from the bin', 'info', b.p.name);
+      }
+    }
+  }
+  /** Repeated penalties earn a yellow card: a back from the offending team sits out 2 minutes. */
+  private penaltyAgainst(off: Side) {
+    this.pens[off]++;
+    if (this.cfg.rules === 'arcade' || this.cfg.drill) return;
+    const limit = this.cfg.rules === 'sim' ? 3 : 4;
+    if (this.pens[off] >= limit && !this.binned.some((b) => b.p.side === off)) {
+      this.pens[off] = 0;
+      const cands = this.teams[off].filter((p) => p.num >= 11 && p.state !== 'off');
+      const p = cands[Math.floor(Math.random() * cands.length)];
+      if (!p) return;
+      p.state = 'off';
+      if (this.controlled === p) this.controlled = null;
+      const now = (this.half - 1) * 2400 + this.gameSec;
+      this.binned.push({ p, until: now + 120 });
+      this.pop('YELLOW CARD', off === 0 ? 'bad' : 'good');
+      this.say('Yellow card!', off === 0 ? 'bad' : 'good', `${p.name} — 2 minutes in the bin`);
+    }
+  }
+  private call: null | { title: string; opts: { id: string; label: string; sub?: string }[]; t: number; timeout: number; def: string; on: (id: string) => void } = null;
+  private openCall(title: string, opts: { id: string; label: string; sub?: string }[], def: string, timeout: number, on: (id: string) => void) {
+    this.call = { title, opts, t: 0, timeout, def, on };
+    this.emit({ type: 'hud', hud: this.hud() });
+  }
+  private tickCall(dt: number) {
+    const c = this.call;
+    if (!c) return;
+    c.t += dt;
+    if (c.t >= c.timeout) this.resolveCall(c.def);
+  }
+  private resolveCall(id: string) {
+    const c = this.call;
+    if (!c || !c.opts.some((o) => o.id === id)) return;
+    this.call = null;
+    audio.click();
+    c.on(id);
+    this.emit({ type: 'hud', hud: this.hud() });
+  }
   /** Kick from the picker: power under ~0.6 falls short, over 1 (held too long) sprays it. */
   private userKick(c: P, kind: KickKind, dist: number, angle: number, power: number) {
     if (kind === 'box' && c.num !== 9) kind = 'high';
@@ -2030,7 +2127,28 @@ export class MatchEngine {
     }
     const z = clamp(c.z, -30, 30);
     const conversion = () => this.setupPlaceKick(side, 'conversion', dirOf(side) * (FIELD.tryX - 12 - Math.abs(z) * 0.1), z);
-    this.after(2.6, () => this.startReplay(clip, conversion));
+    // TMO: close ones (near the corner or a scramble) go upstairs.
+    const close = Math.abs(c.z) > 26 || rand.chance(0.12);
+    const tmo = this.cfg.rules !== 'arcade' && close && rand.chance(this.cfg.rules === 'sim' ? 0.7 : 0.45);
+    const afterReplay = !tmo
+      ? conversion
+      : () => {
+          this.emit({ type: 'tmo', stage: 'check' });
+          this.after(2.2, () => {
+            const given = rand.chance(0.72);
+            this.emit({ type: 'tmo', stage: given ? 'try' : 'notry' });
+            if (given) {
+              this.after(1.4, conversion);
+              return;
+            }
+            this.score[side] -= 5;
+            this.tries[side]--;
+            if (side === 0) this.stats.tries--;
+            this.emit({ type: 'hud', hud: this.hud() });
+            this.after(1.6, () => this.setupScrum(dirOf(side) * (FIELD.tryX - 5), clamp(z, -25, 25), side));
+          });
+        };
+    this.after(2.6, () => this.startReplay(clip, afterReplay));
   }
 
   private goalResult(side: Side, kind: 'drop' | 'conversion' | 'penalty' | 'drill', good: boolean) {
@@ -2177,12 +2295,11 @@ export class MatchEngine {
       this.camFocus = kicker;
       this.camModeT = 0;
     }
-    this.after(1.2, () => {
+    const kick = (target: { x: number; z: number }, T: number) => {
       this.whistle();
       this.after(0.6, () => {
-        const target = { x: atX + dk * rand.range(14, 22), z: rand.range(-18, 18) };
-        // Solve for a high kick landing at the target in ~3 s.
-        const T = 3;
+        void T;
+        // Solve for a high kick landing at the target.
         b.carrier = null;
         b.state = 'air';
         b.x = kicker.x + dk * 0.5;
@@ -2205,7 +2322,38 @@ export class MatchEngine {
         this.phase = 'kickoff';
         this.phaseT = 0;
       });
-    });
+    };
+    const T = 3;
+    if (kickSide === 0 && !this.cfg.drill) {
+      // Your restart: short to contest it, or long to pin them back.
+      this.after(0.8, () =>
+        this.openCall(
+          atX === 0 ? 'KICK-OFF' : '22 DROP-OUT',
+          [
+            { id: 'shortL', label: 'Short ◀', sub: 'contest it' },
+            { id: 'shortR', label: 'Short ▶', sub: 'contest it' },
+            { id: 'longL', label: 'Long ◀', sub: 'pin them back' },
+            { id: 'longR', label: 'Long ▶', sub: 'pin them back' },
+          ],
+          'shortR',
+          5,
+          (id) => {
+            const long = id.startsWith('long');
+            const sgn = (id.endsWith('L') ? -1 : 1) * this.camRightSign();
+            const target = { x: atX + dk * (long ? rand.range(36, 44) : rand.range(11, 14)), z: clamp(sgn * (long ? 16 : 12) + rand.range(-3, 3), -30, 30) };
+            kick(target, long ? 3.4 : 2.8);
+            // chase a short one hard
+            if (!long) for (const p of this.teams[0].slice(3, 8)) {
+              p.tx = target.x;
+              p.tz = target.z;
+              p.urgency = 1;
+            }
+          },
+        ),
+      );
+    } else {
+      this.after(1.2, () => kick({ x: atX + dk * rand.range(14, 22), z: rand.range(-18, 18) }, T));
+    }
   }
 
   private nineOf(side: Side, nx: number, nz: number): P {
@@ -2424,11 +2572,11 @@ export class MatchEngine {
       return;
     }
     const cpuOff = { easy: 0.06, medium: 0.035, hard: 0.02, elite: 0.005 }[this.cfg.difficulty];
-    if (att === 0 && rand.chance(cpuOff)) {
-      this.whistle();
-      this.say('Offside!', 'good', `Penalty ${this.teamShort(0)}`);
-      this.stoppage(() => this.awardPenalty(0, r.x, r.z));
-      return;
+    if (att === 0 && rand.chance(cpuOff * this.strict()) && !this.advantage) {
+      // play on: the user has the advantage
+      this.advantage = { side: 0, x: r.x, z: r.z, startX: r.x, t: 0 };
+      this.pop('ADVANTAGE', 'good');
+      this.say('Offside — advantage', 'good', 'Play on');
     }
     if (att === 1 && this.controlled && this.controlled.state === 'free') {
       const c = this.controlled;
@@ -2710,7 +2858,7 @@ export class MatchEngine {
   }
 
   /** Ball out of the scrum: 9 passes left/right, the 8 picks up, or the 9 waits at the base. */
-  private scrumPlay(play: 'left' | 'right' | 'pick' | 'hold') {
+  private scrumPlay(play: 'left' | 'right' | 'pick' | 'hold' | 'nine') {
     const sc = this.scrum!;
     this.scrum = null;
     const winner = sc.winner;
@@ -2738,6 +2886,17 @@ export class MatchEngine {
       return;
     }
     this.ballToNine(winner, bx + d * 0.6, bz);
+    if (play === 'nine') {
+      // scrum-half breaks round the blindside
+      this.atBaseT = -1;
+      const nine = this.ball.carrier;
+      if (nine) {
+        this.controlled = nine;
+        nine.vx = d * 3;
+        this.say('Scrum-half breaks!', 'info');
+      }
+      return;
+    }
     if (play === 'left' || play === 'right') {
       const nine = this.ball.carrier;
       if (nine) {
@@ -2799,6 +2958,51 @@ export class MatchEngine {
     this.after(0.6, () => {
       this.camMode = 'game';
       jumper.av.root.position.y = 0;
+      // Your throw, your call: off the top, maul or peel.
+      if (winner === 0 && throwSide === 0) {
+        jumper.av.root.position.y = 1.2;
+        this.openCall(
+          'LINEOUT WON — CALL IT',
+          [
+            { id: 'top', label: 'Off the top', sub: 'quick ball to the 9' },
+            { id: 'maul', label: 'Maul', sub: distToLine < 25 ? 'drive for the line' : 'set the drive' },
+            { id: 'peel', label: 'Peel', sub: 'forward runs round' },
+          ],
+          distToLine < 22 ? 'maul' : 'top',
+          3.5,
+          (id) => {
+            jumper.av.root.position.y = 0;
+            if (id === 'maul') {
+              this.resetStates();
+              const carrier = this.teams[0][1];
+              this.place(carrier, x, s * 26);
+              this.startMaul(x, s * 26, 0, carrier);
+            } else if (id === 'peel') {
+              this.resetStates();
+              const runner = this.teams[0][6];
+              this.place(runner, x - d * 1.5, s * 25);
+              runner.vx = d * 3;
+              runner.vz = -s * 4;
+              this.giveBall(runner);
+              this.ball.lastSide = 0;
+              this.phase = 'play';
+              this.phaseT = 0;
+              this.atBaseT = -1;
+              this.controlled = runner;
+              this.assignSlots();
+              this.say('Peel!', 'info', `${runner.name} round the tail`);
+            } else {
+              this.ballToNine(0, x - d * 1, s * 24);
+              const nine = this.ball.carrier;
+              if (nine) {
+                this.atBaseT = -1;
+                this.doPass(nine, false, 0);
+              }
+            }
+          },
+        );
+        return;
+      }
       // Close to the line, the winners set up a driving maul.
       if (winner === throwSide && distToLine < 22 && rand.chance(0.55)) {
         this.resetStates();
@@ -2813,6 +3017,7 @@ export class MatchEngine {
 
   // ---------------------------------------------------------------- penalties
   private awardPenalty(side: Side, x: number, z: number) {
+    this.penaltyAgainst(other(side));
     this.resetStates();
     const d = dirOf(side);
     const px = clamp(x, -45, 45);
@@ -2834,6 +3039,9 @@ export class MatchEngine {
         this.say('Kick to touch', 'info');
         audio.kick();
         this.after(1, () => this.setupLineout(clamp(px + d * 24, -44, 44), pz >= 0 ? 1 : -1, side));
+      } else if (c === 'scrum') {
+        this.say('Scrum, please', 'info');
+        this.after(0.6, () => this.setupScrum(px, pz, side));
       } else {
         this.say('Tap and go!', 'info');
         this.giveBall(holder);

@@ -25,7 +25,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null, catchPrompt: false, wind: { deg: 0, kmh: 0 }, isNine: false,
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null, catchPrompt: false, wind: { deg: 0, kmh: 0 }, isNine: false, call: null, advantage: null, sinBin: [],
 };
 
 export function MatchScreen({
@@ -55,6 +55,7 @@ export function MatchScreen({
   const [plays, setPlays] = useState(false);
   const [drill, setDrill] = useState<{ text: string; progress: string } | null>(null);
   const [kickMenu, setKickMenu] = useState(false);
+  const [tmo, setTmo] = useState<null | 'check' | 'try' | 'notry'>(null);
   const [pops, setPops] = useState<{ id: number; text: string; tone: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
@@ -110,6 +111,10 @@ export function MatchScreen({
           break;
         case 'drill':
           setDrill({ text: e.text, progress: e.progress });
+          break;
+        case 'tmo':
+          setTmo(e.stage);
+          if (e.stage !== 'check') setTimeout(() => setTmo(null), 1500);
           break;
         case 'pop': {
           const id = ++commId.current;
@@ -241,6 +246,35 @@ export function MatchScreen({
         ))}
         {kickMenu && showControls && hud.attacking && !hud.ruck && <KickPicker input={input.current} isNine={hud.isNine} onClose={() => setKickMenu(false)} />}
         {showControls && hud.catchPrompt && <CatchButton input={input.current} />}
+        {hud.advantage && <div className={`adv-chip ${hud.advantage}`}>ADVANTAGE {hud.advantage === 'user' ? cfg.user.short : cfg.cpu.short}</div>}
+        {hud.sinBin.length > 0 && (
+          <div className="sinbin">
+            {hud.sinBin.map((b, i) => (
+              <div key={i}>
+                <i className="ycard" /> {b.team} {b.name} <b>{b.left}</b>
+              </div>
+            ))}
+          </div>
+        )}
+        {tmo && (
+          <div className={`tmo tmo-${tmo}`}>
+            <small>TMO REVIEW</small>
+            {tmo === 'check' ? 'CHECKING THE GROUNDING…' : tmo === 'try' ? 'TRY!' : 'NO TRY'}
+          </div>
+        )}
+        {hud.call && !mini && (
+          <div className="scrum-choose">
+            <div className="scrum-choose-title">{hud.call.title}</div>
+            <div className="scrum-choose-row">
+              {hud.call.opts.map((o) => (
+                <button key={o.id} className="scrum-play call-play" onPointerDown={() => input.current.actions.push({ type: 'call', id: o.id })}>
+                  <b>{o.label}</b>
+                  {o.sub && <small>{o.sub}</small>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {!cfg.drill && hud.wind.kmh > 0 && (
           <div className="wind-chip">
             <span style={{ transform: `rotate(${hud.wind.deg}deg)` }}>↑</span>
@@ -335,6 +369,9 @@ export function MatchScreen({
               </button>
               <button className="btn" onClick={() => (penalty.resolve('tap'), setPenalty(null))}>
                 Tap &amp; go
+              </button>
+              <button className="btn ghost" onClick={() => (penalty.resolve('scrum'), setPenalty(null))}>
+                Scrum
               </button>
             </div>
           </div>

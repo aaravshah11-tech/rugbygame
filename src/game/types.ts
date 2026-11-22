@@ -77,7 +77,7 @@ export interface PlaceKickRequest {
   kicker: string;
 }
 
-export type PenaltyChoice = 'goal' | 'touch' | 'tap';
+export type PenaltyChoice = 'goal' | 'touch' | 'tap' | 'scrum';
 
 export interface HudState {
   userScore: number;
@@ -101,6 +101,12 @@ export interface HudState {
   mph: number;
   /** a defender is close enough for a hand-off */
   nearDef: boolean;
+  /** referee: advantage being played (to the user or the CPU) */
+  advantage: null | 'user' | 'cpu';
+  /** sin-binned players with time left (mm:ss) */
+  sinBin: { team: string; name: string; left: string }[];
+  /** a play to call (lineout win, kick-off …) */
+  call: null | { title: string; opts: { id: string; label: string; sub?: string }[]; left: number };
   /** a high ball is dropping onto your player: tap CATCH */
   catchPrompt: boolean;
   /** wind as seen on screen: angle (deg, 0 = up the screen) and km/h */
@@ -137,6 +143,7 @@ export type EngineEvent =
   | { type: 'replay'; active: boolean }
   | { type: 'drill'; text: string; progress: string }
   | { type: 'pop'; text: string; tone: 'good' | 'bad' | 'big' }
+  | { type: 'tmo'; stage: 'check' | 'try' | 'notry' }
   | { type: 'drillDone'; score: number; total: number };
 
 export type InputAction =
@@ -153,7 +160,8 @@ export type InputAction =
   | { type: 'scrumPush' }
   | { type: 'ruckContest' }
   | { type: 'ruckFan' }
-  | { type: 'scrumPlay'; play: 'left' | 'right' | 'pick' }
+  | { type: 'scrumPlay'; play: 'left' | 'right' | 'pick' | 'nine' }
+  | { type: 'call'; id: string }
   | { type: 'dodge'; dir: -1 | 1 }
   | { type: 'setplay'; id: SetPlayId };
 

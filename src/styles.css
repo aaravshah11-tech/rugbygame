@@ -2347,3 +2347,96 @@ input[type='email'] {
   background: #ffcf3a;
   color: #0b0f17;
 }
+
+.call-play {
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+.call-play b {
+  font-size: 17px;
+}
+.call-play small {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+.scrum-choose-row {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.adv-chip {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--sat, 0px) + 46px);
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: #c6ff1a;
+  color: #0b0f17;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  animation: blink 1s infinite;
+}
+.adv-chip.cpu {
+  background: #ff3d5e;
+  color: #fff;
+}
+.sinbin {
+  position: absolute;
+  left: calc(var(--sal, 0px) + 12px);
+  top: calc(var(--sat, 0px) + 104px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.sinbin > div {
+  background: rgba(11, 15, 23, 0.75);
+  padding: 3px 10px;
+  border-radius: 8px;
+}
+.ycard {
+  display: inline-block;
+  width: 9px;
+  height: 12px;
+  border-radius: 2px;
+  background: #ffd400;
+  vertical-align: -1px;
+}
+.tmo {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  padding: 16px 28px;
+  border-radius: 18px;
+  background: rgba(11, 15, 23, 0.88);
+  box-shadow: 0 0 0 3px #7ad7ff, 0 16px 40px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  font-weight: 900;
+  font-style: italic;
+  font-size: clamp(22px, 5vw, 40px);
+  pointer-events: none;
+  animation: popIn 0.2s ease;
+}
+.tmo small {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  color: #7ad7ff;
+}
+.tmo-try {
+  box-shadow: 0 0 0 3px #c6ff1a, 0 16px 40px rgba(0, 0, 0, 0.5);
+  color: #c6ff1a;
+}
+.tmo-notry {
+  box-shadow: 0 0 0 3px #ff3d5e, 0 16px 40px rgba(0, 0, 0, 0.5);
+  color: #ff3d5e;
+}
