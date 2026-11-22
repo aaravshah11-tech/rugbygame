@@ -11,6 +11,7 @@ export interface Settings {
   difficulty: Difficulty;
   camera: CameraMode;
   halfLength: HalfLength;
+  graphics: 'auto' | 'low' | 'medium' | 'high';
 }
 
 export interface Fixture {

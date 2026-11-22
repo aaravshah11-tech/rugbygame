@@ -83,6 +83,15 @@ export function Settings({ go }: { go: Go }) {
               />
             </div>
             <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Graphics quality</div>
+              <Seg<'auto' | 'low' | 'medium' | 'high'>
+                value={s.graphics ?? 'auto'}
+                options={[{ v: 'auto', label: 'Auto' }, { v: 'low', label: 'Low' }, { v: 'medium', label: 'Med' }, { v: 'high', label: 'High' }]}
+                onChange={(v) => update((x) => (x.settings.graphics = v))}
+              />
+              <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Low: no real-time shadows or bloom, lighter crowd, 30fps. Auto steps down if the frame rate drops.</div>
+            </div>
+            <div>
               <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Half length</div>
               <Seg<HalfLength>
                 value={s.halfLength}
@@ -122,6 +131,9 @@ export function Settings({ go }: { go: Go }) {
               <p className="muted" style={{ margin: 0, fontSize: 13 }}>Cloud sync isn't set up for this build.</p>
             )}
             {msg && <div style={{ fontSize: 13, color: 'var(--cyan)' }}>{msg}</div>}
+            <button className="btn ghost" onClick={() => go({ name: 'viewer' })}>
+              Squad Viewer (debug)
+            </button>
             <button
               className="btn danger"
               style={{ marginTop: 'auto' }}

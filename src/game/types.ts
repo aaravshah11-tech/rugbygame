@@ -1,6 +1,7 @@
 import type { Kit } from '../data/nations';
 import type { Player, Ratings } from '../data/players';
 import type { CameraMode, Difficulty } from '../state/types';
+import type { QualitySetting } from './view/quality';
 
 export interface TeamSetup {
   id: string;
@@ -20,6 +21,7 @@ export interface MatchConfig {
   halfMinutes: number;
   difficulty: Difficulty;
   camera: CameraMode;
+  quality: QualitySetting;
   drill?: Drill;
 }
 
@@ -82,6 +84,8 @@ export type EngineEvent =
   | { type: 'penalty'; canKick: boolean; resolve: (c: PenaltyChoice) => void }
   | { type: 'halftime' }
   | { type: 'end'; result: EngineResult }
+  | { type: 'try'; scorer: string; team: string; userScored: boolean }
+  | { type: 'replay'; active: boolean }
   | { type: 'drill'; text: string; progress: string }
   | { type: 'drillDone'; score: number; total: number };
 

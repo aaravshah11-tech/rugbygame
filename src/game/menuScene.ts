@@ -1,45 +1,57 @@
 import * as THREE from 'three';
-import { buildStadium } from './stadium';
-import { animateModel, createBall, createPlayerModel, makeTeamLook } from './model';
+import { createBall } from './model';
 import type { Kit } from '../data/nations';
+import { buildStadium } from './view/stadium';
+import { buildPitch } from './view/pitch';
+import { PostFX } from './view/effects';
+import { preset, resolveQuality } from './view/quality';
+import { loadPlayerAsset } from './view/assets';
+import { Avatar, makeTeamKit } from './view/avatar';
+import { LegacyVisual, type Visual } from './view/visual';
 
-/** Main menu backdrop: a player standing on the pitch in a floodlit stadium. */
+/** Main menu backdrop: a player standing on the pitch in the floodlit stadium bowl. */
 export class MenuScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(40, 1, 0.3, 400);
+  private camera = new THREE.PerspectiveCamera(36, 1, 0.3, 2000);
+  private post: PostFX;
   private raf = 0;
   private ro: ResizeObserver;
   private disposed = false;
+  private player: Visual | null = null;
 
   constructor(private host: HTMLElement, kit: Kit) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const q = { ...preset(resolveQuality('auto')), crowdDensity: 0.45, shadows: true, shadowMapSize: 1024 };
+    this.renderer = new THREE.WebGLRenderer({ antialias: !q.bloom, powerPreference: 'high-performance' });
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(this.renderer.domElement);
-    const stadium = buildStadium(this.scene, [kit.primary, kit.secondary, '#21e6c1', '#c6ff1a'], { crowdDensity: 0.7 });
-    const model = createPlayerModel(makeTeamLook(kit), 2, 1.05);
-    model.root.position.set(-30, 0, 0);
-    this.scene.add(model.root);
+    this.post = new PostFX(this.renderer, this.scene, this.camera, q);
+    const stadium = buildStadium(this.scene, this.renderer, q, [kit.primary, kit.secondary, '#21e6c1', '#c6ff1a']);
+    buildPitch(this.scene, this.renderer, 9, [kit.primary, kit.secondary]);
+    const key = stadium.key;
+    key.castShadow = true;
+    key.target.position.set(-30, 0, 0);
+    key.position.set(-50, 40, 25);
+    const spot = new THREE.PointLight('#fff4de', 30, 16);
+    spot.position.set(-27, 4, 4);
+    this.scene.add(spot);
     const ball = createBall();
-    ball.scale.setScalar(1.1);
+    ball.scale.setScalar(1.3);
     this.scene.add(ball);
-    // Spotlight pool under the player
-    const glow = new THREE.Mesh(
-      new THREE.CircleGeometry(2.4, 32),
-      new THREE.MeshBasicMaterial({ color: '#c6ff1a', transparent: true, opacity: 0.12, depthWrite: false }),
-    );
-    glow.rotation.x = -Math.PI / 2;
-    glow.position.set(-30, 0.03, 0);
-    this.scene.add(glow);
 
-    const key = new THREE.PointLight('#ffffff', 40, 14);
-    key.position.set(-26, 4, 3);
-    this.scene.add(key);
+    void loadPlayerAsset(this.renderer).then((asset) => {
+      if (this.disposed) return;
+      const av: Visual = asset ? new Avatar(asset, makeTeamKit(kit), { num: 10, forward: false, skin: 1, hair: 3, scrumCap: false }) : new LegacyVisual(kit, 1, false);
+      av.root.position.set(-30, 0, 0);
+      av.setShadow(true);
+      av.setBase('idle');
+      this.scene.add(av.root);
+      this.player = av;
+    });
 
-    const ro = new ResizeObserver(() => this.resize());
-    ro.observe(host);
-    this.ro = ro;
+    this.ro = new ResizeObserver(() => this.resize());
+    this.ro.observe(host);
     this.resize();
 
     let last = performance.now();
@@ -50,27 +62,28 @@ export class MenuScene {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       t += dt;
-      // idle: ball tucked, slight bounce, turning to camera
-      animateModel(model, 0.6, dt, 'carry');
-      const h = -model.root.rotation.y;
-      ball.position.set(-30 + Math.cos(h) * 0.35, 1.1 + Math.sin(t * 2) * 0.02, Math.sin(h) * 0.35);
-      ball.rotation.set(0, -h, 0.4);
-      const a = t * 0.08;
+      const a = t * 0.07 + 2.2;
       const portrait = this.camera.aspect < 1;
-      const r = portrait ? 9 : 7;
-      this.camera.position.set(-30 + Math.cos(a + 2.2) * r, 2.2 + Math.sin(t * 0.3) * 0.2, Math.sin(a + 2.2) * r);
-      // Face the camera at a three-quarter angle.
-      const toCam = Math.atan2(this.camera.position.z, this.camera.position.x + 30);
-      model.root.rotation.y = -(toCam + 0.55 + Math.sin(t * 0.4) * 0.12);
-      // Keep the player on the right side of the screen in landscape.
-      const look = new THREE.Vector3(-30, 1.3, 0);
+      const r = portrait ? 8.5 : 6.2;
+      this.camera.position.set(-30 + Math.cos(a) * r, 1.9 + Math.sin(t * 0.3) * 0.15, Math.sin(a) * r);
+      const p = this.player;
+      if (p) {
+        // face the camera at a three-quarter angle
+        const toCam = Math.atan2(this.camera.position.z, this.camera.position.x + 30);
+        p.root.rotation.y = -(toCam + 0.5);
+        p.update(dt);
+        p.handPosition(ball.position);
+        ball.rotation.set(0, p.root.rotation.y, 0.4);
+      } else ball.position.set(-30, 1.1, 0);
+      const look = new THREE.Vector3(-30, 1.15, 0);
       if (!portrait) {
+        // keep the player on the right of the screen, behind the menu tiles
         const right = new THREE.Vector3().subVectors(look, this.camera.position).cross(new THREE.Vector3(0, 1, 0)).normalize();
-        look.addScaledVector(right, -2.2);
-      } else look.y = 0.4;
+        look.addScaledVector(right, -1.9);
+      } else look.y = 0.3;
       this.camera.lookAt(look);
-      stadium.update(t, 0.25);
-      this.renderer.render(this.scene, this.camera);
+      stadium.update(t, 0.2, this.camera);
+      this.post.render();
     };
     this.raf = requestAnimationFrame(loop);
   }
@@ -78,7 +91,7 @@ export class MenuScene {
   private resize() {
     const w = this.host.clientWidth || 1;
     const h = this.host.clientHeight || 1;
-    this.renderer.setSize(w, h);
+    this.post.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -87,6 +100,7 @@ export class MenuScene {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
+    this.post.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

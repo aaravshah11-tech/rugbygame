@@ -26,7 +26,7 @@ export type NameRegion = 'anglo' | 'celtic' | 'french' | 'italian' | 'pacific' |
 
 export const NATIONS: Nation[] = [
   { id: 'ENG', name: 'England', short: 'ENG', strength: 84, region: 'anglo',
-    kit: { primary: '#f4f5f7', secondary: '#1b2a5c', accent: '#d81e3a', pattern: 'chevron', shorts: '#f4f5f7', socks: '#1b2a5c' } },
+    kit: { primary: '#f4f5f7', secondary: '#1b2a5c', accent: '#d81e3a', pattern: 'chevron', shorts: '#1b2a5c', socks: '#1b2a5c' } },
   { id: 'WAL', name: 'Wales', short: 'WAL', strength: 80, region: 'celtic',
     kit: { primary: '#c8102e', secondary: '#ffffff', accent: '#00843d', pattern: 'sash', shorts: '#ffffff', socks: '#c8102e' } },
   { id: 'SCO', name: 'Scotland', short: 'SCO', strength: 82, region: 'celtic',
@@ -40,7 +40,7 @@ export const NATIONS: Nation[] = [
   { id: 'NZL', name: 'New Zealand', short: 'NZL', strength: 89, region: 'maori',
     kit: { primary: '#0b0b0d', secondary: '#f2f2f2', accent: '#5b5f66', pattern: 'zigzag', shorts: '#0b0b0d', socks: '#0b0b0d' } },
   { id: 'RSA', name: 'South Africa', short: 'RSA', strength: 89, region: 'afrikaans',
-    kit: { primary: '#0b5a35', secondary: '#f6b81a', accent: '#f6b81a', pattern: 'shoulders', shorts: '#ffffff', socks: '#0b5a35' } },
+    kit: { primary: '#0b5a35', secondary: '#f6b81a', accent: '#f6b81a', pattern: 'shoulders', shorts: '#f6b81a', socks: '#0b5a35' } },
   { id: 'AUS', name: 'Australia', short: 'AUS', strength: 82, region: 'anglo',
     kit: { primary: '#f7c600', secondary: '#0c5c3a', accent: '#0c5c3a', pattern: 'chevron', shorts: '#0c5c3a', socks: '#f7c600' } },
   { id: 'ARG', name: 'Argentina', short: 'ARG', strength: 82, region: 'latin',

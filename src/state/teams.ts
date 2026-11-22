@@ -97,6 +97,7 @@ export function buildMatch(user: TeamSetup, cpu: TeamSetup, userIsHome: boolean,
     halfMinutes: p.settings.halfLength,
     difficulty: p.settings.difficulty,
     camera: p.settings.camera,
+    quality: p.settings.graphics ?? 'auto',
     drill,
   };
 }

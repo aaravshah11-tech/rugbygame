@@ -1,7 +1,14 @@
 import * as THREE from 'three';
 import { effectiveRatings, type Player, type Ratings } from '../data/players';
-import { buildStadium, FIELD, type Stadium } from './stadium';
-import { animateModel, createBall, createPlayerModel, makeTeamLook, type PlayerModel, type Pose } from './model';
+import { FIELD } from './stadium';
+import { createBall } from './model';
+import { buildStadium, type StadiumView } from './view/stadium';
+import { buildPitch } from './view/pitch';
+import { BallFx, Particles, PostFX, Selector } from './view/effects';
+import { FpsGovernor, preset, resolveQuality, type QualityPreset } from './view/quality';
+import type { AnimName, PlayerAsset } from './view/assets';
+import { Avatar, makeTeamKit } from './view/avatar';
+import { LegacyVisual, type Visual } from './view/visual';
 import { audio } from '../util/audio';
 import { haptic } from '../util/haptics';
 import { clamp, rand } from '../util/rng';
@@ -49,7 +56,13 @@ interface P {
   stamina: number;
   slotSide: number;
   slotK: number;
-  model: PlayerModel;
+  av: Visual;
+  /** one-shot animation requested by the game logic this frame */
+  fx: AnimName | null;
+  celebrateT: number;
+  wasDown: boolean;
+  /** rendered facing, eased towards `heading` so players turn smoothly */
+  face: number;
 }
 
 interface PassFlight {
@@ -105,12 +118,19 @@ export class MatchEngine {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
-  private stadium: Stadium;
+  private stadium: StadiumView;
+  private post: PostFX;
+  private particles: Particles;
+  private ballFx: BallFx;
+  private selector: Selector;
+  private quality: QualityPreset;
+  private governor: FpsGovernor;
+  private frameSkip = false;
+  private skipToggle = false;
   private players: P[] = [];
   private teams: [P[], P[]] = [[], []];
   private ball: Ball;
   private ballMesh: THREE.Mesh;
-  private ring: THREE.Mesh;
   private targetRing: THREE.Mesh;
   private offsideLine: THREE.Mesh;
   private arc: THREE.Line;
@@ -151,7 +171,11 @@ export class MatchEngine {
   private placeSide: Side = 0;
   private camPos = new THREE.Vector3(-20, 12, 0);
   private camLook = new THREE.Vector3();
-  private camMode: 'game' | 'placekick' | 'setpiece' = 'game';
+  private camMode: 'game' | 'placekick' | 'setpiece' | 'try' | 'kickoff' | 'replay' = 'game';
+  private camFocus: P | null = null;
+  private camModeT = 0;
+  private tackleZoomT = 0;
+  private exciteBoost = 0;
   private drillCount = 0;
   private drillScore = 0;
   private drillStage = 0;
@@ -159,64 +183,83 @@ export class MatchEngine {
   private resizeObs: ResizeObserver;
   /** Dev builds only: `?fast` runs the match clock 20x faster for testing. */
   private clockScale = import.meta.env.DEV && new URLSearchParams(location.search).has('fast') ? 20 : 1;
+  // replay: ring buffer of recent frames, sampled at 30Hz
+  private history: ReplayFrame[] = [];
+  private recordAcc = 0;
+  private replay: { frames: ReplayFrame[]; t: number; done: () => void } | null = null;
+  private tmpV = new THREE.Vector3();
 
-  constructor(private host: HTMLElement, cfg: MatchConfig, input: InputState, listener: (e: EngineEvent) => void) {
+  constructor(private host: HTMLElement, cfg: MatchConfig, input: InputState, listener: (e: EngineEvent) => void, asset: PlayerAsset | null) {
     this.cfg = cfg;
     this.input = input;
     this.listener = listener;
-    this.renderer = new THREE.WebGLRenderer({ antialias: window.devicePixelRatio < 2.5, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const level = resolveQuality(cfg.quality);
+    this.quality = preset(level);
+    this.renderer = new THREE.WebGLRenderer({ antialias: !this.quality.bloom && level !== 'low', powerPreference: 'high-performance', stencil: false });
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(this.renderer.domElement);
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.5, 400);
+    this.camera = new THREE.PerspectiveCamera(48, 1, 0.3, 2000);
+    this.post = new PostFX(this.renderer, this.scene, this.camera, this.quality);
+    this.governor = new FpsGovernor(
+      cfg.quality === 'auto',
+      () => this.downgrade(),
+      () => (this.frameSkip = true),
+    );
+    if (this.quality.targetFps === 30) this.frameSkip = true;
     this.resize();
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(host);
 
-    this.stadium = buildStadium(this.scene, [cfg.user.kit.primary, cfg.user.kit.secondary, cfg.cpu.kit.primary, cfg.cpu.kit.secondary]);
-    this.buildTeams();
+    this.stadium = buildStadium(this.scene, this.renderer, this.quality, [cfg.user.kit.primary, cfg.user.kit.secondary, cfg.cpu.kit.primary, cfg.cpu.kit.secondary]);
+    // The user's team defends the -x end, so those posts wear the user's colours.
+    buildPitch(this.scene, this.renderer, this.quality.pitchPxPerMetre, [cfg.user.kit.primary, cfg.cpu.kit.primary]);
+    this.buildTeams(asset);
 
     this.ballMesh = createBall();
+    this.ballMesh.scale.setScalar(1.45);
+    this.ballMesh.castShadow = true;
     this.scene.add(this.ballMesh);
+    this.ballFx = new BallFx(this.scene);
+    this.particles = new Particles(this.scene, 900, this.quality.particles);
+    this.selector = new Selector(this.scene);
+    this.selector.setColor(indicatorColor(cfg.user.kit));
     this.ball = {
       x: 0, y: 0.1, z: 0, vx: 0, vy: 0, vz: 0, state: 'dead', carrier: null, pass: null, lastSide: 0,
       kicker: null, kickFromX: 0, bounced: false, goalCheck: null, wind: false,
     };
 
-    const ringGeo = new THREE.RingGeometry(0.75, 0.95, 24);
+    const ringGeo = new THREE.RingGeometry(0.6, 0.8, 32);
     ringGeo.rotateX(-Math.PI / 2);
-    this.ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#c6ff1a', transparent: true, opacity: 0.95, depthWrite: false }));
-    this.ring.position.y = 0.04;
-    this.scene.add(this.ring);
-    this.targetRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#21e6c1', transparent: true, opacity: 0.7, depthWrite: false }));
+    this.targetRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#21e6c1', transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.targetRing.position.y = 0.035;
-    this.targetRing.scale.setScalar(0.7);
     this.scene.add(this.targetRing);
 
-    const offGeo = new THREE.PlaneGeometry(0.3, 70);
+    const offGeo = new THREE.PlaneGeometry(0.25, 70);
     offGeo.rotateX(-Math.PI / 2);
-    this.offsideLine = new THREE.Mesh(offGeo, new THREE.MeshBasicMaterial({ color: '#ffd400', transparent: true, opacity: 0.55, depthWrite: false }));
+    this.offsideLine = new THREE.Mesh(offGeo, new THREE.MeshBasicMaterial({ color: '#ffd400', transparent: true, opacity: 0.6, depthWrite: false }));
     this.offsideLine.position.y = 0.05;
     this.offsideLine.visible = false;
     this.scene.add(this.offsideLine);
 
     const arcGeo = new THREE.BufferGeometry();
     arcGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(60 * 3), 3));
-    this.arc = new THREE.Line(arcGeo, new THREE.LineBasicMaterial({ color: '#c6ff1a' }));
+    this.arc = new THREE.Line(arcGeo, new THREE.LineBasicMaterial({ color: new THREE.Color(2, 2.4, 0.4) }));
     this.arc.frustumCulled = false;
     this.arc.visible = false;
     this.scene.add(this.arc);
 
-    // Blob shadows: one instanced draw call for every player + ball.
+    // Soft blob shadows for every player + the ball: one instanced draw call.
     const sc = document.createElement('canvas');
     sc.width = sc.height = 64;
     const sg = sc.getContext('2d')!;
     const grad = sg.createRadialGradient(32, 32, 2, 32, 32, 32);
-    grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(0, 'rgba(0,0,0,0.5)');
+    grad.addColorStop(0.6, 'rgba(0,0,0,0.25)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     sg.fillStyle = grad;
     sg.fillRect(0, 0, 64, 64);
-    const shGeo = new THREE.PlaneGeometry(1.3, 1.3);
+    const shGeo = new THREE.PlaneGeometry(1.4, 1.4);
     shGeo.rotateX(-Math.PI / 2);
     this.shadows = new THREE.InstancedMesh(
       shGeo,
@@ -231,24 +274,59 @@ export class MatchEngine {
     this.wind = { x: Math.cos(wa) * ws, z: Math.sin(wa) * ws };
   }
 
+  /** Steps graphics down one level (auto quality). Returns false when already at Low. */
+  private downgrade(): boolean {
+    if (this.quality.level === 'low') return false;
+    this.quality = preset(this.quality.level === 'high' ? 'medium' : 'low');
+    this.post.configure(this.quality);
+    const key = this.stadium.key;
+    key.castShadow = this.quality.shadows;
+    key.shadow.map?.dispose();
+    key.shadow.map = null;
+    key.shadow.mapSize.set(this.quality.shadowMapSize, this.quality.shadowMapSize);
+    if (!this.quality.shadows) for (const p of this.players) p.av.setShadow(false);
+    this.resize();
+    return true;
+  }
+
+  /** Dev builds only: put the user's fly-half through on the line to test try/replay/conversion. */
+  debugBreak() {
+    if (!import.meta.env.DEV) return;
+    this.timers = [];
+    this.camMode = 'game';
+    const p = this.teams[0][9];
+    this.resetStates();
+    this.place(p, 38, 6);
+    p.vx = 8;
+    this.giveBall(p);
+    this.phase = 'play';
+    for (const o of this.teams[1]) this.place(o, 20, o.num * 3 - 24);
+  }
+
+  get graphicsLevel() {
+    return this.quality.level;
+  }
+
   // ---------------------------------------------------------------- setup
-  private buildTeams() {
+  private buildTeams(asset: PlayerAsset | null) {
     const diffMod = { easy: -8, medium: 0, hard: 6 }[this.cfg.difficulty];
     const mk = (team: TeamSetup, side: Side) => {
-      const look = makeTeamLook(team.kit);
+      const kit = asset ? makeTeamKit(team.kit) : null;
       team.players.slice(0, 15).forEach((pl, i) => {
         const boost: Partial<Ratings> = { ...(team.boost ?? {}) };
         if (side === 1) for (const k of ['pace', 'strength', 'passing', 'kicking', 'tackling', 'handling'] as const) boost[k] = (boost[k] ?? 0) + diffMod;
         const r = effectiveRatings(pl, boost);
         const skin = Math.abs(hashCode(pl.id)) % 5;
-        const scale = i < 8 ? 1.06 : 0.97;
-        const model = createPlayerModel(look, skin, scale);
-        this.scene.add(model.root);
+        const h = Math.abs(hashCode(pl.id + 'h'));
+        // Some forwards wear scrum caps (hooker, locks, flankers more often than not).
+        const scrumCap = [2, 4, 5, 6, 7].includes(i + 1) && h % 3 !== 0;
+        const av: Visual = asset && kit ? new Avatar(asset, kit, { num: i + 1, forward: i < 8, skin, hair: h % 6, scrumCap }) : new LegacyVisual(team.kit, skin, i < 8);
+        this.scene.add(av.root);
         const p: P = {
           side, num: i + 1, data: pl, r, name: `${pl.first[0]}. ${pl.last}`,
           x: 0, z: 0, vx: 0, vz: 0, heading: side === 0 ? 0 : Math.PI, tx: 0, tz: 0, urgency: 0,
           state: 'free', timer: 0, tackleCD: 0, catchCD: 0, sidestepT: 0, sideDir: 1, handoffT: 0, diveT: 0, kickT: 0,
-          stamina: 1, slotSide: 1, slotK: 0, model,
+          stamina: 1, slotSide: 1, slotK: 0, av, fx: null, celebrateT: 0, wasDown: false, face: side === 0 ? 0 : Math.PI,
         };
         this.players.push(p);
         this.teams[side].push(p);
@@ -261,10 +339,11 @@ export class MatchEngine {
   private resize() {
     const w = this.host.clientWidth || window.innerWidth;
     const h = this.host.clientHeight || window.innerHeight;
-    this.renderer.setSize(w, h);
+    this.post.setSize(w, h);
     this.camera.aspect = w / h;
-    this.camera.fov = w / h < 1 ? 70 : 50;
+    this.camera.fov = w / h < 1 ? 66 : 48;
     this.camera.updateProjectionMatrix();
+    this.particles?.setViewportHeight(h * this.renderer.getPixelRatio(), this.camera.fov);
   }
 
   start() {
@@ -273,8 +352,15 @@ export class MatchEngine {
     this.last = performance.now();
     const loop = (now: number) => {
       this.raf = requestAnimationFrame(loop);
-      const dt = Math.min(0.05, (now - this.last) / 1000);
+      const realDt = (now - this.last) / 1000;
+      if (this.frameSkip) {
+        // 30fps cap: render every other display frame.
+        this.skipToggle = !this.skipToggle;
+        if (this.skipToggle) return;
+      }
+      const dt = Math.min(0.05, realDt);
       this.last = now;
+      this.governor.tick(realDt);
       this.frame(dt);
     };
     this.raf = requestAnimationFrame(loop);
@@ -286,11 +372,12 @@ export class MatchEngine {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     audio.stopCrowd();
-    this.renderer.dispose();
+    this.post.dispose();
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.geometry) m.geometry.dispose();
     });
+    this.renderer.dispose();
     this.renderer.domElement.remove();
   }
 
@@ -318,9 +405,10 @@ export class MatchEngine {
   private frame(dt: number) {
     if (!this.paused) {
       this.time += dt;
-      if (!this.waitingBlocking) this.update(dt);
+      if (this.replay) this.updateReplay(dt);
+      else if (!this.waitingBlocking) this.update(dt);
     }
-    this.render(dt);
+    this.render(this.paused ? 0 : dt);
   }
 
   private update(dt: number) {
@@ -423,11 +511,13 @@ export class MatchEngine {
         if (c && userHasBall && c.sidestepT <= 0) {
           c.sidestepT = 0.35;
           c.sideDir = this.input.moveX !== 0 ? Math.sign(this.input.moveX) * this.camRightSign() : c.z > 0 ? -1 : 1;
+          c.fx = c.sideDir * Math.cos(c.heading) > 0 ? 'sidestepR' : 'sidestepL';
         }
         break;
       case 'handoff':
         if (c && userHasBall && c.handoffT <= 0) {
           c.handoffT = 0.6;
+          c.fx = 'handoff';
           const d = this.nearestOpponent(c, 2.2);
           if (d) this.tryFend(c, d);
         }
@@ -443,6 +533,7 @@ export class MatchEngine {
           const carrier = b.carrier;
           const d = dist(c.x, c.z, carrier.x, carrier.z);
           c.diveT = 0.45;
+          c.fx = 'dive';
           const ang = Math.atan2(carrier.z - c.z, carrier.x - c.x);
           c.vx = Math.cos(ang) * 9;
           c.vz = Math.sin(ang) * 9;
@@ -864,8 +955,10 @@ export class MatchEngine {
       if (r < 0.7 && c.sidestepT <= 0 && rand.chance(c.r.pace / 160)) {
         c.sidestepT = 0.35;
         c.sideDir = Math.sign(c.z - nearestP.z) || 1;
+        c.fx = c.sideDir * Math.cos(c.heading) > 0 ? 'sidestepR' : 'sidestepL';
       } else if (c.handoffT <= 0 && rand.chance(c.r.strength / 200)) {
         c.handoffT = 0.6;
+        c.fx = 'handoff';
         if (nearest < 2) this.tryFend(c, nearestP);
       }
     }
@@ -904,6 +997,7 @@ export class MatchEngine {
   // ---------------------------------------------------------------- tackles
   private attemptTackle(t: P, c: P, dive: boolean) {
     t.tackleCD = 0.5;
+    if (!dive) t.fx = 'tackle';
     const evasion = c.r.strength * 0.45 + c.r.pace * 0.3 + c.r.handling * 0.25;
     let p = 0.62 + (t.r.tackling - evasion) / 110;
     if (dive) p += 0.08;
@@ -928,7 +1022,9 @@ export class MatchEngine {
     if (t.side === 0 || c.side === 0) haptic(big ? 'bighit' : 'tackle');
     if (big) this.say(line('bigHit'), t.side === 0 ? 'good' : 'bad');
     c.state = 'down';
-    c.timer = 2.5;
+    c.timer = 1.5; // tackled players are back on their feet after 1.5s
+    this.tackleZoomT = 1.6;
+    this.particles.dust(c.x, c.z, big ? 1.4 : 0.7);
     c.vx *= 0.3;
     c.vz *= 0.3;
     t.state = 'down';
@@ -1021,6 +1117,7 @@ export class MatchEngine {
     this.ball.lastSide = passer.side;
     this.atBaseT = -1;
     passer.kickT = 0.2;
+    passer.fx = 'pass';
     if (passer.side === 0) this.controlled = target;
     return true;
   }
@@ -1091,6 +1188,7 @@ export class MatchEngine {
   private giveBall(p: P) {
     const b = this.ball;
     const changed = b.lastSide !== p.side;
+    if (b.state === 'pass' || b.state === 'air') p.fx = 'catch';
     b.state = 'held';
     b.carrier = p;
     b.pass = null;
@@ -1159,6 +1257,7 @@ export class MatchEngine {
     b.wind = true;
     b.goalCheck = type === 'punt' ? { side: p.side, kind: 'drop' } : null;
     p.kickT = 0.4;
+    p.fx = 'kick';
     this.atBaseT = -1;
     audio.kick();
     for (const pl of this.players) pl.catchCD = pl === p ? 1.2 : 0.35;
@@ -1310,19 +1409,33 @@ export class MatchEngine {
     if (side === 0) this.stats.tries++;
     this.phase = 'dead';
     this.ball.state = 'dead';
-    c.state = 'down';
-    c.timer = 2;
+    c.state = 'free';
+    c.vx = c.vz = 0;
     this.whistle();
     audio.cheer(side === 0 ? 1.2 : 0.7);
     haptic('try');
-    this.say(line('try'), side === 0 ? 'big' : 'bad', `${c.name} scores for ${this.teamShort(side)}`);
+    this.emit({ type: 'try', scorer: c.name, team: this.teamShort(side), userScored: side === 0 });
     this.emit({ type: 'hud', hud: this.hud() });
+    this.exciteBoost = 1;
+    const kit = side === 0 ? this.cfg.user.kit : this.cfg.cpu.kit;
+    this.particles.confetti(c.x, c.z, [kit.primary, kit.secondary, '#ffffff', '#c6ff1a']);
+    for (const m of this.teams[side]) if (dist(m.x, m.z, c.x, c.z) < 18 && m.state !== 'off') {
+      m.celebrateT = 3.2;
+      m.tx = c.x;
+      m.tz = c.z;
+      m.urgency = 0.5;
+    }
+    this.camMode = 'try';
+    this.camFocus = c;
+    this.camModeT = 0;
+    const clip = this.history.slice(-96);
     if (this.cfg.drill) {
       this.after(2, () => this.drillNext());
       return;
     }
     const z = clamp(c.z, -30, 30);
-    this.after(2.6, () => this.setupPlaceKick(side, 'conversion', dirOf(side) * (FIELD.tryX - 12 - Math.abs(z) * 0.1), z));
+    const conversion = () => this.setupPlaceKick(side, 'conversion', dirOf(side) * (FIELD.tryX - 12 - Math.abs(z) * 0.1), z);
+    this.after(2.6, () => this.startReplay(clip, conversion));
   }
 
   private goalResult(side: Side, kind: 'drop' | 'conversion' | 'penalty' | 'drill', good: boolean) {
@@ -1424,6 +1537,7 @@ export class MatchEngine {
       if (p.state !== 'off') p.state = 'free';
       p.timer = 0;
       p.diveT = 0;
+      p.celebrateT = 0;
       p.vx = p.vz = 0;
     }
     this.ruck = null;
@@ -1439,6 +1553,7 @@ export class MatchEngine {
     p.z = p.tz = z;
     p.vx = p.vz = 0;
     p.heading = p.side === 0 ? 0 : Math.PI;
+    p.face = p.heading;
   }
 
   private setupKickoff(kickSide: Side, atX: number) {
@@ -1462,6 +1577,11 @@ export class MatchEngine {
     this.phase = 'dead';
     this.controlled = null;
     this.autoControl();
+    if (!this.cfg.drill) {
+      this.camMode = 'kickoff';
+      this.camFocus = kicker;
+      this.camModeT = 0;
+    }
     this.after(1.2, () => {
       this.whistle();
       this.after(0.6, () => {
@@ -1482,6 +1602,8 @@ export class MatchEngine {
         b.wind = false;
         b.goalCheck = null;
         kicker.kickT = 0.4;
+        kicker.fx = 'kick';
+        this.camMode = 'game';
         for (const pl of this.players) pl.catchCD = kickSide === pl.side ? 0.8 : 0;
         audio.kick();
         this.phase = 'kickoff';
@@ -1914,12 +2036,12 @@ export class MatchEngine {
     if (winner !== throwSide) this.say('Lineout stolen!', winner === 0 ? 'good' : 'bad');
     const jumper = this.teams[winner][3];
     // lift the jumper briefly
-    jumper.model.root.position.y = 1.2;
+    jumper.av.root.position.y = 1.2;
     const d = dirOf(winner);
     const distToLine = FIELD.tryX - x * d;
     this.after(0.6, () => {
       this.camMode = 'game';
-      jumper.model.root.position.y = 0;
+      jumper.av.root.position.y = 0;
       // Close to the line, the winners set up a driving maul.
       if (winner === throwSide && distToLine < 22 && rand.chance(0.55)) {
         this.resetStates();
@@ -2049,6 +2171,7 @@ export class MatchEngine {
     b.kicker = kicker;
     b.goalCheck = { side, kind: this.placeKind === 'drill' ? 'drill' : this.placeKind };
     kicker.kickT = 0.5;
+    kicker.fx = 'kick';
     audio.kick();
     this.arc.visible = false;
     // Safety: if the ball never reaches the posts (short), resolve as a miss.
@@ -2214,62 +2337,164 @@ export class MatchEngine {
   }
 
   // ---------------------------------------------------------------- rendering
+  private animFor(p: P, speed: number): [AnimName, number] {
+    if (p.state === 'down') return ['lying', 1];
+    if (p.state === 'bound') return ['bind', 1];
+    if (p.celebrateT > 0) return ['celebrate', 1];
+    if (speed < 0.45) return ['idle', 1];
+    if (speed < 2.8) return ['walk', clamp(speed / 1.6, 0.6, 1.6)];
+    return ['run', clamp(speed / 6.4, 0.75, 1.45)];
+  }
+
   private render(dt: number) {
     const b = this.ball;
     const m4 = new THREE.Matrix4();
+    const rf = this.replay ? this.replayFrame() : null;
+    const record = !rf && dt > 0 && (this.recordAcc += dt) >= 1 / 30;
+    const rec: ReplayFrame | null = record ? { p: new Float32Array(this.players.length * 6), bx: b.x, by: b.y, bz: b.z, flying: b.state === 'air' || b.state === 'pass' } : null;
+    if (record) this.recordAcc = 0;
+    const animDt = rf ? dt * REPLAY_SPEED : dt;
     let si = 0;
-    for (const p of this.players) {
+    this.players.forEach((p, i) => {
       const off = p.state === 'off';
-      p.model.root.visible = !off;
+      p.av.root.visible = !off;
       if (off) {
         m4.makeScale(0, 0, 0);
         this.shadows.setMatrixAt(si++, m4);
-        continue;
+        return;
       }
-      const speed = Math.hypot(p.vx, p.vz);
-      if (speed > 0.4 && p.state !== 'down') p.heading = Math.atan2(p.vz, p.vx);
-      else if (p.state === 'free' && this.phase !== 'play') p.heading = p.side === 0 ? 0 : Math.PI;
-      p.model.root.position.x = p.x;
-      p.model.root.position.z = p.z;
-      // Rotate so local +x faces the heading.
-      p.model.root.rotation.y = -p.heading;
-      let pose: Pose = 'run';
-      if (p.diveT > 0) pose = 'dive';
-      else if (p.state === 'down') pose = 'down';
-      else if (p.state === 'bound') pose = 'bound';
-      else if (p.kickT > 0) pose = 'kick';
-      else if (b.carrier === p) pose = 'carry';
-      animateModel(p.model, speed, this.paused ? 0 : dt, pose);
-      m4.makeTranslation(p.x, 0.03, p.z);
+      let x: number, z: number, heading: number, base: AnimName, ts: number, trig: AnimName | null;
+      if (rf) {
+        const o = i * 6;
+        [x, z, heading] = [rf.p[o], rf.p[o + 1], rf.p[o + 2]];
+        base = ANIMS[rf.p[o + 3]];
+        ts = rf.p[o + 4];
+        trig = rf.p[o + 5] >= 0 ? ANIMS[rf.p[o + 5]] : null;
+      } else {
+        const speed = Math.hypot(p.vx, p.vz);
+        if (speed > 0.4 && p.state !== 'down') p.heading = Math.atan2(p.vz, p.vx);
+        else if (p.state === 'free' && this.phase !== 'play' && this.phase !== 'kickoff') p.heading = p.side === 0 ? 0 : Math.PI;
+        x = p.x;
+        z = p.z;
+        let dh = p.heading - p.face;
+        dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+        p.face += dh * Math.min(1, dt * (speed > 3 ? 12 : 8));
+        heading = p.face;
+        [base, ts] = this.animFor(p, speed);
+        trig = p.fx;
+        p.fx = null;
+        if (dt > 0) {
+          const down = p.state === 'down';
+          if (down && !p.wasDown && !p.av.busy && !trig) trig = 'fall';
+          if (!down && p.wasDown && p.state === 'free') trig = trig ?? 'getup';
+          p.wasDown = down;
+          p.celebrateT = Math.max(0, p.celebrateT - dt);
+        }
+      }
+      if (rec) rec.p.set([x, z, heading, ANIMS.indexOf(base), ts, trig ? ANIMS.indexOf(trig) : -1], i * 6);
+      p.av.root.position.set(x, 0, z);
+      p.av.root.rotation.y = -heading;
+      p.av.setBase(base, ts);
+      if (trig) p.av.trigger(trig, trig === 'getup' ? 1.8 : trig === 'fall' ? 1.3 : 1);
+      p.av.update(animDt);
+      m4.makeTranslation(x, 0.02, z);
       this.shadows.setMatrixAt(si++, m4);
+    });
+    if (rec) {
+      this.history.push(rec);
+      if (this.history.length > 150) this.history.shift();
     }
-    m4.makeScale(0.4, 1, 0.4);
-    m4.setPosition(b.x, 0.025, b.z);
+
+    // ball: sits in the carrier's hands, otherwise follows physics
+    const ballPos = this.tmpV;
+    if (rf) ballPos.set(rf.bx, rf.by, rf.bz);
+    else if (b.state === 'held' && b.carrier && b.carrier.state !== 'down') {
+      b.carrier.av.handPosition(ballPos);
+      ballPos.y = Math.max(0.3, ballPos.y);
+    } else ballPos.set(b.x, b.y, b.z);
+    this.ballMesh.position.copy(ballPos);
+    const flying = rf ? rf.flying : b.state === 'air' || b.state === 'pass';
+    if (flying) this.ballMesh.rotation.z += dt * (b.state === 'air' ? 10 : 4);
+    else if (b.carrier) this.ballMesh.rotation.set(0, -b.carrier.heading, 0.3);
+    m4.makeScale(0.45, 1, 0.45);
+    m4.setPosition(ballPos.x, 0.021, ballPos.z);
     this.shadows.setMatrixAt(si, m4);
     this.shadows.instanceMatrix.needsUpdate = true;
+    this.ballFx.update(ballPos, flying, this.camera, this.time);
 
-    this.ballMesh.position.set(b.x, b.y, b.z);
-    if (b.state === 'air' || b.state === 'pass') this.ballMesh.rotation.z += dt * (b.state === 'air' ? 10 : 3);
-    else if (b.carrier) this.ballMesh.rotation.set(0, -b.carrier.heading, 0.3);
-
-    const c = this.controlled;
-    const showRing = !!c && c.state !== 'off' && this.phase !== 'placekick' && !this.cfg.drill?.match(/kicking/);
-    this.ring.visible = showRing;
-    if (c && showRing) {
-      this.ring.position.x = c.x;
-      this.ring.position.z = c.z;
-      (this.ring.material as THREE.MeshBasicMaterial).color.set(this.possession() === 0 ? '#c6ff1a' : '#ff3d6e');
-      this.ring.scale.setScalar(1 + Math.sin(this.time * 6) * 0.06);
+    // real shadows only for the players nearest the action
+    if (this.quality.shadows) {
+      const fx = this.camLook.x;
+      const fz = this.camLook.z;
+      const order = this.players.filter((p) => p.state !== 'off').sort((a, c) => (a.x - fx) ** 2 + (a.z - fz) ** 2 - ((c.x - fx) ** 2 + (c.z - fz) ** 2));
+      order.forEach((p, i) => p.av.setShadow(i < this.quality.shadowCasters));
+      const key = this.stadium.key;
+      key.target.position.set(fx, 0, fz);
+      key.position.set(fx - 35, 70, fz + 45);
     }
-    const tgt = b.state === 'pass' && b.pass ? b.pass.target : null;
+
+    // selected player: glowing ring + arrow above the head
+    const c = this.controlled;
+    const showSel = !rf && !!c && c.state !== 'off' && this.phase !== 'placekick' && this.cfg.drill !== 'kicking' && this.camMode !== 'try';
+    if (c && showSel) {
+      c.av.headPosition(this.tmpV);
+      this.selector.place(c.x, c.z, this.tmpV.y, this.time, true);
+    } else this.selector.place(0, 0, 0, 0, false);
+    const tgt = !rf && b.state === 'pass' && b.pass ? b.pass.target : null;
     this.targetRing.visible = !!tgt;
     if (tgt) this.targetRing.position.set(tgt.x, 0.035, tgt.z);
 
-    this.updateArc();
-    this.updateCamera(dt);
-    const excite = this.phase === 'play' ? clamp((Math.abs(b.x) - 25) / 25, 0, 1) : 0.15;
-    this.stadium.update(this.time, excite);
-    this.renderer.render(this.scene, this.camera);
+    this.particles.update(dt);
+    if (!rf) this.updateArc();
+    else this.arc.visible = false;
+    this.updateCamera(dt, rf);
+    this.exciteBoost = Math.max(0, this.exciteBoost - dt * 0.25);
+    const bx = rf ? rf.bx : b.x;
+    const excite = Math.max(this.exciteBoost, this.phase === 'play' || rf ? clamp((Math.abs(bx) - 22) / 26, 0, 1) * 0.8 : 0.1);
+    this.stadium.update(this.time, excite, this.camera);
+    this.post.render();
+  }
+
+  // ---------------------------------------------------------------- replay
+  private startReplay(frames: ReplayFrame[], done: () => void) {
+    if (frames.length < 10) return done();
+    this.replay = { frames, t: 0, done };
+    this.camMode = 'replay';
+    this.emit({ type: 'replay', active: true });
+  }
+
+  /** Called by the UI when the player taps to skip. */
+  skipReplay() {
+    if (this.replay) this.replay.t = this.replay.frames.length;
+  }
+
+  private updateReplay(dt: number) {
+    const r = this.replay!;
+    r.t += dt * 30 * REPLAY_SPEED;
+    if (r.t >= r.frames.length - 1) {
+      this.replay = null;
+      this.camMode = 'game';
+      this.emit({ type: 'replay', active: false });
+      r.done();
+    }
+  }
+
+  private replayFrame(): ReplayFrame {
+    const r = this.replay!;
+    const i = Math.min(Math.floor(r.t), r.frames.length - 1);
+    const a = r.frames[i];
+    const b = r.frames[Math.min(i + 1, r.frames.length - 1)];
+    const u = r.t - i;
+    const out: ReplayFrame = { p: new Float32Array(a.p), bx: a.bx + (b.bx - a.bx) * u, by: a.by + (b.by - a.by) * u, bz: a.bz + (b.bz - a.bz) * u, flying: a.flying };
+    for (let k = 0; k < this.players.length; k++) {
+      const o = k * 6;
+      out.p[o] = a.p[o] + (b.p[o] - a.p[o]) * u;
+      out.p[o + 1] = a.p[o + 1] + (b.p[o + 1] - a.p[o + 1]) * u;
+      // only fire one-shot triggers once per recorded frame
+      if ((r as { lastIdx?: number }).lastIdx === i) out.p[o + 5] = -1;
+    }
+    (r as { lastIdx?: number }).lastIdx = i;
+    return out;
   }
 
   private updateArc() {
@@ -2316,42 +2541,89 @@ export class MatchEngine {
     this.arc.visible = true;
   }
 
-  private updateCamera(dt: number) {
+  private updateCamera(dt: number, rf: ReplayFrame | null) {
     const b = this.ball;
+    this.camModeT += dt;
+    this.tackleZoomT = Math.max(0, this.tackleZoomT - dt);
     const focus = new THREE.Vector3(b.x, 0, b.z);
     if (b.carrier) focus.set(b.carrier.x, 0, b.carrier.z);
     let pos: THREE.Vector3;
     let look: THREE.Vector3;
-    if (this.camMode === 'placekick') {
+    let rate = 3.2;
+    const fp = this.camFocus;
+    if (this.camMode === 'replay' && rf) {
+      // low side-on tracking shot
+      const side = rf.bz < 15 ? 1 : -1;
+      pos = new THREE.Vector3(rf.bx - 7, 3.2, rf.bz + side * 11);
+      look = new THREE.Vector3(rf.bx + 1, 1.1, rf.bz);
+      rate = 4;
+    } else if (this.camMode === 'try' && fp) {
+      // slow orbit around the try scorer
+      const a = 0.6 + this.camModeT * 0.35;
+      pos = new THREE.Vector3(fp.x + Math.cos(a) * 5.5, 1.9, fp.z + Math.sin(a) * 5.5);
+      look = new THREE.Vector3(fp.x, 1.0, fp.z);
+      rate = 2.5;
+    } else if (this.camMode === 'kickoff' && fp) {
+      const d = dirOf(fp.side);
+      pos = new THREE.Vector3(fp.x + d * 4.5, 1.7, fp.z + 3.2);
+      look = new THREE.Vector3(fp.x, 1.2, fp.z);
+      rate = 4;
+    } else if (this.camMode === 'placekick') {
       const d = dirOf(this.placeSide);
-      pos = new THREE.Vector3(b.x - d * 7, 2.6, b.z);
       const toPost = new THREE.Vector3(d * FIELD.tryX - b.x, 0, -b.z).normalize();
-      pos = new THREE.Vector3(b.x, 2.4, b.z).addScaledVector(toPost, -7);
-      look = new THREE.Vector3(d * FIELD.tryX, 4, 0);
-      if (b.state === 'air') look = new THREE.Vector3(b.x, b.y, b.z).lerp(look, 0.5);
+      const flying = b.state === 'air';
+      pos = new THREE.Vector3(b.x, flying ? 2.6 : 1.55, b.z).addScaledVector(toPost, flying ? -5 : -4.2);
+      if (flying) pos.copy(this.camPos).lerp(new THREE.Vector3(b.x, b.y * 0.6 + 2, b.z).addScaledVector(toPost, -9), 0.5);
+      look = new THREE.Vector3(d * FIELD.tryX, 4.5, 0);
+      if (flying) look = new THREE.Vector3(b.x, b.y, b.z).lerp(look, 0.4);
+      rate = flying ? 3 : 5;
     } else if (this.camMode === 'setpiece' && (this.phase === 'scrum' || this.phase === 'lineout')) {
-      pos = new THREE.Vector3(b.x - 12, 7, b.z + (b.z > 0 ? -6 : 6));
-      look = new THREE.Vector3(b.x + 2, 0.5, b.z);
+      pos = new THREE.Vector3(b.x - 9, 4.5, b.z + (b.z > 0 ? -5 : 5));
+      look = new THREE.Vector3(b.x + 2, 0.8, b.z);
     } else {
       const mode = this.cfg.camera;
+      const tight = this.phase === 'ruck' || this.phase === 'maul' || this.tackleZoomT > 0;
       if (mode === 'sideline') {
-        pos = new THREE.Vector3(focus.x * 0.92, 24, focus.z * 0.3 + 46);
+        pos = new THREE.Vector3(focus.x * 0.92, tight ? 16 : 22, focus.z * 0.3 + (tight ? 34 : 44));
         look = new THREE.Vector3(focus.x, 0, focus.z * 0.6);
       } else if (mode === 'close') {
-        pos = new THREE.Vector3(focus.x - 9, 5, focus.z * 0.9);
-        look = new THREE.Vector3(focus.x + 7, 1, focus.z);
+        pos = new THREE.Vector3(focus.x - (tight ? 6.5 : 8), tight ? 3.4 : 4.2, focus.z * 0.92);
+        look = new THREE.Vector3(focus.x + 8, 1, focus.z);
       } else {
-        pos = new THREE.Vector3(focus.x - 15, 10, focus.z * 0.85);
-        look = new THREE.Vector3(focus.x + 9, 0, focus.z);
+        // Low broadcast camera: ~12m behind and 7m above the carrier, looking down the pitch to the try line.
+        const back = tight ? 8.5 : 12;
+        const up = tight ? 5.2 : 7;
+        pos = new THREE.Vector3(focus.x - back, up, focus.z * 0.9);
+        look = new THREE.Vector3(focus.x + 15, 0.6, focus.z * 0.97);
       }
-      if (b.state === 'air') pos.y += Math.min(6, b.y * 0.4);
+      if (b.state === 'air') pos.y += Math.min(5, b.y * 0.35);
     }
-    const k = Math.min(1, dt * (this.camMode === 'placekick' ? 5 : 3.2));
+    const k = 1 - Math.exp(-dt * rate);
     this.camPos.lerp(pos, k);
     this.camLook.lerp(look, k);
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(this.camLook);
   }
+}
+
+const REPLAY_SPEED = 0.45;
+const ANIMS: AnimName[] = ['idle', 'walk', 'run', 'sidestepL', 'sidestepR', 'pass', 'catch', 'kick', 'tackle', 'dive', 'fall', 'getup', 'celebrate', 'bind', 'lying', 'carry'];
+
+interface ReplayFrame {
+  p: Float32Array; // per player: x, z, heading, base anim, time scale, triggered anim
+  bx: number;
+  by: number;
+  bz: number;
+  flying: boolean;
+}
+
+/** Selector colour: the team's primary, unless it's too dark to see against the night sky. */
+function indicatorColor(kit: { primary: string; secondary: string }) {
+  const c = new THREE.Color(kit.primary);
+  const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  if (l > 0.12) return kit.primary;
+  const s = new THREE.Color(kit.secondary);
+  return 0.2126 * s.r + 0.7152 * s.g + 0.0722 * s.b > 0.12 ? kit.secondary : '#c6ff1a';
 }
 
 function hashCode(s: string) {

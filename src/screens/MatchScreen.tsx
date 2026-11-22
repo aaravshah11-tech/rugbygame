@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
+import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
 import { ActionButtons, Joystick } from '../ui/controls';
 import { Commentary, MiniGame, PlaceKickUI, ScoreBug, type Comm } from '../ui/overlays';
@@ -50,6 +51,9 @@ export function MatchScreen({
   const [paused, setPaused] = useState(false);
   const [plays, setPlays] = useState(false);
   const [drill, setDrill] = useState<{ text: string; progress: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
+  const [replay, setReplay] = useState(false);
   const commId = useRef(0);
   const finished = useRef(false);
 
@@ -88,6 +92,16 @@ export function MatchScreen({
           finished.current = true;
           setTimeout(() => setOutcome(onFinish ? onFinish(e.result) : { title: 'Full time', lines: [], coins: 0 }), 1800);
           break;
+        case 'try': {
+          const id = ++commId.current;
+          setTryBanner({ id, scorer: e.scorer, team: e.team, user: e.userScored });
+          setComms([]);
+          setTimeout(() => setTryBanner((b) => (b && b.id === id ? null : b)), 2600);
+          break;
+        }
+        case 'replay':
+          setReplay(e.active);
+          break;
         case 'drill':
           setDrill({ text: e.text, progress: e.progress });
           break;
@@ -98,20 +112,28 @@ export function MatchScreen({
           break;
       }
     };
-    const eng = new MatchEngine(host.current!, cfg, input.current, onEvent);
-    engine.current = eng;
+    let eng: MatchEngine | null = null;
+    let cancelled = false;
     audio.stopMusic();
-    eng.start();
+    void loadPlayerAsset().then((asset) => {
+      if (cancelled) return;
+      eng = new MatchEngine(host.current!, cfg, input.current, onEvent, asset);
+      engine.current = eng;
+      if (import.meta.env.DEV) (window as unknown as { __engine: MatchEngine }).__engine = eng;
+      setLoading(false);
+      eng.start();
+    });
     const vis = () => {
-      if (document.hidden) {
+      if (document.hidden && eng) {
         setPaused(true);
         eng.setPaused(true);
       }
     };
     document.addEventListener('visibilitychange', vis);
     return () => {
+      cancelled = true;
       document.removeEventListener('visibilitychange', vis);
-      eng.dispose();
+      eng?.dispose();
       engine.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -125,11 +147,20 @@ export function MatchScreen({
   const userIsHome = cfg.userIsHome;
   const userSide = { short: cfg.user.short, color: cfg.user.kit.primary, score: hud.userScore };
   const cpuSide = { short: cfg.cpu.short, color: cfg.cpu.kit.primary, score: hud.cpuScore };
-  const showControls = !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
+  const showControls = !loading && !replay && !tryBanner && hud.phase !== 'dead' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
 
   return (
     <div className="match-root">
       <div ref={host} className="match-canvas" />
+      <div className="vignette" />
+      {loading && (
+        <div className="gate" style={{ background: 'var(--bg)' }}>
+          <div className="logo">
+            TRY <span>LINE</span>
+          </div>
+          <div className="muted italic">Warming up the players…</div>
+        </div>
+      )}
       <div className="hud">
         {!cfg.drill && <ScoreBug hud={hud} left={userIsHome ? userSide : cpuSide} right={userIsHome ? cpuSide : userSide} />}
         {drill && cfg.drill && (
@@ -155,7 +186,20 @@ export function MatchScreen({
             Set Plays
           </button>
         )}
-        <Commentary items={comms} />
+        {!tryBanner && <Commentary items={comms} />}
+        {tryBanner && (
+          <div className={`try-banner ${tryBanner.user ? '' : 'them'}`} key={tryBanner.id}>
+            <div className="try-word">TRY!</div>
+            <div className="try-sub">
+              {tryBanner.scorer} · {tryBanner.team}
+            </div>
+          </div>
+        )}
+        {replay && (
+          <button className="replay-tag" onClick={() => engine.current?.skipReplay()}>
+            <span className="rec" /> REPLAY <small>tap to skip</small>
+          </button>
+        )}
         {showControls && <Joystick input={input.current} />}
         {showControls && <ActionButtons input={input.current} attacking={hud.attacking} />}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}

@@ -7,6 +7,8 @@ import { WorldCup } from './screens/WorldCup';
 import { SquadBuilder } from './screens/SquadBuilder';
 import { Training } from './screens/Training';
 import { Settings } from './screens/Settings';
+import { SquadViewer } from './screens/SquadViewer';
+import { loadPlayerAsset } from './game/view/assets';
 import { MatchScreen, type MatchOutcome } from './screens/MatchScreen';
 import type { EngineResult, MatchConfig } from './game/types';
 import { applySettings, restoreFromIdb, runDailyCheck } from './state/store';
@@ -20,6 +22,7 @@ export type Route =
   | { name: 'squad'; tab?: string }
   | { name: 'training' }
   | { name: 'settings' }
+  | { name: 'viewer' }
   | {
       name: 'match';
       cfg: MatchConfig;
@@ -35,6 +38,7 @@ export function App() {
 
   useEffect(() => {
     applySettings();
+    void loadPlayerAsset(); // start downloading the player model straight away
     void restoreFromIdb().then(runDailyCheck);
     // iOS: audio can only start from a user gesture.
     const unlock = () => unlockAudio();
@@ -70,6 +74,9 @@ export function App() {
       break;
     case 'settings':
       screen = <Settings go={go} />;
+      break;
+    case 'viewer':
+      screen = <SquadViewer go={go} />;
       break;
     case 'match':
       screen = <MatchScreen cfg={route.cfg} onFinish={route.onFinish} onDrillDone={route.onDrillDone} onExit={() => go(route.back)} />;

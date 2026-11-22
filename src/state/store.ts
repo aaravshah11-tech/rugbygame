@@ -65,7 +65,7 @@ function freshProfile(): Profile {
   return {
     version: 1,
     coins: 1500,
-    settings: { music: 0.5, sfx: 0.8, haptics: true, difficulty: 'medium', camera: 'broadcast', halfLength: 4 },
+    settings: { music: 0.5, sfx: 0.8, haptics: true, difficulty: 'medium', camera: 'broadcast', halfLength: 4, graphics: 'auto' },
     club: starterClub(),
     championship: null,
     worldCup: null,

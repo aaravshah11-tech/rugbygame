@@ -16,11 +16,30 @@ Install on iOS: open the site in Safari → Share → **Add to Home Screen**. It
 ### Device lock
 `src/util/device.ts` allows only iPhone/iPad (iPadOS desktop-mode UAs are detected via multi-touch). Anything else gets a full-screen "only available on iPhone and iPad" page with a QR code to the site. iPhones in portrait get a rotate screen; iPad works in both orientations.
 
-Dev builds only (`npm run dev`) accept two testing flags:
+Dev builds only (`npm run dev`) accept testing flags:
 - `?device=iphone` / `?device=ipad` — bypass the device lock in a desktop browser
 - `?fast` — runs the match clock 20× faster
+- `window.__engine.debugBreak()` in the console during a match — puts your fly-half through to test the try, replay and conversion
 
 Production builds ignore both.
+
+## Graphics
+
+- **Players:** Quaternius stylised low-poly man (`Male_Shirt`), converted from the uploaded `.blend` with `scripts/blend_to_glb.py` and meshopt-compressed to `public/models/rugby_player.glb` (311 KB).
+  - **Kit parts:** shirt, shorts and socks are separate materials, recoloured in code from each nation's kit. The secondary colour is used for the collar, cuffs and sock hoops. The model's long trousers are cut into shorts, bare knees and socks at load time.
+  - **Faces and heads:** a number decal on the back, eyebrows, varied hair, and scrum caps on some forwards.
+  - **Build:** stylised proportions (bigger head and hands, broad shoulders); forwards are 15% bulkier.
+- **Animations** (`src/game/view/assets.ts`):
+  - From the model's own clips: idle, jog, sprint, fall (Death), get-up (Death reversed), celebrate (Jump) and hand-off (Punch).
+  - Generated as skeletal clips from the Idle pose: pass, catch, kick, tackle, dive, sidestep and ruck-bind.
+  - Clips are retargeted by bone name. Anything that fails to match falls back to Idle, so players never T-pose. Crossfades are 0.2 s.
+- **Squad Viewer:** Settings → Squad Viewer shows all 15 players of any team on turntables, with buttons for every animation.
+- **Stadium:**
+  - Two-tier bowl with a roof, and an instanced billboard crowd that cheers near the try lines.
+  - Floodlight towers, scrolling LED boards with made-up sponsors, an evening sky and PBR image lighting.
+  - Grass with mowing stripes, a normal map and crisp lines; 16 m posts with team-coloured pads.
+- **Effects:** ACES tone mapping and bloom, a real shadow on the six players nearest the ball plus blob shadows for everyone, a ball glow and trail, dust on tackles, confetti on tries, a TRY! banner and a slow-motion replay.
+- **Quality:** Auto/Low/Medium/High in Settings. Auto chooses from the screen resolution, then steps down (and finally caps to 30 fps) if the frame rate drops. Low turns off shadows and bloom and thins the crowd.
 
 ## What's in it
 
