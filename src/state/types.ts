@@ -87,9 +87,10 @@ export interface Profile {
   };
   championship: ChampionshipState | null;
   worldCup: WorldCupState | null;
+  comps: Partial<Record<'six' | 'league' | 'prem', import('./comps').CompState | null>>;
   daily: { lastLogin: string; streak: number; pendingReward: number; challengesDate: string; challenges: Challenge[] };
   stats: { matches: number; wins: number; draws: number; losses: number; tries: number; tackles: number };
-  trophies: { championship: number; worldCup: number; seasons: number };
+  trophies: { championship: number; worldCup: number; seasons: number; league?: number; prem?: number };
   trainingDone: Record<string, boolean>;
   updatedAt: number;
 }

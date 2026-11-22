@@ -98,6 +98,8 @@ interface Ball {
   bounced: boolean;
   goalCheck: null | { side: Side; kind: 'drop' | 'conversion' | 'penalty' | 'drill' };
   wind: boolean;
+  grubber: boolean;
+  hopT: number;
 }
 
 const G = 9.81;
@@ -135,6 +137,7 @@ export class MatchEngine {
   private ball: Ball;
   private ballMesh: THREE.Mesh;
   private targetRing: THREE.Mesh;
+  private kickRing: THREE.Mesh;
   private passMarks: [THREE.Sprite, THREE.Sprite];
   private nameTag: THREE.Sprite;
   private nameCanvas: HTMLCanvasElement;
@@ -168,6 +171,7 @@ export class MatchEngine {
   private ruckArc: THREE.Mesh | null = null;
   private ruckArcBg: THREE.Mesh | null = null;
   private pendingSetPlay: SetPlayId | null = null;
+  private useItCalled = false;
   private slotCount: Record<number, number> = { [-1]: 7, [1]: 7 };
   private maul: null | { x: number; z: number; att: Side; t: number; dur: number; start: number; carrier: P; cpuPush: number; userPush: number } = null;
   private setPlay: null | { id: SetPlayId; targets: P[]; routes: Map<P, () => { x: number; z: number }>; until: number } = null;
@@ -239,7 +243,7 @@ export class MatchEngine {
     this.selector.setColor(indicatorColor(cfg.user.kit));
     this.ball = {
       x: 0, y: 0.1, z: 0, vx: 0, vy: 0, vz: 0, state: 'dead', carrier: null, pass: null, lastSide: 0,
-      kicker: null, kickFromX: 0, bounced: false, goalCheck: null, wind: false,
+      kicker: null, kickFromX: 0, bounced: false, goalCheck: null, wind: false, grubber: false, hopT: 0,
     };
 
     const ringGeo = new THREE.RingGeometry(0.6, 0.8, 32);
@@ -247,6 +251,12 @@ export class MatchEngine {
     this.targetRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: '#21e6c1', transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.targetRing.position.y = 0.035;
     this.scene.add(this.targetRing);
+    const kr = new THREE.RingGeometry(1.1, 1.45, 40);
+    kr.rotateX(-Math.PI / 2);
+    this.kickRing = new THREE.Mesh(kr, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.6, 0.6), transparent: true, opacity: 0.9, depthWrite: false, depthTest: false }));
+    this.kickRing.renderOrder = 5;
+    this.kickRing.visible = false;
+    this.scene.add(this.kickRing);
 
     // Pass markers: who receives a left / right pass right now.
     const mark = (dir: -1 | 1) => {
@@ -533,6 +543,7 @@ export class MatchEngine {
       phase: this.phase,
       phaseNum: this.phaseCount,
       ruck: this.ruck ? (this.ruck.att === 0 ? 'attack' : 'defend') : null,
+      canDrop: this.canDropGoal(),
       mph: Math.round((this.ball.carrier ? Math.hypot(this.ball.carrier.vx, this.ball.carrier.vz) : c ? Math.hypot(c.vx, c.vz) : 0) * 2.237),
     };
   }
@@ -561,7 +572,10 @@ export class MatchEngine {
         if (userHasBall && live) this.doPass(c!, a.long, a.dir);
         break;
       case 'kick':
-        if (userHasBall && live) this.doKick(c!, a.power, a.aim * 0.7, a.power < 0.3 ? 'grubber' : 'punt');
+        if (userHasBall && live) this.kickTo(c!, a.dist, (a.angle * Math.PI) / 180 * this.camRightSign(), a.kind);
+        break;
+      case 'dropgoal':
+        if (userHasBall && live && this.canDropGoal()) this.dropGoal(c!);
         break;
       case 'sidestep':
         if (c && userHasBall && c.sidestepT <= 0) {
@@ -579,13 +593,13 @@ export class MatchEngine {
         }
         break;
       case 'tackle':
-        if (c && live && b.carrier && b.carrier.side === 1 && c.state === 'free') {
+        if (c && live && this.atBaseT < 0 && b.carrier && b.carrier.side === 1 && c.state === 'free') {
           const reach = { easy: 2.4, medium: 1.9, hard: 1.6 }[this.cfg.difficulty];
           if (dist(c.x, c.z, b.carrier.x, b.carrier.z) <= reach) this.attemptTackle(c, b.carrier, false);
         }
         break;
       case 'dive':
-        if (c && live && c.state === 'free' && b.carrier && b.carrier.side === 1) {
+        if (c && live && this.atBaseT < 0 && c.state === 'free' && b.carrier && b.carrier.side === 1) {
           const carrier = b.carrier;
           const d = dist(c.x, c.z, carrier.x, carrier.z);
           c.diveT = 0.45;
@@ -638,6 +652,37 @@ export class MatchEngine {
       .sort((a, b) => dist(a.x, a.z, bx, bz) - dist(b.x, b.z, bx, bz));
     if (cands[0]) this.controlled = cands[0];
     audio.click();
+  }
+
+  /** Average distance of a side's support players from their attacking slots. */
+  private attackSpread(side: Side): number {
+    const c = this.ball.carrier;
+    if (!c) return 0;
+    let tot = 0;
+    let n = 0;
+    for (const p of this.teams[side]) {
+      if (p === c || p.state !== 'free' || p.num <= 8) continue;
+      tot += dist(p.x, p.z, p.tx, p.tz);
+      n++;
+    }
+    return n ? tot / n : 0;
+  }
+
+  /** At the base of a ruck the referee gives you time, then calls "Use it!", then awards a scrum. */
+  private useItCheck(c: P) {
+    if (this.atBaseT > 5 && !this.useItCalled) {
+      this.useItCalled = true;
+      this.whistle();
+      this.say('Use it!', 'info', 'Referee');
+    }
+    if (this.atBaseT > 10) {
+      this.atBaseT = -1;
+      this.whistle();
+      this.say('Ball not used', 'bad', `Scrum ${this.teamShort(other(c.side))}`);
+      const x = c.x;
+      const z = c.z;
+      this.stoppage(() => this.setupScrum(x, z, other(c.side)));
+    }
   }
 
   /** ADD PLAYER at a ruck: bind the nearest free team-mate in. */
@@ -762,7 +807,7 @@ export class MatchEngine {
       let dvz = 0;
       const max = this.maxSpeed(p);
       const carrierNow = this.ball.carrier;
-      const chasing = p === this.controlled && p.state === 'free' && inp.tackleHold && !!carrierNow && carrierNow.side !== p.side && this.phase === 'play';
+      const chasing = p === this.controlled && p.state === 'free' && inp.tackleHold && !!carrierNow && carrierNow.side !== p.side && this.phase === 'play' && this.atBaseT < 0;
       const userDriven = p === this.controlled && p.state === 'free' && (joy > 0.12 || this.ball.carrier === p) && this.phase !== 'placekick';
       if (chasing && carrierNow) {
         // Hold TACKLE: sprint to cut off the ball carrier.
@@ -913,10 +958,7 @@ export class MatchEngine {
     if (c.side === 0 && c === this.controlled && this.atBaseT >= 0) {
       this.atBaseT += dt;
       if (Math.hypot(this.input.moveX, this.input.moveY) > 0.5) this.atBaseT = -1; // sniping: the user runs it
-      else if (this.atBaseT > 1.8) {
-        this.atBaseT = -1;
-        this.doPass(c, false, 0);
-      }
+      else this.useItCheck(c);
     }
     if (c.side === 1 || c !== this.controlled) this.cpuCarrier(dt, c);
   }
@@ -993,7 +1035,7 @@ export class MatchEngine {
       const lead = carrier ? clamp(carrier.vx * dAtt, 0, 9) * 0.9 : 0;
       // At the base the line starts 2m deep and moves up ~3.5 m/s towards the gain line, so the
       // backs are already running when the scrum-half's pass arrives.
-      const baseRun = this.atBaseT >= 0 ? Math.min(this.atBaseT * 3.5, 4.5) - 2 : 0;
+      const baseRun = this.atBaseT >= 0 ? -2 : 0; // hold the shape, 2m deep, until the 9 plays it
       const t = this.attackSlotTarget(p, fx + dAtt * (lead + baseRun), fz, att);
       p.tx = t.x;
       p.tz = t.z;
@@ -1028,7 +1070,7 @@ export class MatchEngine {
     // Chasers: up to two closest defenders hunt the carrier.
     const hunt = carrier ?? (b.pass ? b.pass.target : null);
     const sorted = [...defenders].sort((p, q) => dist(p.x, p.z, fx, fz) - dist(q.x, q.z, fx, fz));
-    const chasers = new Set(sorted.slice(0, this.phase === 'kickoff' ? 2 : 1));
+    const chasers = new Set(this.atBaseT >= 0 ? [] : sorted.slice(0, this.phase === 'kickoff' ? 2 : 1));
     const fb = defenders.find((p) => p.num === 15);
     const lineDef = defenders.filter((p) => !chasers.has(p) && p !== fb).sort((p, q) => p.z - q.z);
     const lineX = fx + dAtt * (this.atBaseT >= 0 ? 3.4 : 5);
@@ -1066,12 +1108,13 @@ export class MatchEngine {
 
     // Holding TACKLE: the controlled defender tackles automatically once in range.
     const uc = this.controlled;
-    if (carrier && this.phase === 'play' && uc && this.input.tackleHold && uc.side !== carrier.side && uc.state === 'free' && uc.tackleCD <= 0) {
+    if (carrier && this.phase === 'play' && this.atBaseT < 0 && uc && this.input.tackleHold && uc.side !== carrier.side && uc.state === 'free' && uc.tackleCD <= 0) {
       const reach = { easy: 2.2, medium: 1.8, hard: 1.5 }[this.cfg.difficulty];
       if (dist(uc.x, uc.z, carrier.x, carrier.z) <= reach) this.attemptTackle(uc, carrier, false);
     }
     // CPU tackles (the user's controlled defender only tackles when the button is pressed)
-    if (carrier && this.phase === 'play') {
+    // The ball at the base of a ruck is still part of it: nobody may tackle the 9 until he plays it.
+    if (carrier && this.phase === 'play' && this.atBaseT < 0) {
       for (const p of this.teams[def]) {
         if (p.state !== 'free' || p.tackleCD > 0 || p === this.controlled) continue;
         const d = dist(p.x, p.z, carrier.x, carrier.z);
@@ -1121,7 +1164,8 @@ export class MatchEngine {
     this.aiDecisionT -= dt;
     if (atBase) {
       this.atBaseT += dt;
-      if (this.atBaseT > (c.side === 1 ? 1.1 : 99)) {
+      // The CPU scrum-half waits for its line to set before passing.
+      if (c.side === 1 && this.atBaseT > 1.4 && (this.attackSpread(1) < 3 || this.atBaseT > 3.2)) {
         this.atBaseT = -1;
         this.doPass(c, rand.chance(0.25), 0);
       }
@@ -1133,7 +1177,7 @@ export class MatchEngine {
     // tactical kick from deep
     const ownDist = FIELD.tryX + c.x * d;
     if ((c.num === 10 || c.num === 15 || c.num === 9) && ownDist < 32 && nearest < 9 && rand.chance(0.35)) {
-      this.doKick(c, rand.range(0.7, 1), rand.range(-0.5, 0.5), 'punt');
+      this.kickTo(c, rand.range(32, 48), rand.range(-0.45, 0.45), 'punt');
       return;
     }
     if (nearest < 3 && nearestP) {
@@ -1392,6 +1436,7 @@ export class MatchEngine {
     const b = this.ball;
     const changed = b.lastSide !== p.side;
     if (changed) this.phaseCount = 0;
+    b.grubber = false;
     if (b.state === 'pass' || b.state === 'air') p.fx = 'catch';
     b.state = 'held';
     b.carrier = p;
@@ -1422,27 +1467,45 @@ export class MatchEngine {
   }
 
   // ---------------------------------------------------------------- kicking
-  private kickVelocity(power: number, aim: number, side: Side, type: 'punt' | 'grubber' | 'box') {
+  /** Heading angle (relative to the side's attacking direction) that points from (x,z) to (tx,tz). */
+  private aimTo(side: Side, x: number, z: number, tx: number, tz: number) {
+    return Math.atan2(tz - z, (tx - x) * dirOf(side));
+  }
+
+  /**
+   * Launch velocity so the ball lands `dist` metres away along heading `aim`.
+   * Punts/box/drop kicks: solved from a flight time. Grubbers: solved by simulating the roll.
+   */
+  private kickVelocity(dist: number, aim: number, side: Side, type: KickType) {
     const d = dirOf(side);
     const hx = Math.cos(aim) * d;
     const hz = Math.sin(aim);
-    let vh: number;
-    let vy: number;
     if (type === 'grubber') {
-      vh = 9 + power * 10;
-      vy = 2;
-    } else if (type === 'box') {
-      vh = 9 + power * 4;
-      vy = 17;
-    } else {
-      vh = 12 + power * 17;
-      vy = 8 + power * 9;
+      let lo = 2;
+      let hi = 40;
+      for (let i = 0; i < 18; i++) {
+        const mid = (lo + hi) / 2;
+        if (simulateGrubber(mid) < dist) lo = mid;
+        else hi = mid;
+      }
+      const vh = (lo + hi) / 2;
+      return { vx: hx * vh, vy: GRUB_VY, vz: hz * vh };
     }
+    // flight time grows with distance; box kicks hang longest
+    const T = type === 'box' ? clamp(1.9 + dist * 0.06, 2.6, 4.2) : type === 'drop' ? clamp(1.3 + dist * 0.035, 1.8, 3.2) : clamp(1.1 + dist * 0.05, 1.5, 4);
+    const y0 = 0.7;
+    const y1 = 1.1; // catch height
+    const vy = (y1 - y0 + 0.5 * G * T * T) / T;
+    const vh = dist / T;
     return { vx: hx * vh, vy, vz: hz * vh };
   }
 
-  private doKick(p: P, power: number, aim: number, type: 'punt' | 'grubber' | 'box') {
-    const v = this.kickVelocity(power, aim, p.side, type);
+  /** Kick from player p to land `dist` m away along heading `aim` (radians), with kicker-skill error. */
+  private kickTo(p: P, dist: number, aim: number, type: KickType, exact = false) {
+    const skill = clamp(1.15 - p.r.kicking / 100, 0.1, 0.8);
+    const aimErr = exact ? 0 : (rand.next() - 0.5) * 2 * skill * (type === 'grubber' ? 0.09 : 0.11);
+    const distErr = exact ? 1 : 1 + (rand.next() - 0.5) * 2 * skill * 0.18;
+    const v = this.kickVelocity(dist * distErr, aim + aimErr, p.side, type);
     const b = this.ball;
     b.carrier = null;
     b.pass = null;
@@ -1457,8 +1520,10 @@ export class MatchEngine {
     b.kickFromX = p.x;
     b.bounced = false;
     b.lastSide = p.side;
-    b.wind = true;
-    b.goalCheck = type === 'punt' ? { side: p.side, kind: 'drop' } : null;
+    b.wind = type !== 'grubber';
+    b.grubber = type === 'grubber';
+    b.hopT = 0.3;
+    b.goalCheck = type === 'drop' ? { side: p.side, kind: 'drop' } : null;
     this.kickCurl = 0;
     p.kickT = 0.4;
     p.fx = 'kick';
@@ -1466,11 +1531,28 @@ export class MatchEngine {
     audio.kick();
     for (const pl of this.players) pl.catchCD = pl === p ? 1.2 : 0.35;
     this.setPlay = null;
+    if (p.side === 0 && type === 'drop') this.say('Drop goal attempt…', 'info');
+  }
+
+  /** Is the user's carrier in range for a drop goal? */
+  private canDropGoal(): boolean {
+    const c = this.ball.carrier;
+    if (!c || c.side !== 0 || c !== this.controlled || this.phase !== 'play') return false;
+    const D = dist(c.x, c.z, FIELD.tryX, 0);
+    return D <= 42 && D >= 8 && Math.abs(c.z) < 24 && c.x < FIELD.tryX - 4;
+  }
+
+  private dropGoal(p: P) {
+    const d = dirOf(p.side);
+    const D = dist(p.x, p.z, d * FIELD.tryX, 0);
+    const aim = this.aimTo(p.side, p.x, p.z, d * FIELD.tryX, 0);
+    // aim beyond the posts so the ball is still climbing/high as it crosses the bar
+    this.kickTo(p, D + 12, aim, 'drop');
   }
 
   private looseBall(x: number, y: number, z: number, vx: number, vy: number, vz: number) {
     const b = this.ball;
-    Object.assign(b, { x, y, z, vx, vy, vz, state: 'air', carrier: null, pass: null, bounced: false, wind: false, goalCheck: null });
+    Object.assign(b, { x, y, z, vx, vy, vz, state: 'air', carrier: null, pass: null, bounced: false, wind: false, goalCheck: null, grubber: false });
     b.kicker = null;
   }
 
@@ -1507,7 +1589,13 @@ export class MatchEngine {
       b.z += b.vz * dt;
       if (b.y <= 0.12) {
         b.y = 0.12;
-        if (Math.abs(b.vy) > 2.5) {
+        if (b.grubber && Math.abs(b.vy) > 1.2) {
+          // grubber: low skidding bounces, slightly unpredictable
+          b.vy = -b.vy * GRUB_REST;
+          b.vx *= GRUB_KEEP;
+          b.vz = b.vz * GRUB_KEEP + rand.range(-0.8, 0.8);
+          b.bounced = true;
+        } else if (!b.grubber && Math.abs(b.vy) > 2.5) {
           b.vy = -b.vy * 0.42;
           b.vx *= 0.6;
           b.vz = b.vz * 0.6 + rand.range(-2, 2);
@@ -1519,11 +1607,21 @@ export class MatchEngine {
         }
       }
     } else if (b.state === 'ground') {
-      const fr = Math.max(0, 1 - dt * 1.6);
+      const fr = Math.max(0, 1 - dt * (b.grubber ? GRUB_FRICTION : 1.6));
       b.vx *= fr;
       b.vz *= fr;
       b.x += b.vx * dt;
       b.z += b.vz * dt;
+      // a rolling rugby ball hops end over end now and then
+      if (b.grubber && Math.hypot(b.vx, b.vz) > 3) {
+        b.hopT -= dt;
+        if (b.hopT <= 0) {
+          b.hopT = rand.range(0.25, 0.55);
+          b.state = 'air';
+          b.vy = rand.range(1.3, 2.4);
+          b.vz += rand.range(-1.2, 1.2);
+        }
+      }
     }
 
     // goal posts (drop goals and place kicks)
@@ -1580,7 +1678,7 @@ export class MatchEngine {
     if (!best) return;
     const p = best;
     if (b.state === 'air') {
-      let pc = 0.86 + (p.r.handling - 70) / 200;
+      let pc = 0.92 + (p.r.handling - 70) / 250;
       if (p.side === 0) pc += this.userAssist();
       if (!rand.chance(clamp(pc, 0.55, 0.98))) {
         p.catchCD = 0.6;
@@ -1810,6 +1908,7 @@ export class MatchEngine {
         b.kickFromX = kicker.x;
         b.bounced = false;
         b.wind = false;
+        b.grubber = false;
         b.goalCheck = null;
         kicker.kickT = 0.4;
         kicker.fx = 'kick';
@@ -1840,6 +1939,7 @@ export class MatchEngine {
     this.giveBall(nine);
     this.ball.lastSide = side;
     this.atBaseT = 0;
+    this.useItCalled = false;
     this.phase = 'play';
     this.phaseT = 0;
     this.assignSlots();
@@ -1981,7 +2081,7 @@ export class MatchEngine {
     r.progress = Math.min(1, r.progress + dt / dur);
     this.updateRuckArc(r);
     const spread = this.positionAroundBreakdown(r.x, r.z, r.att);
-    const settled = spread < 3 || (r.progress >= 1 && r.t > dur + 0.6);
+    const settled = spread < 2.5 || (r.progress >= 1 && r.t > dur + 1.5);
     if (r.progress >= 1 && settled) this.resolveRuck();
   }
 
@@ -2433,8 +2533,9 @@ export class MatchEngine {
     const elev = (36 * Math.PI) / 180;
     const h = 5.5;
     const vReq = Math.sqrt((G * D * D) / (2 * Math.cos(elev) ** 2 * Math.max(0.5, D * Math.tan(elev) - h)));
-    const v = vReq * (0.72 + power * 0.52);
+    const v = vReq * (0.88 + power * 0.4);
     b.state = 'air';
+    b.grubber = false;
     b.vx = Math.cos(ang) * Math.cos(elev) * v;
     b.vz = Math.sin(ang) * Math.cos(elev) * v;
     b.vy = Math.sin(elev) * v;
@@ -2497,7 +2598,7 @@ export class MatchEngine {
       }
       case 'upandunder': {
         this.say('Up and under!', 'info');
-        this.doKick(c, 0.6, 0, 'box');
+        this.kickTo(c, 22, 0, 'box');
         const chasers = [n(11), n(14), n(15)];
         this.setPlay = {
           id,
@@ -2823,27 +2924,59 @@ export class MatchEngine {
     }
     if (!ka.active || !c || this.ball.carrier !== c) {
       this.arc.visible = false;
+      this.kickRing.visible = false;
       return;
     }
-    const v = this.kickVelocity(ka.power, ka.aim * 0.7, c.side, ka.power < 0.3 ? 'grubber' : 'punt');
-    let x = c.x;
+    // Preview the actual flight (no skill error): arc + landing ring.
+    const aim = ((ka.angle * Math.PI) / 180) * this.camRightSign();
+    const v = this.kickVelocity(ka.dist, aim, c.side, ka.kind);
+    let x = c.x + dirOf(c.side) * 0.5;
     let y = 0.7;
     let z = c.z;
+    let vx = v.vx;
+    let vz = v.vz;
     let vy = v.vy;
-    const step = 0.08;
+    const step = ka.kind === 'grubber' ? 0.06 : 0.07;
+    let landX = x;
+    let landZ = z;
+    let landed = false;
     for (let i = 0; i < 60; i++) {
       pos.setXYZ(i, x, Math.max(0.1, y), z);
-      x += v.vx * step;
-      z += v.vz * step;
+      if (landed) continue;
+      x += vx * step;
+      z += vz * step;
       vy -= G * step;
       y += vy * step;
-      if (y < 0.1) {
-        y = 0.1;
-        vy = Math.abs(vy) * 0.3;
+      if (ka.kind !== 'grubber' && vy < 0 && y <= 1.1) {
+        landed = true;
+        landX = x;
+        landZ = z;
+      } else if (ka.kind === 'grubber' && y <= 0.12) {
+        y = 0.12;
+        if (Math.abs(vy) > 1.2) {
+          vy = -vy * GRUB_REST;
+          vx *= GRUB_KEEP;
+          vz *= GRUB_KEEP;
+        } else {
+          vy = 0;
+          const f = Math.max(0, 1 - step * GRUB_FRICTION);
+          vx *= f;
+          vz *= f;
+          if (Math.hypot(vx, vz) < 0.4) {
+            landed = true;
+            landX = x;
+            landZ = z;
+          }
+        }
       }
+      landX = x;
+      landZ = z;
     }
     pos.needsUpdate = true;
     this.arc.visible = true;
+    this.kickRing.visible = true;
+    this.kickRing.position.set(landX, 0.05, landZ);
+    this.kickRing.scale.setScalar(1 + Math.sin(this.time * 6) * 0.06);
   }
 
   private updateCamera(dt: number, rf: ReplayFrame | null) {
@@ -2915,6 +3048,40 @@ export class MatchEngine {
 }
 
 const REPLAY_SPEED = 0.45;
+type KickType = 'punt' | 'grubber' | 'box' | 'drop';
+const GRUB_VY = 3.2;
+const GRUB_REST = 0.45;
+const GRUB_KEEP = 0.8;
+const GRUB_FRICTION = 1.0;
+
+/** Distance a grubber travels before stopping (no random hops), for the aiming solver. */
+function simulateGrubber(vh: number): number {
+  let x = 0;
+  let y = 0.7;
+  let vx = vh;
+  let vy = GRUB_VY;
+  let air = true;
+  const dt = 1 / 60;
+  for (let i = 0; i < 1200; i++) {
+    if (air) {
+      vy -= G * dt;
+      x += vx * dt;
+      y += vy * dt;
+      if (y <= 0.12) {
+        y = 0.12;
+        if (Math.abs(vy) > 1.2) {
+          vy = -vy * GRUB_REST;
+          vx *= GRUB_KEEP;
+        } else air = false;
+      }
+    } else {
+      vx *= Math.max(0, 1 - dt * GRUB_FRICTION);
+      x += vx * dt;
+      if (vx < 0.3) break;
+    }
+  }
+  return x;
+}
 const ANIMS: AnimName[] = ['idle', 'walk', 'run', 'sidestepL', 'sidestepR', 'pass', 'catch', 'kick', 'tackle', 'dive', 'fall', 'getup', 'celebrate', 'bind', 'lying', 'carry'];
 
 interface ReplayFrame {

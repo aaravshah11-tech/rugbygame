@@ -64,6 +64,7 @@ export interface HudState {
   phase: string;
   phaseNum: number;
   ruck: 'attack' | 'defend' | null;
+  canDrop: boolean;
   mph: number;
 }
 
@@ -94,7 +95,8 @@ export type EngineEvent =
 
 export type InputAction =
   | { type: 'pass'; long: boolean; dir: -1 | 0 | 1 }
-  | { type: 'kick'; power: number; aim: number }
+  | { type: 'kick'; kind: 'punt' | 'grubber'; dist: number; angle: number }
+  | { type: 'dropgoal' }
   | { type: 'sidestep' }
   | { type: 'handoff' }
   | { type: 'tackle' }
@@ -113,7 +115,8 @@ export interface InputState {
   /** TACKLE held: chase the carrier and tackle when in range */
   tackleHold: boolean;
   /** live kick aim while the kick button is held */
-  kickAim: { active: boolean; power: number; aim: number };
+  /** live aim while KICK / GRUB is held: distance in metres, angle in degrees (+ = screen right) */
+  kickAim: { active: boolean; kind: 'punt' | 'grubber'; dist: number; angle: number };
   actions: InputAction[];
 }
 
@@ -122,6 +125,6 @@ export const createInput = (): InputState => ({
   moveY: 0,
   sprint: false,
   tackleHold: false,
-  kickAim: { active: false, power: 0, aim: 0 },
+  kickAim: { active: false, kind: 'punt', dist: 32, angle: 0 },
   actions: [],
 });

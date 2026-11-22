@@ -46,7 +46,7 @@ export function Training({ go }: { go: Go }) {
   };
   return (
     <div className="screen">
-      <TopBar title="Training" accent="Ground" onBack={() => go({ name: 'menu' })} />
+      <TopBar title="Training" accent="Ground" onBack={() => go({ name: 'settings' })} />
       <div className="scroll">
         <div className="nation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
           {DRILLS.map((d) => (

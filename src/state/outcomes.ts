@@ -4,6 +4,7 @@ import { recordMatch, update, getProfile } from './store';
 import type { MatchResult } from './types';
 import { advanceChampionship, advanceWorldCup, computeTable } from './tournaments';
 import { nationById } from '../data/nations';
+import { advanceComp, COMP_INFO, type CompKind } from './comps';
 
 function toResult(cfg: MatchConfig, r: EngineResult): MatchResult {
   const home = cfg.userIsHome;
@@ -148,4 +149,40 @@ export function finishDrill(drill: Drill, score: number, total: number): MatchOu
     lines: [`Score: ${score} / ${total}`, first ? 'First completion reward!' : 'Practice makes perfect.'],
     coins,
   };
+}
+
+export function finishCompMatch(cfg: MatchConfig, kind: CompKind, fixtureId: string, r: EngineResult): MatchOutcome {
+  const res = toResult(cfg, r);
+  const coins = recordMatch(res);
+  const lines = [statLine(r)];
+  let bonus = 0;
+  update((p) => {
+    const c = p.comps[kind];
+    if (!c) return;
+    const f = c.fixtures.find((x) => x.id === fixtureId);
+    if (!f || f.played) return;
+    let hs = res.homeScore;
+    let as = res.awayScore;
+    if (!f.stage.startsWith('R') && hs === as) {
+      // knock-out draws are settled by a kicking contest
+      if (Math.random() < 0.5) hs += 3;
+      else as += 3;
+      lines.push('Level at full time: decided by a kicking contest.');
+    }
+    Object.assign(f, { homeScore: hs, awayScore: as, homeTries: res.homeTries, awayTries: res.awayTries, played: true });
+    const before = c.stage;
+    advanceComp(c);
+    if (c.eliminated && before !== c.stage) lines.push(before === 'league' ? 'You missed out on the play-offs.' : 'Knocked out.');
+    if (c.stage === 'done') {
+      const name = `${COMP_INFO[kind].title} ${COMP_INFO[kind].accent}`;
+      if (c.champion === c.user) {
+        bonus = 3000;
+        p.coins += bonus;
+        if (kind === 'six') p.trophies.championship++;
+        else p.trophies[kind] = (p.trophies[kind] ?? 0) + 1;
+        lines.push(`${nationById(c.user).name} win the ${name}! +${bonus} bonus`);
+      } else lines.push(`${nationById(c.champion!).name} win the ${name}.`);
+    }
+  });
+  return { title: verdict(r), lines, coins: coins + bonus };
 }

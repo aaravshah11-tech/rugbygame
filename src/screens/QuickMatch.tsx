@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Go } from '../App';
-import { NATIONS, nationById } from '../data/nations';
+import { CLUBS, NATIONS, nationById } from '../data/nations';
 import { KitBadge, Seg, TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
@@ -45,17 +45,25 @@ export function QuickMatch({ go }: { go: Go }) {
           <p className="muted italic" style={{ margin: '0 0 8px' }}>
             Tap to choose {picking === 'home' ? <b style={{ color: 'var(--neon)' }}>YOUR TEAM</b> : <b style={{ color: 'var(--pink)' }}>OPPONENT</b>}
           </p>
-          <div className="nation-grid">
-            {NATIONS.map((n) => (
-              <button key={n.id} className={`nation-btn ${n.id === home ? 'sel' : n.id === away ? 'sel2' : ''}`} onClick={() => pick(n.id)}>
-                <KitBadge nation={n} />
-                <span>
-                  <b>{n.name}</b>
-                  <small>OVR {nationOvr(n.id)}</small>
-                </span>
-              </button>
-            ))}
-          </div>
+          {[
+            { label: 'Nations', list: NATIONS },
+            { label: 'Clubs', list: CLUBS },
+          ].map((group) => (
+            <div key={group.label} style={{ marginBottom: 10 }}>
+              <div className="muted italic" style={{ fontSize: 12, margin: '2px 0 6px' }}>{group.label.toUpperCase()}</div>
+              <div className="nation-grid">
+                {group.list.map((n) => (
+                  <button key={n.id} className={`nation-btn ${n.id === home ? 'sel' : n.id === away ? 'sel2' : ''}`} onClick={() => pick(n.id)}>
+                    <KitBadge nation={n} />
+                    <span>
+                      <b>{n.name}</b>
+                      <small>OVR {nationOvr(n.id)}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
         <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 260 }}>
           <div className="row" style={{ justifyContent: 'space-around' }}>

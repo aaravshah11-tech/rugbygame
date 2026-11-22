@@ -154,6 +154,55 @@ const TackleIcon = () => (
 );
 
 /** Context buttons: attack set when the user has the ball, defence set otherwise. */
+const KICK_RANGE = { punt: { def: 35, min: 10, max: 55, tap: 35 }, grubber: { def: 15, min: 6, max: 30, tap: 15 } };
+
+/**
+ * KICK / GRUB: tap for a default kick straight ahead; hold to show the landing ring,
+ * drag up/down to set the distance and left/right to aim, then let go.
+ */
+function KickButton({ input, kind, pos }: { input: InputState; kind: 'punt' | 'grubber'; pos: { right: number; bottom: number } }) {
+  const start = useRef({ x: 0, y: 0, t: 0 });
+  const [dist, setDist] = useState<number | null>(null);
+  const r = KICK_RANGE[kind];
+  return (
+    <ActionButton
+      label={kind === 'punt' ? 'Kick' : 'Grub'}
+      sub={dist !== null ? `${Math.round(dist)}m` : kind === 'punt' ? 'hold · drag' : 'grubber'}
+      size={kind === 'punt' ? 'med' : 'sm'}
+      color={kind === 'punt' ? 'gold' : 'white'}
+      pos={pos}
+      onDown={(e) => {
+        start.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+        Object.assign(input.kickAim, { active: true, kind, dist: r.def, angle: 0 });
+        setDist(r.def);
+      }}
+      onMove={(e) => {
+        const d = Math.max(r.min, Math.min(r.max, r.def + (start.current.y - e.clientY) / 3));
+        input.kickAim.dist = d;
+        input.kickAim.angle = Math.max(-35, Math.min(35, (e.clientX - start.current.x) / 3.5));
+        setDist(d);
+      }}
+      onUp={(e, cancelled) => {
+        const moved = Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y);
+        const tap = performance.now() - start.current.t < 220 && moved < 12;
+        const { dist: d, angle } = input.kickAim;
+        input.kickAim.active = false;
+        setDist(null);
+        if (!cancelled) input.actions.push({ type: 'kick', kind, dist: tap ? r.tap : d, angle: tap ? 0 : angle });
+      }}
+    >
+      {kind === 'punt' ? <KickIcon /> : <GrubIcon />}
+    </ActionButton>
+  );
+}
+
+const GrubIcon = () => (
+  <svg viewBox="0 0 40 24" width="30" height="18" aria-hidden>
+    <path d="M4 20 Q10 12 14 20 Q19 14 22 20 Q26 16 28 20" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+    <ellipse cx="33" cy="18" rx="5" ry="3.3" fill="currentColor" />
+  </svg>
+);
+
 /** Swipe left/right on the right half of the screen to dodge (sidestep). */
 export function DodgeLayer({ input }: { input: InputState }) {
   const start = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
@@ -184,13 +233,8 @@ const AddPlayerIcon = () => (
   </svg>
 );
 
-export function ActionButtons({ input, attacking, ruck }: { input: InputState; attacking: boolean; ruck: 'attack' | 'defend' | null }) {
-  const kickStart = useRef({ x: 0, t: 0 });
+export function ActionButtons({ input, attacking, ruck, canDrop = false }: { input: InputState; attacking: boolean; ruck: 'attack' | 'defend' | null; canDrop?: boolean }) {
   const passStart = useRef(0);
-  const [kickPower, setKickPower] = useState(0);
-  const kickRaf = useRef(0);
-
-  useEffect(() => () => cancelAnimationFrame(kickRaf.current), []);
 
   if (ruck) {
     return (
@@ -225,12 +269,6 @@ export function ActionButtons({ input, attacking, ruck }: { input: InputState; a
     );
   }
 
-  const meterStyle = {
-    background: `conic-gradient(var(--neon) ${kickPower * 360}deg, rgba(255,255,255,0.12) 0deg)`,
-    WebkitMask: 'radial-gradient(circle, transparent 60%, #000 61%)',
-    mask: 'radial-gradient(circle, transparent 60%, #000 61%)',
-  } as React.CSSProperties;
-
   const pass = (dir: -1 | 1) => ({
     onDown: () => (passStart.current = performance.now()),
     onUp: (_e: React.PointerEvent, cancelled: boolean) => {
@@ -247,40 +285,11 @@ export function ActionButtons({ input, attacking, ruck }: { input: InputState; a
       <ActionButton label="Pass" sub="hold = long" size="big" color="neon" pos={{ right: 0, bottom: 46 }} {...pass(1)}>
         <PassIcon dir={1} />
       </ActionButton>
-      <ActionButton
-        label="Kick"
-        size="med"
-        color="gold"
-        pos={{ right: 14, bottom: 146 }}
-        onDown={(e) => {
-          kickStart.current = { x: e.clientX, t: performance.now() };
-          input.kickAim.active = true;
-          input.kickAim.aim = 0;
-          const tick = () => {
-            const p = Math.min(1, (performance.now() - kickStart.current.t) / 1100);
-            input.kickAim.power = p;
-            setKickPower(p);
-            kickRaf.current = requestAnimationFrame(tick);
-          };
-          tick();
-        }}
-        onMove={(e) => {
-          input.kickAim.aim = Math.max(-1, Math.min(1, (e.clientX - kickStart.current.x) / 80));
-        }}
-        onUp={(_e, cancelled) => {
-          cancelAnimationFrame(kickRaf.current);
-          const held = performance.now() - kickStart.current.t;
-          const { aim } = input.kickAim;
-          input.kickAim.active = false;
-          setKickPower(0);
-          // tap = a solid default punt; hold = power meter + drag to aim
-          const power = held < 220 ? 0.7 : Math.max(0.15, input.kickAim.power);
-          if (!cancelled) input.actions.push({ type: 'kick', power, aim });
-        }}
-      >
-        <span className="meter" style={meterStyle} />
-        <KickIcon />
-      </ActionButton>
+      <KickButton input={input} kind="punt" pos={{ right: 14, bottom: 146 }} />
+      <KickButton input={input} kind="grubber" pos={{ right: 112, bottom: 96 }} />
+      {canDrop && (
+        <ActionButton label="Drop goal" size="sm" color="cyan" pos={{ right: 96, bottom: 158 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
+      )}
     </div>
   );
 }

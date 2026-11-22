@@ -8,6 +8,8 @@ import { SquadBuilder } from './screens/SquadBuilder';
 import { Training } from './screens/Training';
 import { Settings } from './screens/Settings';
 import { SquadViewer } from './screens/SquadViewer';
+import { Competition } from './screens/Competition';
+import type { CompKind } from './state/comps';
 import { loadPlayerAsset } from './game/view/assets';
 import { MatchScreen, type MatchOutcome } from './screens/MatchScreen';
 import type { EngineResult, MatchConfig } from './game/types';
@@ -23,6 +25,7 @@ export type Route =
   | { name: 'training' }
   | { name: 'settings' }
   | { name: 'viewer' }
+  | { name: 'comp'; kind: CompKind }
   | {
       name: 'match';
       cfg: MatchConfig;
@@ -77,6 +80,9 @@ export function App() {
       break;
     case 'viewer':
       screen = <SquadViewer go={go} />;
+      break;
+    case 'comp':
+      screen = <Competition key={route.kind} go={go} kind={route.kind} />;
       break;
     case 'match':
       screen = <MatchScreen cfg={route.cfg} onFinish={route.onFinish} onDrillDone={route.onDrillDone} onExit={() => go(route.back)} />;

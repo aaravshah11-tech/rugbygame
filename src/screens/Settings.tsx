@@ -131,6 +131,9 @@ export function Settings({ go }: { go: Go }) {
               <p className="muted" style={{ margin: 0, fontSize: 13 }}>Cloud sync isn't set up for this build.</p>
             )}
             {msg && <div style={{ fontSize: 13, color: 'var(--cyan)' }}>{msg}</div>}
+            <button className="btn ghost" onClick={() => go({ name: 'training' })}>
+              Training (tutorials)
+            </button>
             <button className="btn ghost" onClick={() => go({ name: 'viewer' })}>
               Squad Viewer (debug)
             </button>

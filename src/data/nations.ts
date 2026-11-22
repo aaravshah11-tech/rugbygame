@@ -55,6 +55,37 @@ export const NATIONS: Nation[] = [
     kit: { primary: '#1d3f9e', secondary: '#ffffff', accent: '#c8102e', pattern: 'band', shorts: '#1d3f9e', socks: '#1d3f9e' } },
 ];
 
+/**
+ * English league clubs, named after their cities/areas (no official club names or crests).
+ * Kits are original designs in traditional local colours.
+ */
+export const CLUBS: Nation[] = [
+  { id: 'BTH', name: 'Bath', short: 'BTH', strength: 81, region: 'anglo',
+    kit: { primary: '#1f3f8f', secondary: '#0d0d0d', accent: '#ffffff', pattern: 'hoops', shorts: '#0d0d0d', socks: '#1f3f8f' } },
+  { id: 'BRS', name: 'Bristol', short: 'BRS', strength: 80, region: 'anglo',
+    kit: { primary: '#0e1f45', secondary: '#c8102e', accent: '#ffffff', pattern: 'shoulders', shorts: '#0e1f45', socks: '#0e1f45' } },
+  { id: 'EXE', name: 'Exeter', short: 'EXE', strength: 78, region: 'anglo',
+    kit: { primary: '#111111', secondary: '#ffffff', accent: '#c4a64a', pattern: 'band', shorts: '#111111', socks: '#111111' } },
+  { id: 'GLO', name: 'Gloucester', short: 'GLO', strength: 77, region: 'anglo',
+    kit: { primary: '#b0102b', secondary: '#ffffff', accent: '#111111', pattern: 'hoops', shorts: '#111111', socks: '#b0102b' } },
+  { id: 'LEI', name: 'Leicester', short: 'LEI', strength: 80, region: 'anglo',
+    kit: { primary: '#0f6b3a', secondary: '#c8102e', accent: '#ffffff', pattern: 'stripes', shorts: '#ffffff', socks: '#0f6b3a' } },
+  { id: 'LDN', name: 'London North', short: 'LDN', strength: 81, region: 'anglo',
+    kit: { primary: '#0d0d0d', secondary: '#c8102e', accent: '#ffffff', pattern: 'sash', shorts: '#0d0d0d', socks: '#c8102e' } },
+  { id: 'LDW', name: 'London West', short: 'LDW', strength: 79, region: 'anglo',
+    kit: { primary: '#5b2a86', secondary: '#7ec8e3', accent: '#8c1d40', pattern: 'halves', shorts: '#ffffff', socks: '#5b2a86' } },
+  { id: 'NEW', name: 'Newcastle', short: 'NEW', strength: 72, region: 'anglo',
+    kit: { primary: '#111111', secondary: '#c8102e', accent: '#f2c500', pattern: 'chevron', shorts: '#111111', socks: '#111111' } },
+  { id: 'NOR', name: 'Northampton', short: 'NOR', strength: 81, region: 'anglo',
+    kit: { primary: '#0a5c36', secondary: '#111111', accent: '#c9a227', pattern: 'band', shorts: '#111111', socks: '#0a5c36' } },
+  { id: 'SAL', name: 'Sale', short: 'SAL', strength: 78, region: 'celtic',
+    kit: { primary: '#0b2a5b', secondary: '#4aa3df', accent: '#ffffff', pattern: 'zigzag', shorts: '#0b2a5b', socks: '#0b2a5b' } },
+];
+
+export const PREM_CLUBS = CLUBS.map((c) => c.id);
+export const LEAGUE_NORTH = ['ENG', 'FRA', 'IRE', 'ITA', 'SCO', 'WAL'];
+export const LEAGUE_SOUTH = ['NZL', 'RSA', 'AUS', 'ARG', 'FIJ', 'JPN'];
+
 /** The user's own club in Squad Builder. */
 export const CLUB_ID = 'CLB';
 export const CLUB_NATION: Nation = {
@@ -68,7 +99,7 @@ export const CLUB_NATION: Nation = {
 
 export function nationById(id: string): Nation {
   if (id === CLUB_ID) return CLUB_NATION;
-  return NATIONS.find((n) => n.id === id) ?? NATIONS[0];
+  return NATIONS.find((n) => n.id === id) ?? CLUBS.find((n) => n.id === id) ?? NATIONS[0];
 }
 
 export const CHAMPIONSHIP_NATIONS = ['ENG', 'FRA', 'IRE', 'ITA', 'SCO', 'WAL'];

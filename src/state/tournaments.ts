@@ -42,12 +42,13 @@ export function computeTable(teams: string[], fixtures: Fixture[]): TableRow[] {
     if (!f.played || f.homeScore === undefined || f.awayScore === undefined) continue;
     const h = rows.get(f.home);
     const a = rows.get(f.away);
-    if (!h || !a) continue;
-    const sides: [TableRow, number, number, number][] = [
+    // Count each side that belongs to this table (cross-pool games count for the team in the pool).
+    const sides: [TableRow | undefined, number, number, number][] = [
       [h, f.homeScore, f.awayScore, f.homeTries ?? 0],
       [a, f.awayScore, f.homeScore, f.awayTries ?? 0],
     ];
     for (const [r, for_, against, tries] of sides) {
+      if (!r) continue;
       r.p++;
       r.pf += for_;
       r.pa += against;

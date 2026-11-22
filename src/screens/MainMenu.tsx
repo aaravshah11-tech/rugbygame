@@ -68,26 +68,22 @@ export function MainMenu({ go }: { go: Go }) {
 
         <div className="menu-grid">
           <button className="tile wide" style={{ '--accent': 'var(--neon)' } as React.CSSProperties} onClick={() => nav({ name: 'quick' })}>
-            <span className="tag">Play now</span>
+            <span className="tag">Any team</span>
             <h3>Quick Match</h3>
-            <p>Any two nations, straight onto the pitch</p>
+            <p>Every nation and club, straight onto the pitch</p>
           </button>
-          <button className="tile" style={{ '--accent': 'var(--gold)' } as React.CSSProperties} onClick={() => nav({ name: 'squad' })}>
-            <span className="tag">Cards</span>
-            <h3>Squad Builder</h3>
-            <p>Packs · seasons · coins</p>
+          <button className="tile" style={{ '--accent': 'var(--pink)' } as React.CSSProperties} onClick={() => nav({ name: 'comp', kind: 'league' })}>
+            <span className="tag">North v South</span>
+            <h3>Nations League</h3>
           </button>
-          <button className="tile" style={{ '--accent': 'var(--cyan)' } as React.CSSProperties} onClick={() => nav({ name: 'championship' })}>
-            <span className="tag">6 teams</span>
+          <button className="tile" style={{ '--accent': 'var(--cyan)' } as React.CSSProperties} onClick={() => nav({ name: 'comp', kind: 'six' })}>
+            <span className="tag">6 nations</span>
             <h3>Nations Championship</h3>
           </button>
-          <button className="tile" style={{ '--accent': 'var(--pink)' } as React.CSSProperties} onClick={() => nav({ name: 'worldcup' })}>
-            <span className="tag">14 nations</span>
-            <h3>World Cup</h3>
-          </button>
-          <button className="tile" style={{ '--accent': '#9d7bff' } as React.CSSProperties} onClick={() => nav({ name: 'training' })}>
-            <span className="tag">Tutorial</span>
-            <h3>Training</h3>
+          <button className="tile wide" style={{ '--accent': 'var(--gold)' } as React.CSSProperties} onClick={() => nav({ name: 'comp', kind: 'prem' })}>
+            <span className="tag">10 clubs</span>
+            <h3>The Prem</h3>
+            <p>League, then semi-finals and the final</p>
           </button>
         </div>
       </div>

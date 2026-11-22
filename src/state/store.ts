@@ -69,6 +69,7 @@ function freshProfile(): Profile {
     club: starterClub(),
     championship: null,
     worldCup: null,
+    comps: {},
     daily: { lastLogin: '', streak: 0, pendingReward: 0, challengesDate: d, challenges: makeChallenges(d) },
     stats: { matches: 0, wins: 0, draws: 0, losses: 0, tries: 0, tackles: 0 },
     trophies: { championship: 0, worldCup: 0, seasons: 0 },

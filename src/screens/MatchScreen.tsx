@@ -23,7 +23,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, mph: 0,
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0,
 };
 
 export function MatchScreen({
@@ -225,7 +225,7 @@ export function MatchScreen({
         )}
         {showControls && <Joystick input={input.current} />}
         {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
-        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} />}
+        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} canDrop={hud.canDrop} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}
         {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} onDone={() => {}} />}
@@ -240,7 +240,7 @@ export function MatchScreen({
                 <b>Run</b>Floating stick on the left; push to the edge to sprint. Swipe left/right on the right side to dodge.
               </div>
               <div>
-                <b>◀ Pass · Pass ▶</b>The arrows above team-mates show who gets it. Hold for a long pass. KICK: tap, or hold to aim.
+                <b>◀ Pass · Pass ▶ · Kick</b>Arrows show who gets the pass (hold = long). KICK / GRUB: tap, or hold and drag to place the landing ring. DROP GOAL appears in range.
               </div>
               <div>
                 <b>Rucks</b>The arc fills until the ball is out. ADD PLAYER secures it (attacking) or contests it (defending).
