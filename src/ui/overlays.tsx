@@ -160,58 +160,65 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
   );
 }
 
-// ---------------------------------------------------------------- place kick
+// ---------------------------------------------------------------- place kick (swipe)
+/**
+ * Swipe up through the ball: the swipe's direction aims, its speed sets the power,
+ * and bending the swipe curls the kick. The wind is shown top-right.
+ */
 export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; engine: MatchEngine; onDone: () => void }) {
-  const [stage, setStage] = useState<'aim' | 'power' | 'acc' | 'gone'>('aim');
-  const [aim, setAim] = useState(0);
-  const [meter, setMeter] = useState(0);
-  const power = useRef(0);
-  const start = useRef({ x: 0, aim: 0 });
-  const t0 = useRef(0);
-  const meterRef = useRef(0);
+  const [trail, setTrail] = useState<{ x: number; y: number }[]>([]);
+  const [msg, setMsg] = useState('');
+  const [gone, setGone] = useState(false);
+  const pts = useRef<{ x: number; y: number; t: number }[]>([]);
+  const active = useRef(false);
 
-  useEffect(() => {
-    if (stage !== 'power' && stage !== 'acc') return;
-    t0.current = performance.now();
-    let raf = 0;
-    const loop = () => {
-      const t = (performance.now() - t0.current) / 1000;
-      let m: number;
-      if (stage === 'power') {
-        const u = (t / 1.0) % 2;
-        m = u < 1 ? u : 2 - u;
-      } else {
-        m = power.current - t / 0.55;
-        if (m < -0.05) {
-          shoot(1.5);
-          return;
-        }
-      }
-      meterRef.current = m;
-      setMeter(m);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [stage]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const shoot = (acc: number) => {
-    setStage('gone');
-    engine.shootPlaceKick(aim, power.current, acc);
-    setTimeout(onDone, 200);
+  const aimFrom = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+    const dx = b.x - a.x;
+    const dy = a.y - b.y;
+    return Math.max(-25, Math.min(25, ((Math.atan2(dx, Math.max(1, dy)) * 180) / Math.PI) * 0.8));
   };
 
-  const tap = () => {
-    if (stage === 'power') {
-      power.current = meterRef.current;
-      setStage('acc');
-      audio.click();
-    } else if (stage === 'acc') {
-      // accuracy band sits at 6%..13% of the meter
-      const centre = 0.095;
-      const off = (meterRef.current - centre) / 0.12;
-      shoot(Math.max(-1.5, Math.min(1.5, off)));
+  const release = () => {
+    if (!active.current) return;
+    active.current = false;
+    const p = pts.current;
+    if (p.length < 2) return;
+    const a = p[0];
+    const b = p[p.length - 1];
+    const dy = a.y - b.y;
+    if (dy < 50) {
+      setMsg('Swipe further up through the ball');
+      setTrail([]);
+      return;
     }
+    let len = 0;
+    for (let i = 1; i < p.length; i++) len += Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y);
+    // use the last ~120ms of the swipe for speed so slow starts don't kill the power
+    const tail = p.filter((q) => q.t >= b.t - 120);
+    const t0 = tail[0] ?? a;
+    let tailLen = 0;
+    for (let i = 1; i < tail.length; i++) tailLen += Math.hypot(tail[i].x - tail[i - 1].x, tail[i].y - tail[i - 1].y);
+    const speed = Math.max(tailLen / Math.max(16, b.t - t0.t), len / Math.max(16, b.t - a.t)); // px per ms
+    const vh = window.innerHeight;
+    // power: mostly swipe speed, partly swipe length, so a firm flick of ~1/3 screen is ideal
+    const speedTerm = speed / (vh * 0.0038);
+    const lengthTerm = dy / (vh * 0.45);
+    const strength = Math.max(0, Math.min(1.25, speedTerm * 0.65 + lengthTerm * 0.35));
+    // curl: how far the swipe bows away from a straight line (+ = bows right)
+    const lx = b.x - a.x;
+    const ly = b.y - a.y;
+    let dev = 0;
+    for (const q of p) {
+      const d = (lx * (q.y - a.y) - ly * (q.x - a.x)) / Math.max(1, Math.hypot(lx, ly));
+      if (Math.abs(d) > Math.abs(dev)) dev = d;
+    }
+    const curl = Math.max(-1, Math.min(1, dev / (Math.hypot(lx, ly) * 0.25)));
+    const aim = aimFrom(a, b);
+    setGone(true);
+    setMsg(strength < 0.6 ? 'Too soft…' : strength > 1.1 ? 'Big boot!' : 'Sweet strike!');
+    engine.shootPlaceKick(aim, strength * 0.6, (Math.random() - 0.5) * 0.25, curl);
+    audio.click();
+    setTimeout(onDone, 200);
   };
 
   const windDeg = (Math.atan2(req.cross, req.along) * 180) / Math.PI;
@@ -220,15 +227,20 @@ export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; en
     <div
       className="pk-layer"
       onPointerDown={(e) => {
-        if (stage === 'aim') start.current = { x: e.clientX, aim };
-        else tap();
+        if (gone) return;
+        active.current = true;
+        pts.current = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+        setTrail([{ x: e.clientX, y: e.clientY }]);
+        setMsg('');
       }}
       onPointerMove={(e) => {
-        if (stage !== 'aim' || e.buttons === 0) return;
-        const a = Math.max(-20, Math.min(20, start.current.aim + (e.clientX - start.current.x) / 9));
-        setAim(a);
-        engine.setPlaceAim(a);
+        if (!active.current) return;
+        pts.current.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+        setTrail(pts.current.map(({ x, y }) => ({ x, y })));
+        engine.setPlaceAim(aimFrom(pts.current[0], pts.current[pts.current.length - 1]));
       }}
+      onPointerUp={release}
+      onPointerCancel={release}
     >
       <div className="wind">
         Wind
@@ -238,32 +250,22 @@ export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; en
         {Math.round(req.windSpeed)} km/h
         <div className="muted" style={{ fontSize: 10 }}>{Math.round(req.distance)}m out</div>
       </div>
-      {(stage === 'power' || stage === 'acc') && (
-        <div className="swing">
-          <div className="acc" />
-          <div className="ideal" style={{ bottom: '55%' }} />
-          <div className="fill" style={{ height: `${Math.max(0, meter) * 100}%` }} />
+      <svg className="swipe-trail" width="100%" height="100%">
+        {trail.length > 1 && <polyline points={trail.map((q) => `${q.x},${q.y}`).join(' ')} />}
+      </svg>
+      {!gone && (
+        <div className="swipe-hint">
+          <div className="swipe-ball" />
+          <div className="swipe-arrow">↑</div>
         </div>
       )}
-      <div className="pk-help">
-        {stage === 'aim' && (
-          <>
-            <div style={{ fontSize: 20 }}>{req.kind === 'conversion' ? 'Conversion' : req.kind === 'penalty' ? 'Penalty kick' : 'Kicking practice'} · {req.kicker}</div>
-            <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>Drag left / right to aim · allow for the wind</div>
-            <button
-              className="btn primary"
-              style={{ pointerEvents: 'auto', minWidth: 160 }}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                setStage('power');
-              }}
-            >
-              Kick
-            </button>
-          </>
-        )}
-        {stage === 'power' && <div style={{ fontSize: 20 }}>Tap to set power — white line is ideal</div>}
-        {stage === 'acc' && <div style={{ fontSize: 20 }}>Tap in the accuracy band!</div>}
+      <div className="pk-help top">
+        <div style={{ fontSize: 18 }}>
+          {req.kind === 'conversion' ? 'Conversion' : req.kind === 'penalty' ? 'Penalty kick' : 'Kicking practice'} · {req.kicker}
+        </div>
+        <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          {msg || 'Swipe up through the ball · direction aims · speed is power · curve to bend it'}
+        </div>
       </div>
     </div>
   );

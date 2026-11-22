@@ -43,6 +43,9 @@ interface P {
   heading: number;
   tx: number;
   tz: number;
+  /** smoothed movement goal */
+  gx: number;
+  gz: number;
   urgency: number;
   state: PState;
   timer: number;
@@ -178,6 +181,7 @@ export class MatchEngine {
   private tackleZoomT = 0;
   private exciteBoost = 0;
   private phaseCount = 0;
+  private kickCurl = 0;
   private drillCount = 0;
   private drillScore = 0;
   private drillStage = 0;
@@ -356,7 +360,7 @@ export class MatchEngine {
         this.scene.add(av.root);
         const p: P = {
           side, num: i + 1, data: pl, r, name: `${pl.first[0]}. ${pl.last}`,
-          x: 0, z: 0, vx: 0, vz: 0, heading: side === 0 ? 0 : Math.PI, tx: 0, tz: 0, urgency: 0,
+          x: 0, z: 0, vx: 0, vz: 0, heading: side === 0 ? 0 : Math.PI, tx: 0, tz: 0, gx: 0, gz: 0, urgency: 0,
           state: 'free', timer: 0, tackleCD: 0, catchCD: 0, sidestepT: 0, sideDir: 1, handoffT: 0, diveT: 0, kickT: 0,
           stamina: 1, slotSide: 1, slotK: 0, av, fx: null, celebrateT: 0, wasDown: false, face: side === 0 ? 0 : Math.PI,
         };
@@ -622,8 +626,10 @@ export class MatchEngine {
 
   // ---------------------------------------------------------------- movement
   private maxSpeed(p: P) {
-    let s = 5.4 + (p.r.pace / 100) * 4;
-    if (this.ball.carrier === p) s *= 0.95;
+    // Quick, arcade-feel running: ~9.5 m/s for an average back.
+    let s = 6.4 + (p.r.pace / 100) * 4;
+    if (this.ball.carrier === p) s *= 0.97;
+    if (p === this.controlled && p.side === 0) s *= 1.06; // the player you control is a step quicker
     return s;
   }
 
@@ -661,7 +667,7 @@ export class MatchEngine {
       const userDriven = p === this.controlled && p.state === 'free' && (joy > 0.12 || this.ball.carrier === p) && this.phase !== 'placekick';
       if (userDriven) {
         const sprinting = inp.sprint && p.stamina > 0.05;
-        const spd = max * (sprinting ? 1.2 : 1) * Math.min(1, joy);
+        const spd = max * (sprinting ? 1.18 : 1) * Math.min(1, joy * 1.15);
         if (joy > 0.05) {
           const mx = inp.moveX / Math.max(joy, 1);
           const my = inp.moveY / Math.max(joy, 1);
@@ -671,10 +677,14 @@ export class MatchEngine {
           dvx = (wx / n) * spd;
           dvz = (wz / n) * spd;
         }
-        p.stamina = clamp(p.stamina + (sprinting && joy > 0.1 ? -0.22 : 0.1) * dt, 0, 1);
+        p.stamina = clamp(p.stamina + (sprinting && joy > 0.1 ? -0.14 : 0.12) * dt, 0, 1);
       } else if (p.state === 'free' || p.state === 'bound') {
-        const dx = p.tx - p.x;
-        const dz = p.tz - p.z;
+        // Ease the goal towards the AI's target so players glide into shape instead of jittering.
+        const ease = Math.min(1, dt * (p.urgency >= 1 ? 9 : 3.2));
+        p.gx += (p.tx - p.gx) * ease;
+        p.gz += (p.tz - p.gz) * ease;
+        const dx = p.gx - p.x;
+        const dz = p.gz - p.z;
         const d = Math.hypot(dx, dz);
         if (d > 0.15) {
           const spd = max * p.urgency * Math.min(1, d / 2.5) * (p.state === 'bound' ? 0.5 : 1);
@@ -687,7 +697,7 @@ export class MatchEngine {
         dvz += p.sideDir * 7;
         dvx += dirOf(p.side) * 2;
       }
-      const acc = p.state === 'bound' ? 4 : 7;
+      const acc = p.state === 'bound' ? 4 : 9;
       p.vx += (dvx - p.vx) * Math.min(1, dt * acc);
       p.vz += (dvz - p.vz) * Math.min(1, dt * acc);
       p.x += p.vx * dt;
@@ -907,7 +917,7 @@ export class MatchEngine {
     const chasers = new Set(sorted.slice(0, this.phase === 'kickoff' ? 2 : 1));
     const fb = defenders.find((p) => p.num === 15);
     const lineDef = defenders.filter((p) => !chasers.has(p) && p !== fb).sort((p, q) => p.z - q.z);
-    const lineX = fx + dAtt * (this.atBaseT >= 0 ? 4 : 3);
+    const lineX = fx + dAtt * (this.atBaseT >= 0 ? 6 : 5);
     // Even lanes centred on the ball, nudged towards the attacker in each lane.
     const n = lineDef.length;
     const spacing = Math.min(6.2, 62 / Math.max(1, n));
@@ -945,7 +955,9 @@ export class MatchEngine {
       for (const p of this.teams[def]) {
         if (p.state !== 'free' || p.tackleCD > 0 || p === this.controlled) continue;
         const d = dist(p.x, p.z, carrier.x, carrier.z);
-        if (d < 1.1) {
+        // Only tackle from in front or the side, not by catching up from behind on a sprinter.
+        const fromBehind = (carrier.x - p.x) * dirOf(carrier.side) > 0.4 && Math.hypot(carrier.vx, carrier.vz) > 6;
+        if (d < 1.05 && !fromBehind) {
           this.attemptTackle(p, carrier, false);
           if (this.ball.carrier !== carrier) break;
         }
@@ -1060,7 +1072,9 @@ export class MatchEngine {
     if (dive) p += 0.08;
     if (c.handoffT > 0) p -= 0.12 + (c.r.strength - t.r.strength) / 200;
     if (c.sidestepT > 0) p -= 0.2 * (c.r.pace / 90);
-    p += t.side === 0 ? this.userAssist() + 0.08 : -this.userAssist() - 0.06;
+    p += t.side === 0 ? this.userAssist() + 0.08 : -this.userAssist() - 0.12;
+    // Sprinting carriers are harder to bring down.
+    if (c.side === 0 && Math.hypot(c.vx, c.vz) > 8) p -= 0.08;
     // Automatic fend: strong carriers driving through contact can bump tacklers off.
     if (c.side === 0 && c === this.controlled && Math.hypot(this.input.moveX, this.input.moveY) > 0.5) p -= Math.max(0, (c.r.strength - t.r.strength) / 160);
     p = clamp(p, 0.15, 0.95);
@@ -1068,7 +1082,8 @@ export class MatchEngine {
       this.tackleMade(t, c);
     } else {
       t.state = 'down';
-      t.timer = dive ? 1.2 : 0.7;
+      t.timer = dive ? 1.4 : 1.1;
+      t.tackleCD = 1.6;
       if (!c.av.busy) c.fx = 'handoff';
       if (rand.chance(0.6)) this.say(line('brokenTackle'), c.side === 0 ? 'good' : 'bad');
     }
@@ -1083,7 +1098,6 @@ export class MatchEngine {
     if (big) this.say(line('bigHit'), t.side === 0 ? 'good' : 'bad');
     c.state = 'down';
     c.timer = 1.5; // tackled players are back on their feet after 1.5s
-    this.tackleZoomT = 1.6;
     this.particles.dust(c.x, c.z, big ? 1.4 : 0.7);
     c.vx *= 0.3;
     c.vz *= 0.3;
@@ -1323,6 +1337,7 @@ export class MatchEngine {
     b.lastSide = p.side;
     b.wind = true;
     b.goalCheck = type === 'punt' ? { side: p.side, kind: 'drop' } : null;
+    this.kickCurl = 0;
     p.kickT = 0.4;
     p.fx = 'kick';
     this.atBaseT = -1;
@@ -1358,6 +1373,12 @@ export class MatchEngine {
       if (b.wind) {
         b.vx += this.wind.x * 0.05 * dt;
         b.vz += this.wind.z * 0.05 * dt;
+        if (this.kickCurl) {
+          // swerve: sideways acceleration perpendicular to the flight
+          const sp = Math.hypot(b.vx, b.vz) || 1;
+          b.vx += (-b.vz / sp) * this.kickCurl * dt;
+          b.vz += (b.vx / sp) * this.kickCurl * dt;
+        }
       }
       b.x += b.vx * dt;
       b.y += b.vy * dt;
@@ -1616,8 +1637,8 @@ export class MatchEngine {
   }
 
   private place(p: P, x: number, z: number) {
-    p.x = p.tx = x;
-    p.z = p.tz = z;
+    p.x = p.tx = p.gx = x;
+    p.z = p.tz = p.gz = z;
     p.vx = p.vz = 0;
     p.heading = p.side === 0 ? 0 : Math.PI;
     p.face = p.heading;
@@ -1730,7 +1751,7 @@ export class MatchEngine {
     // Two from each side join the ruck.
     const join = (side: Side, off: number) => {
       const cands = this.teams[side].filter((p) => p.state === 'free' && p !== this.controlled).sort((p, q) => dist(p.x, p.z, x, z) - dist(q.x, q.z, x, z));
-      cands.slice(0, 2).forEach((p, i) => {
+      cands.slice(0, 1).forEach((p, i) => {
         p.state = 'bound';
         p.tx = x + off;
         p.tz = z + (i ? 0.45 : -0.45);
@@ -2212,8 +2233,10 @@ export class MatchEngine {
   }
 
   /** Swing meter result: power 0..1 (≈0.55 is ideal), accuracy -1..1 (0 = perfect). */
-  shootPlaceKick(aimDeg: number, power: number, accuracy: number) {
+  shootPlaceKick(aimDeg: number, power: number, accuracy: number, curl = 0) {
     if (this.phase !== 'placekick') return;
+    // curl: -1..1 from the swipe; + bends right on screen
+    this.kickCurl = curl * 2.2 * (this.placeSide === 0 ? 1 : -1);
     const side = this.placeSide;
     const d = dirOf(side);
     const kicker = this.placeKicker!;
@@ -2243,6 +2266,7 @@ export class MatchEngine {
     this.arc.visible = false;
     // Safety: if the ball never reaches the posts (short), resolve as a miss.
     const myKick = b.goalCheck;
+    this.after(4.6, () => (this.kickCurl = 0));
     this.after(4.5, () => {
       if (this.ball.goalCheck === myKick && myKick) {
         this.ball.goalCheck = null;
@@ -2350,7 +2374,7 @@ export class MatchEngine {
     if (drill === 'kicking') {
       const spots: [number, number][] = [[36, 0], [34, 12], [30, -18], [26, 8], [32, -26]];
       if (this.drillCount >= spots.length) return this.finishDrill(spots.length);
-      this.emit({ type: 'drill', text: 'Drag to aim, then tap twice: power, then accuracy. Watch the wind!', progress: `Kick ${this.drillCount + 1} / 5 · ${this.drillScore} scored` });
+      this.emit({ type: 'drill', text: 'Swipe up through the ball: direction aims, speed is power, curve your swipe to bend it. Watch the wind!', progress: `Kick ${this.drillCount + 1} / 5 · ${this.drillScore} scored` });
       const [x, z] = spots[this.drillCount];
       this.setupPlaceKick(0, 'drill', x, z);
       return;
@@ -2626,6 +2650,7 @@ export class MatchEngine {
     this.tackleZoomT = Math.max(0, this.tackleZoomT - dt);
     const focus = new THREE.Vector3(b.x, 0, b.z);
     if (b.carrier) focus.set(b.carrier.x, 0, b.carrier.z);
+    else if (b.state === 'pass' && b.pass) focus.set(b.pass.target.x, 0, b.pass.target.z);
     let pos: THREE.Vector3;
     let look: THREE.Vector3;
     let rate = 3.2;
@@ -2670,12 +2695,13 @@ export class MatchEngine {
         look = new THREE.Vector3(focus.x + 8, 1, focus.z);
       } else {
         // Low broadcast camera: ~12m behind and 7m above the carrier, looking down the pitch to the try line.
-        const back = tight ? 7.5 : 9.5;
-        const up = tight ? 3.8 : 4.6;
-        pos = new THREE.Vector3(focus.x - back, up, focus.z * 0.85);
-        look = new THREE.Vector3(focus.x + 16, 1.0, focus.z * 0.9);
+        // Steady broadcast view behind your team: follows the ball, only partly sideways, no zooming.
+        pos = new THREE.Vector3(focus.x - 11, 6.2, focus.z * 0.6);
+        look = new THREE.Vector3(focus.x + 13, 0.4, focus.z * 0.78);
+        void tight;
       }
-      if (b.state === 'air') pos.y += Math.min(5, b.y * 0.35);
+      if (b.state === 'air' && b.kicker) pos.y += Math.min(4, b.y * 0.25);
+      rate = 2.4;
     }
     const k = 1 - Math.exp(-dt * rate);
     this.camPos.lerp(pos, k);

@@ -25,7 +25,7 @@ const DRILLS: { id: Drill; name: string; desc: string; tips: string[]; accent: s
     id: 'kicking',
     name: 'Kicking',
     desc: 'Five place kicks from around the 22.',
-    tips: ['Drag to aim — allow for the wind arrow', 'First tap sets power: the white line is ideal', 'Second tap in the band for accuracy', 'In open play: hold KICK, drag to aim, release'],
+    tips: ['Swipe up through the ball to kick', 'Swipe direction aims; swipe speed is power', 'Curve your swipe to bend the ball against the wind', 'In open play: tap KICK, or hold to set power and drag to aim'],
     accent: 'var(--gold)',
   },
   {

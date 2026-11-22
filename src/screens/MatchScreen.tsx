@@ -3,7 +3,7 @@ import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
 import { ActionButtons, Joystick } from '../ui/controls';
-import { Commentary, MiniGame, PlaceKickUI, ScoreBug, type Comm } from '../ui/overlays';
+import { MiniGame, PlaceKickUI, ScoreBug, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { update, useProfile } from '../state/store';
 import type { CameraMode } from '../state/types';
@@ -197,6 +197,12 @@ export function MatchScreen({
             <b>{hud.attacking ? 'Attacking' : 'Defending'}</b>
             {hud.attacking && hud.phaseNum > 0 && <span>Phase {hud.phaseNum + 1}</span>}
             {hud.phase === 'ruck' && <span>Ruck</span>}
+            {comms.length > 0 && !tryBanner && (
+              <span className="call">
+                {comms[comms.length - 1].text}
+                {comms[comms.length - 1].sub ? ` · ${comms[comms.length - 1].sub}` : ''}
+              </span>
+            )}
           </div>
         )}
         {showControls && hud.attacking && hud.canAct && !cfg.drill && (
@@ -204,7 +210,6 @@ export function MatchScreen({
             Set Plays
           </button>
         )}
-        {!tryBanner && <Commentary items={comms} />}
         {tryBanner && (
           <div className={`try-banner ${tryBanner.user ? '' : 'them'}`} key={tryBanner.id}>
             <div className="try-word">TRY!</div>
@@ -233,7 +238,7 @@ export function MatchScreen({
                 <b>Run</b>Drag anywhere on the left side. Push the stick right to the edge to sprint.
               </div>
               <div>
-                <b>◀ Pass · Pass ▶</b>The arrows above your team-mates show who gets the ball. Hold for a long pass.
+                <b>◀ Pass · Pass ▶</b>Arrows above team-mates show who gets it. Hold for a long pass.
               </div>
               <div>
                 <b>Kick</b>Tap for a long kick. Hold to set the power and drag to aim.
@@ -245,7 +250,7 @@ export function MatchScreen({
                 <b>Rucks</b>They happen automatically. Your scrum-half passes on if you don't. Stay behind the yellow line when defending.
               </div>
               <div>
-                <b>Score</b>Get the ball over their try line for 5 points, then kick the conversion for 2.
+                <b>Score</b>Get the ball over their try line for 5 points. Conversions: swipe up through the ball. Speed is power, curve it to beat the wind.
               </div>
             </div>
             <button
