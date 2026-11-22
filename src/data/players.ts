@@ -141,8 +141,8 @@ export function nationSquad(nationId: string): NationSquad {
   const real = parseSquad(nationId);
   if (real && real.length >= 23) {
     const squad = {
-      starters: real.slice(0, 15).map((l, i) => realPlayer(nation, l, i + 1, `${nationId}-${i + 1}`)),
-      bench: real.slice(15, 23).map((l, i) => realPlayer(nation, l, BENCH_POS[i], `${nationId}-b${i}`)),
+      starters: real.slice(0, 15).map((l, i) => realPlayer(nation, l, l.pos ?? i + 1, `${nationId}-${i + 1}`)),
+      bench: real.slice(15, 23).map((l, i) => realPlayer(nation, l, l.pos ?? BENCH_POS[i], `${nationId}-b${i}`)),
     };
     squadCache.set(nationId, squad);
     return squad;
