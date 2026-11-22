@@ -70,16 +70,18 @@ interface MiniSpec {
   /** choose a lineout jumper first */
   pick?: boolean;
   calls?: boolean;
+  /** defending lineout: guess FRONT / MIDDLE / FAR */
+  guess?: boolean;
 }
 const MINI: Record<MiniGameRequest['kind'], MiniSpec> = {
   scrum: { title: 'Scrum', hint: 'Swipe UP on "SET" when the marker is in the green', dir: 'up', timed: true, calls: true },
   scrumDefend: { title: 'Scrum', hint: 'Swipe UP in the green to drive against their put-in', dir: 'up', timed: true, calls: true },
   lineout: { title: 'Lineout', hint: 'Pick your jumper, then swipe DOWN in the green to throw', dir: 'down', timed: true, pick: true },
-  lineoutDefend: { title: 'Contest the lineout', hint: 'Swipe UP in the green to jump for the steal', dir: 'up', timed: true },
+  lineoutDefend: { title: 'Contest the lineout', hint: 'Choose a range to contest: guess where they will throw', dir: 'up', timed: false, guess: true },
   ruck: { title: 'Ruck', hint: 'Swipe UP in the green to secure quick ball', dir: 'up', timed: true },
   counterRuck: { title: 'Contest the ruck', hint: 'Swipe UP fast to jackal the ball', dir: 'up', timed: false },
-  maul: { title: 'Drive the maul', hint: 'Swipe UP again and again to drive', dir: 'up', timed: false, repeat: true },
-  maulDefend: { title: 'Hold up the maul', hint: 'Swipe UP again and again to push back', dir: 'up', timed: false, repeat: true },
+  maul: { title: 'Maul!', hint: 'Swipe UP when the arrow is full to push the maul', dir: 'up', timed: false, repeat: true },
+  maulDefend: { title: 'Maul!', hint: 'Swipe UP when the arrow is full to push them back', dir: 'up', timed: false, repeat: true },
 };
 const JUMPERS = [
   { id: 'front', label: 'Front', zone: 1.3, bonus: -0.06, desc: 'Safe, short throw' },
@@ -104,6 +106,25 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
   const start = useRef<{ x: number; y: number; t: number } | null>(null);
   const countRef = useRef(0);
   const ready = stage >= 3 && !!jumper;
+  // maul: an arrow meter fills; swipe when it's full
+  const [fill, setFill] = useState(0);
+  const fillRef = useRef(0);
+  const goodRef = useRef(0);
+  useEffect(() => {
+    if (!spec.repeat) return;
+    let raf = 0;
+    let last = performance.now();
+    const loop = () => {
+      const now = performance.now();
+      fillRef.current = Math.min(1, fillRef.current + (now - last) / 800);
+      last = now;
+      setFill(fillRef.current);
+      if (!done.current) raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const cpuRange = useRef(Math.floor(Math.random() * 3));
 
   const finish = (q: number, label?: string) => {
     if (done.current) return;
@@ -132,7 +153,7 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
         posRef.current = u < 1 ? u : 2 - u;
         setPos(posRef.current);
         if (!req.blocking && t > req.duration) finish(0.5, '—');
-      } else if (t > (req.duration || 3)) {
+      } else if (!spec.guess && t > (req.duration || 3) + (spec.repeat ? 1.5 : 0)) {
         if (spec.repeat) finish(Math.min(1, countRef.current / 9), `${countRef.current} DRIVES`);
         else finish(0.4, 'TOO SLOW');
       }
@@ -143,7 +164,7 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
   }, [jumper]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSwipe = (dy: number, ms: number) => {
-    if (done.current || !ready) return;
+    if (done.current || !ready || spec.guess) return;
     const okDir = spec.dir === 'up' ? dy > 40 : dy < -40;
     if (!okDir) {
       setNudge(spec.dir === 'up' ? 'Swipe UP ↑' : 'Swipe DOWN ↓');
@@ -152,10 +173,16 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
     setNudge('');
     haptic('light');
     if (spec.repeat) {
+      const full = fillRef.current >= 0.95;
+      fillRef.current = 0;
       countRef.current++;
       setCount(countRef.current);
-      req.onTap?.();
-      req.onTap?.();
+      if (full) {
+        goodRef.current++;
+        for (let i = 0; i < 4; i++) req.onTap?.();
+        setNudge('PUSH!');
+      } else setNudge('Too early, wait for the arrow to fill');
+      if (countRef.current >= 3) finish(goodRef.current / 3, goodRef.current >= 2 ? 'DRIVEN!' : 'HELD');
       return;
     }
     if (!spec.timed) {
@@ -190,7 +217,7 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
 
   return (
     <>
-    {req.blocking && <div className="swipe-layer" {...handlers} />}
+    {(req.blocking || spec.repeat) && <div className="swipe-layer" {...handlers} />}
     <div
       className={`mini swipe ${req.blocking ? 'blocking' : ''}`}
       onPointerDown={(e) => {
@@ -231,11 +258,30 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
         </div>
       )}
       {spec.repeat && (
-        <div className="drive-meter">
-          <i style={{ width: `${Math.min(100, (count / 9) * 100)}%` }} />
+        <div className={`maul-arrow ${fill >= 0.95 ? 'full' : ''}`}>
+          <i style={{ height: `${fill * 100}%` }} />
+          <span>{fill >= 0.95 ? 'SWIPE!' : `${count}/3`}</span>
         </div>
       )}
-      {ready && !result && <div className={`swipe-cue ${spec.dir}`}>{arrow}</div>}
+      {spec.guess && !result && (
+        <div className="jumpers">
+          {['Front', 'Middle', 'Far'].map((label, i) => (
+            <button
+              key={label}
+              className="btn"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                audio.click();
+                const hit = i === cpuRange.current;
+                finish(hit ? 0.95 : 0.2, hit ? 'READ IT!' : `THEY WENT ${['FRONT', 'MIDDLE', 'FAR'][cpuRange.current]}`);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {ready && !result && !spec.guess && <div className={`swipe-cue ${spec.dir}`}>{arrow}</div>}
       <div className="hint">{nudge || (spec.pick && !jumper ? 'Choose where to throw' : spec.hint)}</div>
     </div>
     </>

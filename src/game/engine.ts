@@ -136,6 +136,9 @@ export class MatchEngine {
   private ballMesh: THREE.Mesh;
   private targetRing: THREE.Mesh;
   private passMarks: [THREE.Sprite, THREE.Sprite];
+  private nameTag: THREE.Sprite;
+  private nameCanvas: HTMLCanvasElement;
+  private nameFor: P | null = null;
   private offsideLine: THREE.Mesh;
   private arc: THREE.Line;
   private shadows: THREE.InstancedMesh;
@@ -161,7 +164,11 @@ export class MatchEngine {
   private waitingBlocking = false;
   private miniId = 0;
   private activeMini: { id: number; kind: MiniGameKind; q: number | null; taps: number; done: boolean } | null = null;
-  private ruck: null | { x: number; z: number; att: Side; t: number; dur: number } = null;
+  private ruck: null | { x: number; z: number; att: Side; t: number; dur: number; progress: number; addAtt: number; addDef: number } = null;
+  private ruckArc: THREE.Mesh | null = null;
+  private ruckArcBg: THREE.Mesh | null = null;
+  private idleStickT = 0;
+  private pendingSetPlay: SetPlayId | null = null;
   private maul: null | { x: number; z: number; att: Side; t: number; dur: number; start: number; carrier: P; cpuPush: number; userPush: number } = null;
   private setPlay: null | { id: SetPlayId; targets: P[]; routes: Map<P, () => { x: number; z: number }>; until: number } = null;
   private slotTimer = 0;
@@ -270,6 +277,16 @@ export class MatchEngine {
       return sp;
     };
     this.passMarks = [mark(-1), mark(1)];
+    // Name label above the selected player
+    this.nameCanvas = document.createElement('canvas');
+    this.nameCanvas.width = 256;
+    this.nameCanvas.height = 48;
+    const nameTex = new THREE.CanvasTexture(this.nameCanvas);
+    nameTex.colorSpace = THREE.SRGBColorSpace;
+    this.nameTag = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTex, depthTest: false, transparent: true }));
+    this.nameTag.scale.set(2.6, 0.49, 1);
+    this.nameTag.renderOrder = 11;
+    this.scene.add(this.nameTag);
 
     const offGeo = new THREE.PlaneGeometry(0.25, 70);
     offGeo.rotateX(-Math.PI / 2);
@@ -377,7 +394,7 @@ export class MatchEngine {
     const h = this.host.clientHeight || window.innerHeight;
     this.post.setSize(w, h);
     this.camera.aspect = w / h;
-    this.camera.fov = w / h < 1 ? 68 : 50;
+    this.camera.fov = w / h < 1 ? 64 : 44;
     this.camera.updateProjectionMatrix();
     this.particles?.setViewportHeight(h * this.renderer.getPixelRatio(), this.camera.fov);
   }
@@ -515,6 +532,8 @@ export class MatchEngine {
       timeUp: this.timeUp(),
       phase: this.phase,
       phaseNum: this.phaseCount,
+      ruck: this.ruck ? (this.ruck.att === 0 ? 'attack' : 'defend') : null,
+      mph: Math.round((this.ball.carrier ? Math.hypot(this.ball.carrier.vx, this.ball.carrier.vz) : c ? Math.hypot(c.vx, c.vz) : 0) * 2.237),
     };
   }
 
@@ -583,11 +602,25 @@ export class MatchEngine {
           }
         }
         break;
+      case 'addPlayer':
+        this.addToRuck();
+        break;
+      case 'dodge':
+        if (c && userHasBall && c.sidestepT <= 0) {
+          c.sidestepT = 0.4;
+          c.sideDir = a.dir * this.camRightSign();
+          c.fx = c.sideDir * Math.cos(c.heading) > 0 ? 'sidestepR' : 'sidestepL';
+        }
+        break;
       case 'switch':
         if (this.possession() === 1 || !b.carrier) this.switchDefender();
         break;
       case 'setplay':
         if (userHasBall && live) this.startSetPlay(a.id);
+        else if (this.ruck && this.ruck.att === 0) {
+          this.pendingSetPlay = a.id; // run it as soon as the 9 has the ball
+          this.say('Set play called', 'info');
+        }
         break;
     }
   }
@@ -607,6 +640,59 @@ export class MatchEngine {
     audio.click();
   }
 
+  /** ADD PLAYER at a ruck: bind the nearest free team-mate in. */
+  private addToRuck() {
+    const r = this.ruck;
+    if (!r) return;
+    const mine = r.att === 0 ? r.addAtt : r.addDef;
+    if (mine >= 2) return;
+    const d = dirOf(r.att);
+    const cand = this.teams[0]
+      .filter((p) => p.state === 'free' && p.num !== 9 && p !== this.controlled)
+      .sort((p, q) => dist(p.x, p.z, r.x, r.z) - dist(q.x, q.z, r.x, r.z))[0];
+    if (!cand) return;
+    cand.state = 'bound';
+    cand.tx = r.x + (r.att === 0 ? -d : d) * (1.6 + mine * 0.6);
+    cand.tz = r.z + (mine ? 0.5 : -0.5);
+    cand.urgency = 1;
+    if (r.att === 0) r.addAtt++;
+    else r.addDef++;
+    audio.thud(0.4);
+    haptic('light');
+  }
+
+  /** Arc under the ruck that fills as the ball becomes available. */
+  private updateRuckArc(r: { x: number; z: number; att: Side; progress: number }) {
+    const mk = (color: string, opacity: number, order: number) => {
+      const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
+      m.renderOrder = order;
+      this.scene.add(m);
+      return m;
+    };
+    this.ruckArcBg ??= mk('#13204a', 0.85, 3);
+    this.ruckArc ??= mk('#ffffff', 1, 4);
+    const build = (mesh: THREE.Mesh, frac: number, r0: number, r1: number) => {
+      // smile-shaped arc on the camera side (-x) of the ruck
+      const a0 = Math.PI - 0.95;
+      const a1 = a0 + 1.9 * frac;
+      const segs = 24;
+      const pos: number[] = [];
+      for (let i = 0; i < segs; i++) {
+        const t0 = a0 + ((a1 - a0) * i) / segs;
+        const t1 = a0 + ((a1 - a0) * (i + 1)) / segs;
+        const p = (a: number, rad: number) => [r.x + Math.cos(a) * rad, 0.06, r.z + Math.sin(a) * rad];
+        pos.push(...p(t0, r0), ...p(t0, r1), ...p(t1, r1), ...p(t0, r0), ...p(t1, r1), ...p(t1, r0));
+      }
+      mesh.geometry.dispose();
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      mesh.geometry = g;
+      mesh.visible = true;
+    };
+    build(this.ruckArcBg, 1, 2.6, 3.0);
+    build(this.ruckArc, r.progress, 2.65, 2.95);
+  }
+
   private autoControl() {
     const b = this.ball;
     if (b.carrier && b.carrier.side === 0) {
@@ -616,6 +702,15 @@ export class MatchEngine {
     if (b.state === 'pass' && b.pass && b.pass.target.side === 0) {
       this.controlled = b.pass.target;
       return;
+    }
+    const joy = Math.hypot(this.input.moveX, this.input.moveY);
+    this.idleStickT = joy > 0.12 || this.input.tackleHold ? 0 : this.idleStickT + 1 / 60;
+    const carrier = b.carrier;
+    if (carrier && carrier.side === 1 && this.idleStickT > 0.5 && this.controlled) {
+      const best = this.teams[0]
+        .filter((p) => p.state === 'free')
+        .sort((p, q) => dist(p.x, p.z, carrier.x, carrier.z) - dist(q.x, q.z, carrier.x, carrier.z))[0];
+      if (best && best !== this.controlled && dist(best.x, best.z, carrier.x, carrier.z) + 3 < dist(this.controlled.x, this.controlled.z, carrier.x, carrier.z)) this.controlled = best;
     }
     if (!this.controlled || this.controlled.state !== 'free' || this.phase !== 'play') {
       const free = this.teams[0].filter((p) => p.state === 'free');
@@ -628,7 +723,7 @@ export class MatchEngine {
   private maxSpeed(p: P) {
     // Quick, arcade-feel running: ~9.5 m/s for an average back.
     // Realistic pace: ~7.5 m/s cruising for an average back, a bit more when sprinting.
-    let s = 4.9 + (p.r.pace / 100) * 3.3;
+    let s = 3.9 + (p.r.pace / 100) * 2.3; // ~5.5 m/s (12 mph) for an average back
     if (this.ball.carrier === p) s *= 0.97;
     if (p === this.controlled && p.side === 0) s *= 1.04;
     return s;
@@ -674,13 +769,13 @@ export class MatchEngine {
         const tx = carrierNow.x + carrierNow.vx * lead - p.x;
         const tz = carrierNow.z + carrierNow.vz * lead - p.z;
         const n = Math.hypot(tx, tz) || 1;
-        const spd = max * (p.stamina > 0.05 ? 1.16 : 1);
+        const spd = max * (p.stamina > 0.05 ? 1.24 : 1);
         dvx = (tx / n) * spd;
         dvz = (tz / n) * spd;
         p.stamina = clamp(p.stamina - 0.1 * dt, 0, 1);
       } else if (userDriven) {
         const sprinting = inp.sprint && p.stamina > 0.05;
-        const spd = max * (sprinting ? 1.16 : 1) * Math.min(1, joy * 1.15);
+        const spd = max * (sprinting ? 1.24 : 1) * Math.min(1, joy * 1.15);
         if (joy > 0.05) {
           const mx = inp.moveX / Math.max(joy, 1);
           const my = inp.moveY / Math.max(joy, 1);
@@ -970,7 +1065,7 @@ export class MatchEngine {
         if (p.state !== 'free' || p.tackleCD > 0 || p === this.controlled) continue;
         const d = dist(p.x, p.z, carrier.x, carrier.z);
         // Only tackle from in front or the side, not by catching up from behind on a sprinter.
-        const fromBehind = (carrier.x - p.x) * dirOf(carrier.side) > 0.4 && Math.hypot(carrier.vx, carrier.vz) > 5.5;
+        const fromBehind = (carrier.x - p.x) * dirOf(carrier.side) > 0.4 && Math.hypot(carrier.vx, carrier.vz) > 5;
         if (d < 1.05 && !fromBehind) {
           this.attemptTackle(p, carrier, false);
           if (this.ball.carrier !== carrier) break;
@@ -1088,7 +1183,7 @@ export class MatchEngine {
     if (c.sidestepT > 0) p -= 0.2 * (c.r.pace / 90);
     p += t.side === 0 ? this.userAssist() + 0.08 : -this.userAssist() - 0.12;
     // Sprinting carriers are harder to bring down.
-    if (c.side === 0 && Math.hypot(c.vx, c.vz) > 7.5) p -= 0.08;
+    if (c.side === 0 && Math.hypot(c.vx, c.vz) > 6.2) p -= 0.08;
     // Automatic fend: strong carriers driving through contact can bump tacklers off.
     if (c.side === 0 && c === this.controlled && Math.hypot(this.input.moveX, this.input.moveY) > 0.5) p -= Math.max(0, (c.r.strength - t.r.strength) / 160);
     p = clamp(p, 0.15, 0.95);
@@ -1195,7 +1290,7 @@ export class MatchEngine {
     if (!target) return false;
     const d = dirOf(passer.side);
     const distTo = dist(passer.x, passer.z, target.x, target.z);
-    const speed = long ? 15 : 11.5; // slower, readable passes
+    const speed = long ? 14 : 11; // slower, readable passes
     const T = clamp(distTo / speed, 0.25, 1.6);
     // aim at where the receiver will be
     let tx = target.x + target.vx * T;
@@ -1743,6 +1838,12 @@ export class MatchEngine {
       this.controlled = null;
       this.autoControl();
     }
+    if (side === 0 && this.pendingSetPlay) {
+      const id = this.pendingSetPlay;
+      this.pendingSetPlay = null;
+      this.atBaseT = -1;
+      this.startSetPlay(id);
+    } else this.pendingSetPlay = null;
   }
 
   // ---------------------------------------------------------------- ruck
@@ -1753,7 +1854,7 @@ export class MatchEngine {
     const z = c.z;
     this.phase = 'ruck';
     this.phaseT = 0;
-    this.ruck = { x, z, att, t: 0, dur: 1.8 };
+    this.ruck = { x, z, att, t: 0, dur: 2.2, progress: 0, addAtt: 0, addDef: 0 };
     this.phaseCount++;
     const b = this.ball;
     b.carrier = null;
@@ -1789,7 +1890,6 @@ export class MatchEngine {
     const uc = this.controlled;
     if (att === 1 && uc && uc.state === 'free' && (uc.x - x) * d < -1 && Math.abs(uc.z - z) < 8) this.say('Get back onside!', 'info', 'Stay behind the yellow line');
     // Attacking rucks resolve automatically; when defending you can swipe up to jackal.
-    if (att === 1) this.after(0.35, () => this.ruck && this.requestMini('counterRuck', false, 1.2));
   }
 
   /**
@@ -1862,17 +1962,20 @@ export class MatchEngine {
   private updateRuck(dt: number) {
     const r = this.ruck!;
     r.t += dt;
+    // The ball-availability arc fills over the ruck; extra attackers speed it up.
+    const dur = Math.max(1.2, r.dur - r.addAtt * 0.45 + r.addDef * 0.25);
+    r.progress = Math.min(1, r.progress + dt / dur);
+    this.updateRuckArc(r);
     const spread = this.positionAroundBreakdown(r.x, r.z, r.att);
-    const miniDone = !this.activeMini || this.activeMini.done;
-    // Wait until the shape has formed (or a cap) so the play is readable.
-    const settled = spread < 2.5 || r.t > r.dur + 1.6;
-    if (r.t >= r.dur && settled && (miniDone || r.t > r.dur + 1.2)) this.resolveRuck();
+    const settled = spread < 2.5 || r.progress >= 1 && r.t > dur + 1.2;
+    if (r.progress >= 1 && settled) this.resolveRuck();
   }
 
   private resolveRuck() {
     const r = this.ruck!;
     this.ruck = null;
     this.offsideLine.visible = false;
+    if (this.ruckArc) this.ruckArc.visible = this.ruckArcBg!.visible = false;
     const q = this.activeMini && this.activeMini.kind.match(/uck/i) ? this.activeMini.q : null;
     this.emit({ type: 'minigameCancel' });
     this.activeMini = null;
@@ -1880,6 +1983,9 @@ export class MatchEngine {
     const def = other(att);
     let pTurn = 0.06;
     if (def === 1) pTurn += { easy: -0.03, medium: 0.01, hard: 0.05 }[this.cfg.difficulty];
+    // ADD PLAYER: attackers secure the ball, defenders committing make a steal likelier
+    if (att === 0) pTurn *= Math.pow(0.45, r.addAtt);
+    else pTurn = Math.min(0.55, pTurn + r.addDef * 0.16);
     if (att === 0 && q !== null) pTurn = q > 0.7 ? 0.01 : q < 0.3 ? pTurn + 0.12 : pTurn;
     if (att === 1 && q !== null) pTurn = q > 0.7 ? 0.38 : q < 0.3 ? 0.03 : pTurn;
     // penalties at the breakdown
@@ -2593,7 +2699,26 @@ export class MatchEngine {
     if (c && showSel) {
       c.av.headPosition(this.tmpV);
       this.selector.place(c.x, c.z, this.tmpV.y, this.time, true);
-    } else this.selector.place(0, 0, 0, 0, false);
+      if (this.nameFor !== c) {
+        this.nameFor = c;
+        const g = this.nameCanvas.getContext('2d')!;
+        g.clearRect(0, 0, 256, 48);
+        g.font = '800 26px "Avenir Next Condensed", "Arial Narrow", Arial, sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.lineWidth = 5;
+        g.strokeStyle = 'rgba(0,0,0,0.75)';
+        g.strokeText(c.name, 128, 26);
+        g.fillStyle = '#ffffff';
+        g.fillText(c.name, 128, 26);
+        (this.nameTag.material as THREE.SpriteMaterial).map!.needsUpdate = true;
+      }
+      this.nameTag.visible = true;
+      this.nameTag.position.set(c.x, this.tmpV.y + 1.15, c.z);
+    } else {
+      this.selector.place(0, 0, 0, 0, false);
+      this.nameTag.visible = false;
+    }
     // Pass markers over the players who would receive a left / right pass.
     const showMarks = !rf && !!c && b.carrier === c && c.side === 0 && (this.phase === 'play' || this.phase === 'kickoff');
     const crs = this.camRightSign();
@@ -2760,8 +2885,8 @@ export class MatchEngine {
         // Low broadcast camera: ~12m behind and 7m above the carrier, looking down the pitch to the try line.
         // Steady broadcast view behind your team: follows the ball, only partly sideways, no zooming.
         // Broadcast view from behind your team: far enough back and high enough to read the whole line.
-        pos = new THREE.Vector3(focus.x - 13.5, 7.6, focus.z * 0.45);
-        look = new THREE.Vector3(focus.x + 7, 0, focus.z * 0.7);
+        pos = new THREE.Vector3(focus.x - 20, 12, focus.z * 0.5);
+        look = new THREE.Vector3(focus.x + 12, 0, focus.z * 0.75);
         void tight;
       }
       if (b.state === 'air' && b.kicker) pos.y += Math.min(4, b.y * 0.25);

@@ -154,7 +154,37 @@ const TackleIcon = () => (
 );
 
 /** Context buttons: attack set when the user has the ball, defence set otherwise. */
-export function ActionButtons({ input, attacking }: { input: InputState; attacking: boolean }) {
+/** Swipe left/right on the right half of the screen to dodge (sidestep). */
+export function DodgeLayer({ input }: { input: InputState }) {
+  const start = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
+  return (
+    <div
+      className="dodge-layer"
+      onPointerDown={(e) => (start.current = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId })}
+      onPointerUp={(e) => {
+        const s0 = start.current;
+        start.current = null;
+        if (!s0 || s0.id !== e.pointerId) return;
+        const dx = e.clientX - s0.x;
+        const dy = e.clientY - s0.y;
+        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3 && performance.now() - s0.t < 500) {
+          input.actions.push({ type: 'dodge', dir: dx > 0 ? 1 : -1 });
+          haptic('light');
+        }
+      }}
+    />
+  );
+}
+
+const AddPlayerIcon = () => (
+  <svg viewBox="0 0 40 32" width="34" height="28" aria-hidden>
+    <circle cx="14" cy="8" r="4" fill="currentColor" />
+    <path d="M10 13 L22 19 L30 17 M14 16 L10 28 M22 19 L26 28" stroke="currentColor" strokeWidth="3.4" fill="none" strokeLinecap="round" />
+    <path d="M33 4 V12 M29 8 H37" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+  </svg>
+);
+
+export function ActionButtons({ input, attacking, ruck }: { input: InputState; attacking: boolean; ruck: 'attack' | 'defend' | null }) {
   const kickStart = useRef({ x: 0, t: 0 });
   const passStart = useRef(0);
   const [kickPower, setKickPower] = useState(0);
@@ -162,12 +192,22 @@ export function ActionButtons({ input, attacking }: { input: InputState; attacki
 
   useEffect(() => () => cancelAnimationFrame(kickRaf.current), []);
 
+  if (ruck) {
+    return (
+      <div className="actions">
+        <ActionButton label="Add player" size="big" color={ruck === 'attack' ? 'neon' : 'pink'} pos={{ right: 0, bottom: 34 }} onDown={() => input.actions.push({ type: 'addPlayer' })}>
+          <AddPlayerIcon />
+        </ActionButton>
+      </div>
+    );
+  }
+
   if (!attacking) {
     return (
       <div className="actions">
         <ActionButton
-          label="Tackle"
-          sub="hold to chase"
+          label="Stand"
+          sub="hold to tackle"
           size="big"
           color="pink"
           pos={{ right: 0, bottom: 34 }}
@@ -180,7 +220,7 @@ export function ActionButtons({ input, attacking }: { input: InputState; attacki
           <TackleIcon />
         </ActionButton>
         <ActionButton label="Dive" size="med" color="gold" pos={{ right: 98, bottom: 0 }} onDown={() => input.actions.push({ type: 'dive' })} />
-        <ActionButton label="Switch" size="med" color="cyan" pos={{ right: 104, bottom: 80 }} onDown={() => input.actions.push({ type: 'switch' })} />
+        <ActionButton label="Switch" size="sm" color="dark" pos={{ right: 110, bottom: 92 }} onDown={() => input.actions.push({ type: 'switch' })} />
       </div>
     );
   }
@@ -241,7 +281,6 @@ export function ActionButtons({ input, attacking }: { input: InputState; attacki
         <span className="meter" style={meterStyle} />
         <KickIcon />
       </ActionButton>
-      <ActionButton label="Step" size="sm" color="cyan" pos={{ right: 110, bottom: 98 }} onDown={() => input.actions.push({ type: 'sidestep' })} />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
-import { ActionButtons, Joystick } from '../ui/controls';
+import { ActionButtons, DodgeLayer, Joystick } from '../ui/controls';
 import { MiniGame, PlaceKickUI, ScoreBug, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { update, useProfile } from '../state/store';
@@ -23,7 +23,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0,
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, mph: 0,
 };
 
 export function MatchScreen({
@@ -158,7 +158,7 @@ export function MatchScreen({
   const userIsHome = cfg.userIsHome;
   const userSide = { short: cfg.user.short, color: cfg.user.kit.primary, score: hud.userScore };
   const cpuSide = { short: cfg.cpu.short, color: cfg.cpu.kit.primary, score: hud.cpuScore };
-  const showControls = !loading && !howTo && !replay && !tryBanner && hud.phase !== 'dead' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
+  const showControls = !loading && !howTo && !replay && !tryBanner && hud.phase !== 'dead' && hud.phase !== 'maul' && hud.phase !== 'scrum' && hud.phase !== 'lineout' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
 
   return (
     <div className="match-root">
@@ -205,8 +205,8 @@ export function MatchScreen({
             )}
           </div>
         )}
-        {showControls && hud.attacking && hud.canAct && !cfg.drill && (
-          <button className="setplays-btn" onClick={() => (audio.click(), setPlays(true))}>
+        {showControls && hud.attacking && (hud.ruck === 'attack' || hud.phaseNum > 0) && hud.canAct && !cfg.drill && (
+          <button className="setplays-btn pill-bottom" onClick={() => (audio.click(), setPlays(true))}>
             Set Plays
           </button>
         )}
@@ -224,7 +224,9 @@ export function MatchScreen({
           </button>
         )}
         {showControls && <Joystick input={input.current} />}
-        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} />}
+        {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
+        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} />}
+        {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}
         {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} onDone={() => {}} />}
       </div>
@@ -235,22 +237,22 @@ export function MatchScreen({
             <h2>How to play</h2>
             <div className="howto-grid" style={{ textAlign: 'left' }}>
               <div>
-                <b>Run</b>Drag anywhere on the left side. Push the stick right to the edge to sprint.
+                <b>Run</b>Floating stick on the left; push to the edge to sprint. Swipe left/right on the right side to dodge.
               </div>
               <div>
-                <b>◀ Pass · Pass ▶</b>Arrows above team-mates show who gets it. Hold for a long pass.
+                <b>◀ Pass · Pass ▶</b>The arrows above team-mates show who gets it. Hold for a long pass. KICK: tap, or hold to aim.
               </div>
               <div>
-                <b>Kick</b>Tap for a long kick. Hold to set the power and drag to aim.
+                <b>Rucks</b>The arc fills until the ball is out. ADD PLAYER secures it (attacking) or contests it (defending).
               </div>
               <div>
-                <b>Defending</b>Hold TACKLE: your player chases the ball carrier and tackles. SWITCH changes player. Swipe UP to contest rucks.
+                <b>Defending</b>Hold STAND to chase and tackle; DIVE from further out. You switch to the defender nearest the ball.
               </div>
               <div>
-                <b>Set pieces</b>Scrum: swipe UP on SET. Lineout: pick a jumper, swipe DOWN to throw. Rucks form automatically.
+                <b>Set pieces</b>Scrum: swipe UP on SET. Lineout: pick a jumper, swipe DOWN. Maul: swipe UP when the arrow is full.
               </div>
               <div>
-                <b>Score</b>Get the ball over their try line for 5 points. Conversions: swipe up through the ball. Speed is power, curve it to beat the wind.
+                <b>Kicks at goal</b>Swipe from the ball to the posts. Speed is power; curve your swipe to beat the wind.
               </div>
             </div>
             <button

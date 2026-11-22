@@ -1852,3 +1852,80 @@ input[type='email'] {
   -webkit-backdrop-filter: none;
   min-height: 0;
 }
+
+/* ---------- dodge layer, mph, set plays pill ---------- */
+.dodge-layer {
+  position: absolute;
+  left: 45%;
+  right: 0;
+  top: 20%;
+  bottom: 0;
+  touch-action: none;
+}
+.mph {
+  position: absolute;
+  top: calc(var(--sat) + 8px);
+  right: calc(var(--sar) + 64px);
+  min-width: 52px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 18px;
+  line-height: 30px;
+  background: rgba(12, 16, 26, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.mph small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.setplays-btn.pill-bottom {
+  top: auto;
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--sab) + 14px);
+  border-radius: 22px;
+  padding: 0 26px;
+  background: rgba(12, 16, 26, 0.55);
+}
+.maul-arrow {
+  position: relative;
+  width: 70px;
+  height: 90px;
+  margin: 4px auto 0;
+  clip-path: polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%);
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid #fff;
+  overflow: hidden;
+}
+.maul-arrow i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(0deg, #1fae4b, #4be37a);
+}
+.maul-arrow.full i {
+  background: #5cff8d;
+  box-shadow: 0 0 24px #5cff8d;
+}
+.maul-arrow span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 13px;
+  color: #fff;
+  text-shadow: 0 1px 4px #000;
+}

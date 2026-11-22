@@ -63,6 +63,8 @@ export interface HudState {
   timeUp: boolean;
   phase: string;
   phaseNum: number;
+  ruck: 'attack' | 'defend' | null;
+  mph: number;
 }
 
 export interface EngineResult {
@@ -98,6 +100,8 @@ export type InputAction =
   | { type: 'tackle' }
   | { type: 'dive' }
   | { type: 'switch' }
+  | { type: 'addPlayer' }
+  | { type: 'dodge'; dir: -1 | 1 }
   | { type: 'setplay'; id: SetPlayId };
 
 export type SetPlayId = 'crash' | 'loop' | 'miss' | 'upandunder';
