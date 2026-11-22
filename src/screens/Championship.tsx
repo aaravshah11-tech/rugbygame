@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
 import { CHAMPIONSHIP_NATIONS, nationById } from '../data/nations';
-import { KitBadge, TopBar } from '../ui/common';
+import { TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
 import { championshipUserFixture, computeTable, createChampionship, nationOvr } from '../state/tournaments';
@@ -21,11 +22,11 @@ export function FixtureRow({ f, user }: { f: Fixture; user: string }) {
   }
   return (
     <div className="row" style={{ padding: '6px 0', borderTop: '1px solid var(--line)', fontWeight: 800, fontStyle: 'italic', color: mine ? 'var(--text)' : 'var(--muted)' }}>
-      <KitBadge nation={H} size={22} />
+      <TeamLogo id={H.id} size={22} />
       <span className="grow">{H.short}</span>
       <span style={{ minWidth: 64, textAlign: 'center' }}>{f.played ? `${f.homeScore} – ${f.awayScore}` : 'vs'}</span>
       <span className="grow" style={{ textAlign: 'right' }}>{A.short}</span>
-      <KitBadge nation={A} size={22} />
+      <TeamLogo id={A.id} size={22} />
       <span style={{ width: 24 }}>{pill}</span>
     </div>
   );
@@ -52,7 +53,7 @@ export function StandingsTable({ teams, fixtures, user, highlightTop = 0 }: { te
           <tr key={r.team} className={r.team === user ? 'me' : ''} style={i < highlightTop ? { background: 'rgba(33,230,193,0.08)' } : undefined}>
             <td className="l">
               <span className="row" style={{ gap: 6 }}>
-                <KitBadge nation={nationById(r.team)} size={18} />
+                <TeamLogo id={r.team} size={18} />
                 {nationById(r.team).short}
               </span>
             </td>
@@ -91,7 +92,7 @@ export function Championship({ go }: { go: Go }) {
                 update((x) => (x.championship = createChampionship(id)));
               }}
             >
-              <KitBadge nation={nationById(id)} size={44} />
+              <TeamLogo id={id} size={44} />
               <span>
                 <b>{nationById(id).name}</b>
                 <small>OVR {nationOvr(id)}</small>

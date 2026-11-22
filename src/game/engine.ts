@@ -485,6 +485,8 @@ export class MatchEngine {
       }
     }
     this.phaseT += dt;
+    // Once the 9 has played the ball, the ruck breaks up and those players rejoin the game.
+    if (this.phase === 'play' && this.atBaseT < 0) this.releaseRuck();
     if (!this.cfg.drill && (this.phase === 'play' || this.phase === 'ruck' || this.phase === 'maul')) {
       this.gameSec += dt * this.clockScale * (2400 / (this.cfg.halfMinutes * 60));
     }
@@ -970,7 +972,7 @@ export class MatchEngine {
     const anchor = b.carrier ?? (b.pass ? b.pass.target : null);
     const ax = anchor ? anchor.x : b.x;
     const az = anchor ? anchor.z : b.z;
-    const mates = this.teams[att].filter((p) => p !== anchor && p.state !== 'off');
+    const mates = this.teams[att].filter((p) => p !== anchor && p.state !== 'off' && p.state !== 'bound');
     const left = mates.filter((p) => p.z < az).sort((p, q) => q.z - p.z);
     const right = mates.filter((p) => p.z >= az).sort((p, q) => p.z - q.z);
     // Balance the line: more runners on the open side.
@@ -1066,7 +1068,7 @@ export class MatchEngine {
       return;
     }
 
-    const attackers = this.teams[att].filter((p) => p.state !== 'off' && p.state !== 'down').sort((p, q) => p.z - q.z);
+    const attackers = this.teams[att].filter((p) => p.state !== 'off' && p.state !== 'down' && p.state !== 'bound').sort((p, q) => p.z - q.z);
     // Chasers: up to two closest defenders hunt the carrier.
     const hunt = carrier ?? (b.pass ? b.pass.target : null);
     const sorted = [...defenders].sort((p, q) => dist(p.x, p.z, fx, fz) - dist(q.x, q.z, fx, fz));
@@ -1157,9 +1159,9 @@ export class MatchEngine {
     }
     if (Math.abs(c.z) > 28) steerZ -= Math.sign(c.z) * 3;
     const atBase = this.atBaseT >= 0 && this.ball.carrier === c;
-    c.tx = c.x + d * 10;
-    c.tz = clamp(c.z + steerZ, -33, 33);
-    c.urgency = atBase ? 0.25 : 1;
+    c.tx = atBase ? c.x : c.x + d * 10;
+    c.tz = atBase ? c.z : clamp(c.z + steerZ, -33, 33);
+    c.urgency = atBase ? 0.1 : 1;
 
     this.aiDecisionT -= dt;
     if (atBase) {
@@ -1929,13 +1931,24 @@ export class MatchEngine {
     return free[0] ?? nine;
   }
 
+  private releaseRuck() {
+    let n = 0;
+    for (const p of this.players) if (p.state === 'bound') {
+      p.state = 'free';
+      p.urgency = 0.7 + (n++ % 3) * 0.1; // peel off at slightly different speeds
+    }
+    if (n) this.assignSlots();
+  }
+
   /** Puts the ball in the scrum-half's hands at the base and restarts open play. */
   private ballToNine(side: Side, x: number, z: number) {
     const d = dirOf(side);
-    const nx = x - d * 1.2;
+    const nx = x - d * 2.1;
     const nine = this.nineOf(side, nx, z);
     nine.state = 'free';
-    this.place(nine, nx, z + 0.6);
+    this.place(nine, nx, z);
+    nine.heading = d > 0 ? 0 : Math.PI; // crouched behind the ruck, facing it
+    nine.vx = nine.vz = 0;
     this.giveBall(nine);
     this.ball.lastSide = side;
     this.atBaseT = 0;
@@ -1978,11 +1991,11 @@ export class MatchEngine {
     b.z = z;
     // Two from each side join the ruck.
     const join = (side: Side, off: number) => {
-      const cands = this.teams[side].filter((p) => p.state === 'free' && p !== this.controlled).sort((p, q) => dist(p.x, p.z, x, z) - dist(q.x, q.z, x, z));
-      cands.slice(0, 1).forEach((p, i) => {
+      const cands = this.teams[side].filter((p) => p.state === 'free' && p !== this.controlled && p.num !== 9).sort((p, q) => dist(p.x, p.z, x, z) - dist(q.x, q.z, x, z));
+      cands.slice(0, 2).forEach((p, i) => {
         p.state = 'bound';
         p.tx = x + off;
-        p.tz = z + (i ? 0.45 : -0.45);
+        p.tz = z + (i ? 0.5 : -0.5);
         p.urgency = 1;
       });
     };
@@ -2136,10 +2149,7 @@ export class MatchEngine {
       this.endHalf();
       return;
     }
-    for (const p of this.players) if (p.state === 'bound') {
-      p.state = 'down';
-      p.timer = 0.35;
-    }
+    // The ruck stays formed over the ball until the 9 plays it (see releaseRuck).
     this.ballToNine(winner, r.x, r.z);
   }
 
@@ -2715,6 +2725,7 @@ export class MatchEngine {
   private animFor(p: P, speed: number): [AnimName, number] {
     if (p.state === 'down') return ['lying', 1];
     if (p.state === 'bound') return ['bind', 1];
+    if (this.atBaseT >= 0 && this.ball.carrier === p && this.phase === 'play') return ['base', 1];
     if (p.celebrateT > 0) return ['celebrate', 1];
     if (speed < 0.45) return ['idle', 1];
     if (speed < 2.8) return ['walk', clamp(speed / 1.6, 0.6, 1.6)];
@@ -2783,7 +2794,10 @@ export class MatchEngine {
     // ball: sits in the carrier's hands, otherwise follows physics
     const ballPos = this.tmpV;
     if (rf) ballPos.set(rf.bx, rf.by, rf.bz);
-    else if (b.state === 'held' && b.carrier && b.carrier.state !== 'down') {
+    else if (b.state === 'held' && b.carrier && this.atBaseT >= 0 && this.phase === 'play') {
+      const c = b.carrier;
+      ballPos.set(c.x + Math.cos(c.heading) * 0.55, 0.14, c.z + Math.sin(c.heading) * 0.55);
+    } else if (b.state === 'held' && b.carrier && b.carrier.state !== 'down') {
       b.carrier.av.handPosition(ballPos);
       ballPos.y = Math.max(0.3, ballPos.y);
     } else ballPos.set(b.x, b.y, b.z);
@@ -3082,7 +3096,7 @@ function simulateGrubber(vh: number): number {
   }
   return x;
 }
-const ANIMS: AnimName[] = ['idle', 'walk', 'run', 'sidestepL', 'sidestepR', 'pass', 'catch', 'kick', 'tackle', 'dive', 'fall', 'getup', 'celebrate', 'bind', 'lying', 'carry'];
+const ANIMS: AnimName[] = ['idle', 'walk', 'run', 'sidestepL', 'sidestepR', 'pass', 'catch', 'kick', 'tackle', 'dive', 'fall', 'getup', 'celebrate', 'bind', 'lying', 'carry', 'base'];
 
 interface ReplayFrame {
   p: Float32Array; // per player: x, z, heading, base anim, time scale, triggered anim

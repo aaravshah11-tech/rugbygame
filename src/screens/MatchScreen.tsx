@@ -156,8 +156,8 @@ export function MatchScreen({
   };
 
   const userIsHome = cfg.userIsHome;
-  const userSide = { short: cfg.user.short, color: cfg.user.kit.primary, score: hud.userScore };
-  const cpuSide = { short: cfg.cpu.short, color: cfg.cpu.kit.primary, score: hud.cpuScore };
+  const userSide = { id: cfg.user.id, short: cfg.user.short, color: cfg.user.kit.primary, score: hud.userScore };
+  const cpuSide = { id: cfg.cpu.id, short: cfg.cpu.short, color: cfg.cpu.kit.primary, score: hud.cpuScore };
   const showControls = !loading && !howTo && !replay && !tryBanner && hud.phase !== 'dead' && hud.phase !== 'maul' && hud.phase !== 'scrum' && hud.phase !== 'lineout' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
 
   return (

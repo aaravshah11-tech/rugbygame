@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
 import { NATIONS, CLUB_NATION, type Nation } from '../data/nations';
-import { KitBadge, TopBar } from '../ui/common';
+import { TopBar } from '../ui/common';
 import { SquadViewerScene } from '../game/view/squadViewer';
 import type { AnimName } from '../game/view/assets';
 import { audio } from '../util/audio';
@@ -54,7 +55,7 @@ export function SquadViewer({ go }: { go: Go }) {
                 void scene.current?.showTeam(n.kit);
               }}
             >
-              <KitBadge nation={n} size={20} />
+              <TeamLogo id={n.id} size={20} />
               {n.short}
             </button>
           ))}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { TeamLogo } from './logos';
 import type { CommentaryTone, HudState, MiniGameRequest, PlaceKickRequest } from '../game/types';
 import type { MatchEngine } from '../game/engine';
 import type { Difficulty } from '../state/types';
@@ -12,13 +13,13 @@ export function ScoreBug({
   right,
 }: {
   hud: HudState;
-  left: { short: string; color: string; score: number };
-  right: { short: string; color: string; score: number };
+  left: { id: string; short: string; color: string; score: number };
+  right: { id: string; short: string; color: string; score: number };
 }) {
   return (
     <div className="scorebug">
       <div className="team">
-        <i style={{ background: left.color }} />
+        <TeamLogo id={left.id} size={22} />
         {left.short}
       </div>
       <div className="score">
@@ -26,7 +27,7 @@ export function ScoreBug({
       </div>
       <div className="team">
         {right.short}
-        <i style={{ background: right.color }} />
+        <TeamLogo id={right.id} size={22} />
       </div>
       <div className={`clock ${hud.timeUp ? 'up' : ''}`}>
         <small>{hud.half === 1 ? '1H' : '2H'}</small>

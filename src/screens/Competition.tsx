@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
 import { nationById } from '../data/nations';
-import { KitBadge, TopBar } from '../ui/common';
+import { TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
 import { nationOvr } from '../state/tournaments';
@@ -35,7 +36,7 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
                   update((x) => (x.comps[kind] = createComp(kind, id)));
                 }}
               >
-                <KitBadge nation={nationById(id)} />
+                <TeamLogo id={id} />
                 <span>
                   <b>{nationById(id).name}</b>
                   <small>OVR {nationOvr(id)}</small>
@@ -135,7 +136,7 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
             </>
           ) : (
             <>
-              <KitBadge nation={nationById(c.user)} size={56} />
+              <TeamLogo id={c.user} size={56} />
               <h3>{nationById(c.user).name}</h3>
               {next && (
                 <p className="muted">

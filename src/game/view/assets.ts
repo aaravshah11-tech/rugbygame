@@ -29,7 +29,8 @@ export type AnimName =
   | 'handoff'
   | 'bind'
   | 'lying'
-  | 'carry';
+  | 'carry'
+  | 'base';
 
 /** Source clip for each game animation (first match wins). */
 export const CLIP_SOURCES: Partial<Record<AnimName, string[]>> = {
@@ -341,7 +342,7 @@ function prepare(gltfScene: THREE.Object3D, animations: THREE.AnimationClip[]): 
   }
   if (!clips.has('walk')) clips.set('walk', clips.get('run') ?? idle);
   if (!clips.has('run')) clips.set('run', clips.get('walk') ?? idle);
-  const all: AnimName[] = ['idle', 'walk', 'run', 'sidestepL', 'sidestepR', 'pass', 'catch', 'kick', 'tackle', 'dive', 'fall', 'getup', 'celebrate', 'handoff', 'bind', 'lying', 'carry'];
+  const all: AnimName[] = ['idle', 'walk', 'run', 'sidestepL', 'sidestepR', 'pass', 'catch', 'kick', 'tackle', 'dive', 'fall', 'getup', 'celebrate', 'handoff', 'bind', 'lying', 'carry', 'base'];
   for (const n of all) if (!clips.has(n)) clips.set(n, idle);
 
   // Leave the template in the Idle pose so every clone starts from it.
@@ -436,6 +437,42 @@ const POSES: Partial<Record<AnimName, KeyPose[]>> = {
     { t: 0, p: merge(CROUCH, { bones: { LArm: [['x', -120]], RArm: [['x', -120]] } }) },
     { t: 0.25, p: { bones: { LArm: [['x', -165]], RArm: [['x', -165]], LUpLeg: [['x', 25]], RUpLeg: [['x', 15]], Head: [['x', -45]] }, hips: { dy: -0.4, dz: 0.4, rot: [['x', 80]] } } },
     { t: 0.5, p: { bones: { LArm: [['x', -170]], RArm: [['x', -170]], LUpLeg: [['x', 10]], RUpLeg: [['x', 8]], LLeg: [['x', 20]], RLeg: [['x', 30]], Head: [['x', -40]] }, hips: { dy: -0.82, dz: 0.3, rot: [['x', 88]] } } },
+  ],
+  // scrum-half crouched at the back of the ruck, hands on the ball, looking up at the line
+  base: [
+    {
+      t: 0,
+      p: merge(CROUCH, {
+        bones: {
+          LUpLeg: [['x', -80]], RUpLeg: [['x', -55]], LLeg: [['x', 100]], RLeg: [['x', 70]],
+          Spine: [['x', 50]], Chest: [['x', 10]], Head: [['x', -45]],
+          LArm: [['x', -55], ['z', -10]], RArm: [['x', -55], ['z', 10]], LForeArm: [['x', -15]], RForeArm: [['x', -15]],
+        },
+        hips: { dy: -0.42, rot: [['x', 20]] },
+      }),
+    },
+    {
+      t: 0.8,
+      p: merge(CROUCH, {
+        bones: {
+          LUpLeg: [['x', -80]], RUpLeg: [['x', -55]], LLeg: [['x', 100]], RLeg: [['x', 70]],
+          Spine: [['x', 48]], Chest: [['x', 10]], Head: [['x', -40], ['y', 15]],
+          LArm: [['x', -55], ['z', -10]], RArm: [['x', -55], ['z', 10]], LForeArm: [['x', -15]], RForeArm: [['x', -15]],
+        },
+        hips: { dy: -0.42, rot: [['x', 20]] },
+      }),
+    },
+    {
+      t: 1.6,
+      p: merge(CROUCH, {
+        bones: {
+          LUpLeg: [['x', -80]], RUpLeg: [['x', -55]], LLeg: [['x', 100]], RLeg: [['x', 70]],
+          Spine: [['x', 50]], Chest: [['x', 10]], Head: [['x', -45]],
+          LArm: [['x', -55], ['z', -10]], RArm: [['x', -55], ['z', 10]], LForeArm: [['x', -15]], RForeArm: [['x', -15]],
+        },
+        hips: { dy: -0.42, rot: [['x', 20]] },
+      }),
+    },
   ],
   bind: [
     { t: 0, p: BIND_POSE(45, -65, -65) },

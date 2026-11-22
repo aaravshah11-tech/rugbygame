@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
 import { NATIONS, nationById } from '../data/nations';
-import { KitBadge, TopBar } from '../ui/common';
+import { TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
 import { createWorldCup, finishWorldCup, nationOvr, worldCupUserFixture } from '../state/tournaments';
@@ -30,7 +31,7 @@ export function WorldCup({ go }: { go: Go }) {
                   update((x) => (x.worldCup = createWorldCup(n.id)));
                 }}
               >
-                <KitBadge nation={n} />
+                <TeamLogo id={n.id} />
                 <span>
                   <b>{n.name}</b>
                   <small>OVR {nationOvr(n.id)}</small>
@@ -128,7 +129,7 @@ export function WorldCup({ go }: { go: Go }) {
             </>
           ) : (
             <>
-              <KitBadge nation={nationById(w.user)} size={60} />
+              <TeamLogo id={w.user} size={60} />
               <h3>{nationById(w.user).name}</h3>
               {next && (
                 <p className="muted">

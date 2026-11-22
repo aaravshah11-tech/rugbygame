@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
 import { CLUBS, NATIONS, nationById } from '../data/nations';
-import { KitBadge, Seg, TopBar } from '../ui/common';
+import { Seg, TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
 import { nationOvr } from '../state/tournaments';
@@ -54,7 +55,7 @@ export function QuickMatch({ go }: { go: Go }) {
               <div className="nation-grid">
                 {group.list.map((n) => (
                   <button key={n.id} className={`nation-btn ${n.id === home ? 'sel' : n.id === away ? 'sel2' : ''}`} onClick={() => pick(n.id)}>
-                    <KitBadge nation={n} />
+                    <TeamLogo id={n.id} />
                     <span>
                       <b>{n.name}</b>
                       <small>OVR {nationOvr(n.id)}</small>
@@ -68,12 +69,12 @@ export function QuickMatch({ go }: { go: Go }) {
         <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 260 }}>
           <div className="row" style={{ justifyContent: 'space-around' }}>
             <button className="nation-btn sel" style={{ flexDirection: 'column', flex: 1 }} onClick={() => setPicking('home')}>
-              <KitBadge nation={H} size={46} />
+              <TeamLogo id={H.id} size={46} />
               <b>{H.short}</b>
             </button>
             <h2 style={{ color: 'var(--muted)' }}>VS</h2>
             <button className="nation-btn sel2" style={{ flexDirection: 'column', flex: 1 }} onClick={() => setPicking('away')}>
-              <KitBadge nation={A} size={46} />
+              <TeamLogo id={A.id} size={46} />
               <b>{A.short}</b>
             </button>
           </div>

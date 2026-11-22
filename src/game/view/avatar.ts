@@ -96,7 +96,7 @@ function attachKeepWorld(bone: THREE.Object3D, obj: THREE.Object3D, worldPos: TH
   bone.add(obj);
 }
 
-const LOOPING: AnimName[] = ['idle', 'walk', 'run', 'bind', 'lying', 'carry', 'celebrate'];
+const LOOPING: AnimName[] = ['idle', 'walk', 'run', 'bind', 'lying', 'carry', 'celebrate', 'base'];
 
 export interface AvatarOptions {
   num: number;

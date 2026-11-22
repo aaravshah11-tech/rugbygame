@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
 import { nationById } from '../data/nations';
 import {
@@ -14,7 +15,7 @@ import {
   type Rarity,
   type Rating,
 } from '../data/players';
-import { KitBadge, PlayerCard, TopBar } from '../ui/common';
+import { PlayerCard, TopBar } from '../ui/common';
 import { STAFF, update, useProfile } from '../state/store';
 import { buildMatch, chemistry, clubOvr, clubPlayers, clubTeam, nationTeam, staffBoost } from '../state/teams';
 import { createSeason } from '../state/tournaments';
@@ -457,7 +458,7 @@ export function SquadBuilder({ go, initialTab }: { go: Go; initialTab?: string }
               return (
                 <div key={f.id} className="row" style={{ padding: '6px 0', borderTop: '1px solid var(--line)', opacity: i > season.index ? 0.6 : 1 }}>
                   <span className="muted" style={{ width: 28 }}>{f.stage}</span>
-                  <KitBadge nation={n} size={24} />
+                  <TeamLogo id={n.id} size={24} />
                   <b className="grow italic">{n.name}</b>
                   <span>{f.played ? `${f.homeScore} – ${f.awayScore}` : i === season.index ? 'NEXT' : ''}</span>
                   {res && <span className={`pill ${res === 'W' ? 'win' : res === 'L' ? 'loss' : ''}`}>{res}</span>}
@@ -512,7 +513,7 @@ function PlayerDetail({ player, owned, onClose }: { player: Player; owned: boole
           <div className="grow">
             <h2 style={{ fontSize: 22 }}>{fullName(player)}</h2>
             <div className="row muted" style={{ gap: 6, fontSize: 13 }}>
-              <KitBadge nation={nation} size={18} /> {nation.name} · {posInfo(player.position).name}
+              <TeamLogo id={nation.id} size={18} /> {nation.name} · {posInfo(player.position).name}
             </div>
             <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
               Level {player.level} · {player.xp}/300 XP · <span style={{ textTransform: 'capitalize' }}>{rarityOf(playerOvr(player))}</span>
