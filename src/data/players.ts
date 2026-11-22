@@ -1,6 +1,7 @@
 import { makeRng, hashString, clamp, uid, type Rng } from '../util/rng';
 import { NATIONS, nationById, type Nation } from './nations';
 import { randomName } from './names';
+import { BENCH_POS, parseSquad, REAL_SQUADS, type RealLine } from './realSquads';
 
 export type Rating = 'pace' | 'strength' | 'passing' | 'kicking' | 'tackling' | 'handling';
 export const RATING_KEYS: Rating[] = ['pace', 'strength', 'passing', 'kicking', 'tackling', 'handling'];
@@ -117,11 +118,35 @@ export interface NationSquad {
 
 const squadCache = new Map<string, NationSquad>();
 
-/** Each nation's squad is generated from a fixed seed so it stays the same every session. */
+/** Build a real player: position profile for the shape, traits on top, then tuned to their OVR. */
+function realPlayer(nation: Nation, line: RealLine, position: number, id: string): Player {
+  const rng = makeRng(hashString('real-' + id + line.last));
+  const p = generatePlayer(rng, nation, position, line.ovr + 6);
+  p.first = line.first;
+  p.last = line.last;
+  p.id = id;
+  for (const ch of line.traits) {
+    const k = ({ P: 'pace', S: 'strength', K: 'kicking', A: 'passing', H: 'handling', T: 'tackling' } as Record<string, Rating>)[ch];
+    if (k) p.ratings[k] = clamp(p.ratings[k] + 9, 20, 99);
+  }
+  tuneToOvr(p, line.ovr);
+  return p;
+}
+
+/** Real squads where we have them; otherwise a squad generated from a fixed seed. */
 export function nationSquad(nationId: string): NationSquad {
   const cached = squadCache.get(nationId);
   if (cached) return cached;
   const nation = nationById(nationId);
+  const real = parseSquad(nationId);
+  if (real && real.length >= 23) {
+    const squad = {
+      starters: real.slice(0, 15).map((l, i) => realPlayer(nation, l, i + 1, `${nationId}-${i + 1}`)),
+      bench: real.slice(15, 23).map((l, i) => realPlayer(nation, l, BENCH_POS[i], `${nationId}-b${i}`)),
+    };
+    squadCache.set(nationId, squad);
+    return squad;
+  }
   const rng = makeRng(hashString('tryline-' + nationId));
   const starters: Player[] = [];
   for (let pos = 1; pos <= 15; pos++) {
@@ -142,13 +167,42 @@ export function nationSquad(nationId: string): NationSquad {
   return squad;
 }
 
+/** Every real player once (a player in two squads counts once, under their first team). */
+let realPool: Player[] | null = null;
+function allRealPlayers(): Player[] {
+  if (realPool) return realPool;
+  const seen = new Set<string>();
+  realPool = [];
+  for (const id of Object.keys(REAL_SQUADS)) {
+    const sq = nationSquad(id);
+    for (const pl of [...sq.starters, ...sq.bench]) {
+      const key = pl.first + ' ' + pl.last;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      realPool.push(pl);
+    }
+  }
+  return realPool;
+}
+
 export function teamOvr(players: Player[], boost: Partial<Ratings> = {}): number {
   if (!players.length) return 0;
   return Math.round(players.reduce((s, p, i) => s + playerOvr(p, i + 1, boost), 0) / players.length);
 }
 
-/** Random card for packs. `quality` 0..1 shifts the OVR distribution. */
-export function randomCard(rarity: Rarity, rng: Rng): Player {
+/** Random card for packs. With `real`, draws a real player in the rarity's OVR band when there is one. */
+export function randomCard(rarity: Rarity, rng: Rng, real = false): Player {
+  if (real) {
+    const [lo, hi] = rarity === 'gold' ? [80, 99] : rarity === 'silver' ? [70, 79] : [0, 69];
+    const pool = allRealPlayers().filter((p) => {
+      const o = ovrFor(p.ratings, p.position);
+      return o >= lo && o <= hi;
+    });
+    if (pool.length) {
+      const src = rng.pick(pool);
+      return { ...src, id: uid(), ratings: { ...src.ratings }, training: {}, level: 1, xp: 0 };
+    }
+  }
   const nation = rng.pick(NATIONS);
   const position = rng.int(1, 15);
   const target = rarity === 'gold' ? rng.int(80, 90) : rarity === 'silver' ? rng.int(70, 79) : rng.int(58, 69);

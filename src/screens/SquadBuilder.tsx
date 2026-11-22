@@ -55,7 +55,7 @@ function openPack(kind: Rarity): Player[] {
     if (kind === 'bronze') r = rng.chance(0.12) ? 'silver' : 'bronze';
     if (kind === 'silver') r = rng.chance(0.15) ? 'gold' : 'silver';
     if (kind === 'gold') r = i === 0 || rng.chance(0.45) ? 'gold' : 'silver';
-    out.push(randomCard(r, rng));
+    out.push(randomCard(r, rng, true));
   }
   return out.sort((a, b) => playerOvr(b) - playerOvr(a));
 }
@@ -63,7 +63,7 @@ function openPack(kind: Rarity): Player[] {
 function marketFor(date: string): Player[] {
   const rng = makeRng(Number(date.replace(/-/g, '')) * 7 + 3);
   return [0, 1, 2, 3, 4, 5].map((i) => {
-    const c = randomCard(i < 1 ? 'gold' : i < 3 ? 'silver' : 'bronze', rng);
+    const c = randomCard(i < 1 ? "gold" : i < 3 ? "silver" : "bronze", rng, true);
     return { ...c, id: `mkt-${date}-${i}` };
   });
 }

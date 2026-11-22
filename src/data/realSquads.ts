@@ -1,0 +1,610 @@
+/**
+ * Real squads (private build). Ratings are game estimates, not official figures.
+ *
+ * Each line: "Name|OVR|traits". 23 lines per team: shirts 1-15, then the bench in the
+ * order 2, 1, 3, 4, 7, 9, 10, 13 (see BENCH_POS).
+ * Traits bump one rating: P pace, S strength, K kicking, A passing, H handling, T tackling.
+ * To change a player, just edit the line.
+ */
+export const BENCH_POS = [2, 1, 3, 4, 7, 9, 10, 13];
+
+export const REAL_SQUADS: Record<string, string> = {
+  ENG: `
+Ellis Genge|86|S
+Jamie George|84|
+Will Stuart|82|
+Maro Itoje|89|T
+Ollie Chessum|86|
+Tom Curry|87|T
+Sam Underhill|85|T
+Ben Earl|88|P
+Alex Mitchell|85|A
+Fin Smith|85|K
+Ollie Sleightholme|83|P
+Fraser Dingwall|82|
+Ollie Lawrence|85|S
+Tommy Freeman|87|P
+Freddie Steward|84|H
+Luke Cowan-Dickie|82|
+Fin Baxter|80|
+Joe Heyes|79|
+Alex Coles|80|
+Henry Pollock|83|P
+Jack van Poortvliet|80|
+Marcus Smith|85|KP
+Henry Slade|83|A`,
+  FRA: `
+Jean-Baptiste Gros|84|
+Peato Mauvaka|87|P
+Uini Atonio|83|S
+Thibaud Flament|86|
+Emmanuel Meafou|86|S
+François Cros|85|T
+Oscar Jegou|84|
+Grégory Alldritt|88|H
+Antoine Dupont|95|PAH
+Romain Ntamack|88|K
+Louis Bielle-Biarrey|89|P
+Yoram Moefana|84|
+Gaël Fickou|85|T
+Damian Penaud|88|P
+Thomas Ramos|86|K
+Julien Marchand|84|
+Cyril Baille|84|
+Dorian Aldegheri|80|
+Hugo Auradou|81|
+Paul Boudehent|82|
+Nolann Le Garrec|82|A
+Matthieu Jalibert|85|KP
+Émilien Gailleton|83|`,
+  IRE: `
+Andrew Porter|87|S
+Dan Sheehan|89|P
+Tadhg Furlong|85|S
+Joe McCarthy|87|
+Tadhg Beirne|87|T
+Ryan Baird|83|
+Josh van der Flier|86|T
+Caelan Doris|89|H
+Jamison Gibson-Park|88|A
+Sam Prendergast|84|K
+James Lowe|86|K
+Bundee Aki|86|S
+Garry Ringrose|85|T
+Mack Hansen|85|H
+Hugo Keenan|86|H
+Rónan Kelleher|84|
+Jack Boyle|79|
+Finlay Bealham|80|
+James Ryan|84|
+Jack Conan|84|
+Craig Casey|81|
+Jack Crowley|84|K
+Robbie Henshaw|84|`,
+  ITA: `
+Danilo Fischetti|80|
+Giacomo Nicotera|79|
+Simone Ferrari|79|
+Niccolò Cannone|81|
+Federico Ruzza|80|
+Sebastian Negri|81|S
+Manuel Zuliani|79|
+Lorenzo Cannone|82|
+Stephen Varney|79|
+Paolo Garbisi|82|K
+Monty Ioane|82|P
+Tommaso Menoncello|85|P
+Juan Ignacio Brex|82|T
+Louis Lynagh|80|P
+Ange Capuozzo|84|P
+Gianmarco Lucchesi|76|
+Mirco Spagnolo|75|
+Marco Riccioni|78|
+Andrea Zambonin|76|
+Michele Lamaro|82|T
+Alessandro Garbisi|76|
+Tommaso Allan|78|K
+Leonardo Marin|77|`,
+  SCO: `
+Pierre Schoeman|82|S
+Ewan Ashman|81|
+Zander Fagerson|84|
+Grant Gilchrist|81|
+Scott Cummings|81|
+Jamie Ritchie|82|T
+Rory Darge|84|T
+Matt Fagerson|83|
+Ben White|81|
+Finn Russell|89|KA
+Duhan van der Merwe|86|SP
+Sione Tuipulotu|86|S
+Huw Jones|85|P
+Darcy Graham|84|P
+Blair Kinghorn|85|PK
+George Turner|79|
+Rory Sutherland|79|
+Elliot Millar Mills|77|
+Gregor Brown|79|
+Jack Dempsey|80|
+Jamie Dobie|79|
+Adam Hastings|78|K
+Stafford McDowall|79|`,
+  WAL: `
+Gareth Thomas|77|
+Dewi Lake|81|
+Keiron Assiratti|76|
+Dafydd Jenkins|81|
+Adam Beard|79|
+Aaron Wainwright|80|
+Jac Morgan|84|T
+Taulupe Faletau|81|H
+Tomos Williams|81|
+Dan Edwards|77|K
+Louis Rees-Zammit|82|P
+Ben Thomas|77|
+Max Llewellyn|78|
+Josh Adams|80|
+Blair Murray|78|
+Elliot Dee|77|
+Nicky Smith|76|
+Henry Thomas|74|
+Freddie Thomas|75|
+Tommy Reffell|80|T
+Rhodri Williams|74|
+Jarrod Evans|76|K
+Nick Tompkins|78|`,
+  NZL: `
+Ethan de Groot|84|S
+Codie Taylor|86|
+Tyrel Lomax|85|S
+Scott Barrett|86|
+Tupou Vaa'i|85|
+Wallace Sititi|85|P
+Du'Plessis Kirifi|82|T
+Ardie Savea|91|SH
+Cam Roigard|87|P
+Beauden Barrett|87|KP
+Caleb Clarke|85|SP
+Jordie Barrett|87|SK
+Rieko Ioane|85|P
+Sevu Reece|85|P
+Will Jordan|90|PH
+Samisoni Taukei'aho|83|S
+Tamaiti Williams|82|S
+Fletcher Newell|81|
+Patrick Tuipulotu|83|
+Peter Lakai|81|
+Cortez Ratima|83|
+Damian McKenzie|86|KP
+Anton Lienert-Brown|83|`,
+  RSA: `
+Ox Nché|85|S
+Malcolm Marx|89|S
+Thomas du Toit|85|S
+Eben Etzebeth|90|ST
+RG Snyman|86|
+Siya Kolisi|87|T
+Pieter-Steph du Toit|90|T
+Jasper Wiese|85|S
+Cobus Reinach|84|P
+Handré Pollard|87|K
+Cheslin Kolbe|89|PK
+Damian de Allende|87|S
+Jesse Kriel|86|T
+Kurt-Lee Arendse|87|P
+Damian Willemse|85|K
+Bongi Mbonambi|83|
+Gerhard Steenekamp|82|
+Wilco Louw|82|
+Franco Mostert|85|T
+Kwagga Smith|85|
+Grant Williams|84|P
+Sacha Feinberg-Mngomezulu|86|KP
+André Esterhuizen|85|S`,
+  AUS: `
+Angus Bell|82|
+Matt Faessler|80|
+Taniela Tupou|84|S
+Nick Frost|81|
+Will Skelton|85|S
+Rob Valetini|86|S
+Fraser McReight|85|T
+Harry Wilson|84|
+Jake Gordon|80|
+Tom Lynagh|79|K
+Harry Potter|80|P
+Len Ikitau|84|
+Joseph-Aukuso Suaalii|85|SP
+Max Jorgensen|85|P
+Tom Wright|81|
+Billy Pollard|78|
+James Slipper|79|
+Allan Alaalatoa|79|
+Jeremy Williams|78|
+Carlo Tizzano|82|T
+Tate McDermott|80|P
+James O'Connor|80|K
+Hunter Paisami|80|S`,
+  ARG: `
+Thomas Gallo|82|
+Julián Montoya|85|
+Joel Sclavi|80|
+Guido Petti|82|
+Pedro Rubiolo|82|
+Pablo Matera|84|S
+Juan Martín González|84|T
+Joaquín Oviedo|80|
+Gonzalo Bertranou|80|
+Tomás Albornoz|82|K
+Mateo Carreras|82|P
+Santiago Chocobares|82|S
+Lucio Cinti|80|
+Bautista Delguy|80|P
+Juan Cruz Mallía|84|P
+Agustín Creevy|77|
+Mayco Vivas|77|
+Pedro Delgado|75|
+Franco Molina|78|
+Marcos Kremer|83|T
+Simón Benítez Cruz|77|
+Santiago Carreras|82|K
+Matías Moroni|79|`,
+  FIJ: `
+Eroni Mawi|78|
+Tevita Ikanivere|78|
+Mesake Doge|77|
+Isoa Nasilasila|77|
+Temo Mayanavanua|80|
+Lekima Tagitagivalu|80|
+Elia Canakaivata|79|
+Viliame Mata|82|SH
+Frank Lomani|80|
+Caleb Muntz|78|K
+Jiuta Wainiqolo|83|P
+Josua Tuisova|85|S
+Waisea Nayacalevu|82|
+Selestino Ravutaumada|83|P
+Ilaisa Droasese|81|P
+Sam Matavesi|77|
+Haereiti Hetet|75|
+Peni Ravai|76|
+Albert Tuisue|79|
+Levani Botia|81|T
+Simione Kuruvoli|76|
+Vilimoni Botitu|76|
+Semi Radradra|85|SP`,
+  JPN: `
+Takato Okabe|74|
+Atsushi Sakate|76|
+Asaeli Ai Valu|76|
+Warner Dearns|82|S
+Amato Fakatava|79|
+Michael Leitch|80|T
+Ben Gunter|78|
+Faulua Makisi|79|
+Naoto Saito|78|P
+Seungsin Lee|77|K
+Jone Naikabula|78|P
+Dylan Riley|80|
+Charlie Lawrence|77|
+Kippei Ishida|76|P
+Yoshitaka Yazaki|77|
+Mamoru Harada|73|
+Sena Kimura|72|
+Shuhei Takeuchi|73|
+Sanaila Waqa|74|
+Tiennan Costley|75|
+Shinobu Fujiwara|74|
+Takuya Yamasawa|76|K
+Tomoki Osada|74|`,
+  TGA: `
+Siegfried Fisi'ihoi|75|
+Paula Ngauamo|76|
+Ben Tameifuna|77|S
+Halaleva Fifita|74|
+Adam Coleman|79|
+Tanginoa Halaifonua|75|
+Sione Talitui|75|
+Vaea Fifita|80|P
+Augustine Pulu|76|
+William Havili|76|K
+Solomone Kata|78|
+Malakai Fekitoa|82|S
+Pita Ahki|77|
+Afusipa Taumoepeau|76|P
+Charles Piutau|82|P
+Sam Moli|72|
+Feao Fotuaika|73|
+Tau Koloamatangi|72|
+Samiuela Lousi|73|
+Solomone Funaki|73|
+Sonatane Takulua|75|
+Patrick Pellegrini|74|
+George Moala|76|S`,
+  SAM: `
+James Lay|75|
+Seilala Lam|74|
+Michael Alaalatoa|77|
+Theo McFarland|78|
+Chris Vui|77|
+Taleni Seu|75|
+Fritz Lee|77|
+Steven Luatua|78|
+Jonathan Taumateine|74|
+Christian Leali'ifano|76|K
+Nigel Ah Wong|76|P
+Lima Sopoaga|77|K
+Tumua Manu|77|
+Ben Lam|78|P
+Duncan Paia'aua|77|
+Sama Malolo|72|
+Jordan Lay|73|
+Paul Alo-Emile|73|
+Brian Alainu'uese|73|
+Alamanda Motuga|75|
+Melani Matavao|74|
+D'Angelo Leuila|74|K
+Ulupano Seuteni|75|`,
+
+  // ---- Premiership clubs ----
+  BTH: `
+Beno Obano|80|S
+Tom Dunn|82|
+Thomas du Toit|85|S
+Quinn Roux|79|
+Charlie Ewels|81|
+Ted Hill|82|
+Sam Underhill|85|T
+Alfie Barbeary|84|S
+Ben Spencer|82|A
+Finn Russell|89|KA
+Henry Arundell|83|P
+Cameron Redpath|82|
+Ollie Lawrence|85|S
+Joe Cokanasiga|82|S
+Tom de Glanville|79|
+Niall Annett|76|
+Francois van Wyk|78|
+Will Stuart|82|
+Ross Molony|79|
+Guy Pepper|82|
+Tom Carr-Smith|76|
+Orlando Bailey|77|K
+Max Ojomoh|79|`,
+  BRS: `
+Ellis Genge|86|S
+Gabriel Oghre|79|
+Max Lahiff|77|
+Joe Batley|78|
+Chris Vui|77|
+Joe Owen|76|
+Fitz Harding|81|T
+Magnus Bradbury|80|
+Harry Randall|81|P
+AJ MacGinty|80|K
+Gabriel Ibitoye|80|P
+James Williams|77|
+Benhard Janse van Rensburg|81|S
+Kalaveti Ravouvou|79|P
+Rich Lane|78|
+Will Capon|77|
+Jake Woolmore|76|
+Lewis Thiede|75|
+Pierce Phillips|74|
+Jake Heenan|77|
+Kieran Marmion|76|
+Callum Sheedy|77|K
+Sam Worsley|76|`,
+  EXE: `
+Scott Sio|78|
+Jack Yeandle|78|
+Harry Williams|79|
+Dafydd Jenkins|81|
+Rus Tuima|78|
+Ethan Roots|80|S
+Ross Vintcent|81|
+Greg Fisilau|81|S
+Tom Cairns|76|
+Harvey Skinner|77|K
+Olly Woodburn|77|
+Will Rigg|77|
+Henry Slade|83|A
+Immanuel Feyi-Waboso|83|P
+Josh Hodge|78|K
+Max Norey|74|
+Danny Southworth|74|
+Marcus Street|77|
+Lewis Pearson|75|
+Richard Capstick|76|
+Jack Maunder|77|
+Will Haydon-Wood|74|
+Joe Hawkins|77|`,
+  GLO: `
+Jamal Ford-Robinson|76|
+Seb Blake|77|
+Fraser Balmain|77|
+Freddie Thomas|78|
+Arthur Clark|77|
+Ruan Ackermann|80|
+Lewis Ludlow|78|T
+Zach Mercer|85|H
+Tomos Williams|81|
+George Barton|77|K
+Jonny May|80|P
+Seb Atkinson|81|
+Chris Harris|78|T
+Ollie Thorley|77|P
+Josh Hathaway|76|
+George McGuigan|77|
+Val Rapava-Ruskin|77|
+Kirill Gotovtsev|74|
+Albert Tuisue|79|
+Jack Clement|76|
+Caolan Englefield|74|
+Caleb Muntz|78|K
+Max Llewellyn|78|`,
+  LEI: `
+James Cronin|77|
+Julián Montoya|85|
+Joe Heyes|79|
+Ollie Chessum|86|
+Harry Wells|76|
+Hanro Liebenberg|79|
+Tommy Reffell|80|T
+Olly Cracknell|77|
+Jack van Poortvliet|81|
+Handré Pollard|87|K
+Ollie Hassell-Collins|80|P
+Solomone Kata|78|
+Dan Kelly|79|
+Adam Radwan|79|P
+Freddie Steward|84|H
+Charlie Clare|76|
+Nephi Leatigaga|75|
+Dan Cole|77|
+Cameron Henderson|76|
+Emeka Ilione|76|
+Tom Whiteley|75|
+Billy Searle|75|K
+Matt Scott|76|`,
+  LDN: `
+Eroni Mawi|78|
+Jamie George|84|
+Marco Riccioni|78|
+Maro Itoje|89|T
+Hugh Tizard|79|
+Juan Martín González|84|T
+Andy Christie|79|
+Ben Earl|88|P
+Ivan van Zyl|78|
+Owen Farrell|84|KA
+Rotimi Segun|79|P
+Nick Tompkins|78|
+Lucio Cinti|80|
+Tobias Elliott|78|
+Elliot Daly|82|K
+Theo Dan|80|P
+Rhys Carré|77|
+Alec Clarey|76|
+Theo McFarland|78|
+Tom Willis|80|S
+Gareth Simpson|74|
+Fergus Burke|79|K
+Olly Hartley|75|`,
+  LDW: `
+Fin Baxter|80|
+Jack Walker|77|
+Wilco Louw|82|S
+Stephan Lewies|79|
+Irne Herbst|77|
+Chandler Cunningham-South|83|S
+Will Evans|79|T
+Alex Dombrandt|81|H
+Lewis Gjaltema|74|
+Marcus Smith|85|KP
+Cadan Murley|81|P
+André Esterhuizen|85|S
+Luke Northmore|79|
+Nick David|77|P
+Tyrone Green|79|
+Sam Riley|75|
+Titi Lamositele|75|
+Will Collier|77|
+George Hammond|74|
+Jack Kenningham|77|
+Will Porter|73|
+Jarrod Evans|76|K
+Oscar Beard|77|`,
+  NEW: `
+Murray McCallum|72|
+Jamie Blamire|74|
+Adam Brocklebank|71|
+Sam Lockwood|72|
+Fyn Brown|71|
+Freddie Lockwood|71|
+Guy Graham|72|T
+Callum Chick|74|S
+Sam Stuart|72|
+Brett Connon|73|K
+George Wacokecoke|73|P
+Ben Stevenson|72|
+Matías Orlando|74|S
+Tom Penny|72|P
+Ollie Fletcher|71|
+Mark Tampin|69|
+Phil Brantingham|69|
+Morgan Ralph|69|
+Greg Peterson|70|
+Josh Basham|70|
+Michael Young|69|
+Joel Hodgson|70|K
+Elliott Obatoyinbo|70|`,
+  NOR: `
+Emmanuel Iyogun|79|
+Curtis Langdon|80|
+Trevor Davison|79|
+Alex Coles|80|
+Temo Mayanavanua|80|
+Josh Kemeny|80|
+Henry Pollock|83|P
+Juarno Augustus|82|S
+Alex Mitchell|85|A
+Fin Smith|85|K
+Ollie Sleightholme|83|P
+Fraser Dingwall|82|
+Burger Odendaal|79|
+Tommy Freeman|87|P
+George Furbank|84|HA
+Sam Matavesi|77|
+Alfie Petch|76|
+Elliot Millar Mills|77|
+Tom Lockett|75|
+Tom Pearson|78|
+Tom James|75|
+Anthony Belleau|77|K
+James Ramm|77|`,
+  SAL: `
+Bevan Rodd|80|
+Luke Cowan-Dickie|82|
+Asher Opoku-Fordjour|81|S
+Jonny Hill|79|
+Hyron Andrews|77|
+Tom Curry|87|T
+Ben Curry|82|T
+Jean-Luc du Preez|81|S
+Gus Warr|78|
+George Ford|85|KA
+Tom Roebuck|82|P
+Rob du Preez|80|
+Luke James|77|
+Arron Reed|78|P
+Joe Carpenter|79|
+Ben Bamber|75|
+Nathan Jibulu|74|
+Ralph Adams-Hale|75|
+Sam Dugdale|77|
+Ernst van Rhyn|77|
+Raffi Quirke|79|P
+Sam James|76|
+Tom O'Flaherty|76|P`,
+};
+
+export interface RealLine {
+  first: string;
+  last: string;
+  ovr: number;
+  traits: string;
+}
+
+export function parseSquad(id: string): RealLine[] | null {
+  const raw = REAL_SQUADS[id];
+  if (!raw) return null;
+  return raw
+    .trim()
+    .split('\n')
+    .map((l) => {
+      const [name, ovr, traits = ''] = l.split('|');
+      const parts = name.trim().split(' ');
+      return { first: parts[0], last: parts.slice(1).join(' ') || parts[0], ovr: Number(ovr), traits: traits.trim() };
+    });
+}
