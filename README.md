@@ -6,7 +6,8 @@ A 3D rugby union game for **iPhone and iPad**, built with Three.js, React and Ty
 
 ```bash
 npm install
-npm run dev        # http://<your-ip>:8080 — open on an iPhone/iPad on the same network
+npm run dev        # serves on your network — open the printed address on an iPhone/iPad
+npm run typecheck  # tsc -b
 npm run build      # production build in dist/
 npm run preview    # serve the production build
 ```
@@ -26,18 +27,15 @@ Production builds ignore both.
 ## Graphics
 
 - **Players:** Quaternius stylised low-poly man (`Male_Shirt`), converted from the uploaded `.blend` with `scripts/blend_to_glb.py` and meshopt-compressed to `public/models/rugby_player.glb` (311 KB).
-  - **Kit parts:** shirt, shorts and socks are separate materials, recoloured in code from each nation's kit. The secondary colour is used for the collar, cuffs and sock hoops. The model's long trousers are cut into shorts, bare knees and socks at load time.
+  - **Kit parts:** shirt, shorts and socks are separate materials, recoloured in code from each team's kit. Shirt patterns (hoops, stripes, halves, quarters, bands, yokes) are drawn in a shader in the mesh's bind-pose space, so they move with the body. The model's long trousers are cut into shorts, bare knees and socks at load time.
   - **Faces and heads:** a number decal on the back, eyebrows, varied hair, and scrum caps on some forwards.
   - **Build:** stylised proportions (bigger head and hands, broad shoulders); forwards are 15% bulkier.
 - **Animations** (`src/game/view/assets.ts`):
   - From the model's own clips: idle, jog, sprint, fall (Death), get-up (Death reversed), celebrate (Jump) and hand-off (Punch).
   - Generated as skeletal clips from the Idle pose: pass, catch, kick, tackle, dive, sidestep and ruck-bind.
-  - Clips are retargeted by bone name. Anything that fails to match falls back to Idle, so players never T-pose. Crossfades are 0.2 s.
+  - Clips are retargeted by bone name. Anything that fails to match falls back to Idle, so players never T-pose. Crossfades are 0.2 s; walk/run keep their stride phase when switching and play back at the measured stride speed.
 - **Squad Viewer:** Settings → Squad Viewer shows all 15 players of any team on turntables, with buttons for every animation.
-- **Stadium:**
-  - Two-tier bowl with a roof, and an instanced billboard crowd that cheers near the try lines.
-  - Floodlight towers, scrolling LED boards with made-up sponsors, an evening sky and PBR image lighting.
-  - Grass with mowing stripes, a normal map and crisp lines; 16 m posts with team-coloured pads.
+- **Stadiums:** each home side has its own ground (`src/data/venues.ts`), built by `src/game/view/stadium.ts` from a description: tiers per stand, open corners, grass banks, roof type (stands / closed / translucent), track, masts, seat colours and floodlights. Instanced billboard crowd in home colours that reacts to the play, scrolling LED boards with the ground's name, evening sky and PBR image lighting. Grass with mowing stripes and crisp lines; 16 m posts with team-coloured pads.
 - **Effects:** ACES tone mapping and bloom, a real shadow on the six players nearest the ball plus blob shadows for everyone, a ball glow and trail, dust on tackles, confetti on tries, a TRY! banner and a slow-motion replay.
 - **Quality:** Auto/Low/Medium/High in Settings. Auto chooses from the screen resolution, then steps down (and finally caps to 30 fps) if the frame rate drops. Low turns off shadows and bloom and thins the crowd.
 
@@ -45,19 +43,22 @@ Production builds ignore both.
 
 | Area | Where |
 | --- | --- |
-| Match engine: rules, AI, ball physics, phases, camera | `src/game/engine.ts` |
-| Stadium, pitch texture, instanced shader-animated crowd | `src/game/stadium.ts` |
-| Low-poly players, procedural animation, original kits | `src/game/model.ts`, `src/game/kit.ts` |
-| Touch controls (joystick, contextual buttons) | `src/ui/controls.tsx` |
-| Mini-games, place-kick swing meter, score bug, commentary | `src/ui/overlays.tsx` |
-| Nations, fictional players, ratings / OVR | `src/data/` |
-| Save data, daily challenges, login rewards, coins | `src/state/store.ts` |
-| Championship / World Cup / season logic | `src/state/tournaments.ts` |
+| Match engine: phases, AI, rules, ball physics, set pieces, camera | `src/game/engine.ts` and `src/game/engine/` |
+| Tuning numbers (speeds, reach, stamina, timings) | `src/game/gameConfig.ts` |
+| Players, animation, kits, stadiums, effects, quality | `src/game/view/` |
+| Touch controls (joystick, buttons, kick aim, layout editor support) | `src/ui/controls.tsx` |
+| Mini-games, goal-kick swipe, score bug, scrum push | `src/ui/overlays.tsx` |
+| Teams, squads, logos, venues | `src/data/`, `public/logos/` |
+| Save data, daily rewards, coins, competitions | `src/state/` |
 | Screens | `src/screens/` |
 
-**Rules modelled (simplified):** tackles → rucks (timing bar to secure / jackal), mauls (tap to drive), knock-ons and forward passes → scrums (crouch-bind-set timing), touch → lineouts (throw/steal timing), breakdown offside and other penalties (kick at goal / kick to touch / tap & go), tries, conversions, penalty goals, drop goals, 22 drop-outs, and the half ends at the next stoppage after the clock passes 40:00.
+**Rules modelled (simplified):** tackles → rucks (the 9 waits at the base; "use it" after a while), mauls, knock-ons and forward passes → scrums (crouch-bind-set, then a push battle), touch → lineouts, 50:22, out on the full, offside with advantage, penalties (goal / touch / tap / scrum), yellow cards and the sin bin, TMO for close tries, tries, conversions (which can be charged down), penalty goals, drop goals, 22 drop-outs; the half ends at the next stoppage after 40:00. Strictness is set in Settings (Arcade / Standard / Simulation).
 
-**Controls:** joystick bottom-left (push to the edge to sprint). Attack: ◀ PASS and PASS ▶ (tap short, hold long; arrows above team-mates show who receives), KICK (tap for a long kick, hold for power and drag to aim), STEP, plus a Set Plays menu. Hand-offs are automatic. Defence: TACKLE, DIVE, SWITCH. Rucks resolve automatically and the scrum-half passes on if you don't. A How to play card appears at your first kick-off (and in the pause menu).
+**Controls:** the joystick appears where your left thumb lands (push to the edge, or hold SPRINT, to sprint).
+- **Attack:** ◀ PASS and PASS ▶ (hold = long pass; or one smart PASS in Settings), swipe left/right on the right half for a quick pass, STEP (or swipe up) to sidestep, HAND-OFF when a defender is close (it's a button, not automatic), OFFLOAD in the tackle, KICK (hold, slide to aim, swipe up; tap to choose the kick — or *Aim & power* in Settings), DROP GOAL in range, the MOVES strip and SET PLAYS menu (including plays you design on the pitch).
+- **At the base of a ruck:** spin pass left/right, box kick, pick & go, snipe.
+- **Defence:** TACKLE (hold to chase), DIVE, SWITCH, CONTEST / FAN OUT at rucks, COLLAPSE a maul, CHARGE conversions, swipe up to contest high balls.
+- Buttons can be moved and resized in **Settings → Edit control layout**. A How to Play card appears before your first match (and in the pause menu).
 
 **Haptics:** uses the Vibration API where available. iOS Safari has no Vibration API, so on iPhone it falls back to toggling a hidden `<input type="checkbox" switch>`, which produces a system haptic on iOS 18+.
 
@@ -87,4 +88,4 @@ create policy "own row" on profiles for all using (auth.uid() = id) with check (
 Settings → Account then offers email magic-link sign-in with Upload / Download.
 
 ## Content notes
-Real country names only; every kit is an original design in national colours with no logos or crests. All player names are randomly generated fictional combinations. Card packs are bought with in-game coins only — there are no real-money purchases.
+This is a private build: it uses real team names, squads (with estimated ratings), colours and logos supplied by the owner. Card packs are bought with in-game coins only — there are no real-money purchases.
