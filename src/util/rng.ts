@@ -10,6 +10,10 @@ export function makeRng(seed: number) {
   };
   return {
     next,
+    /** restart the sequence (used by the replay-determinism test harness) */
+    seed: (s: number) => {
+      a = s >>> 0;
+    },
     range: (min: number, max: number) => min + (max - min) * next(),
     int: (min: number, max: number) => Math.floor(min + (max - min + 1) * next()),
     pick: <T>(arr: readonly T[]): T => arr[Math.floor(next() * arr.length)],

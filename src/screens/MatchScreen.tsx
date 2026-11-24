@@ -1,3 +1,4 @@
+import { rand } from '../util/rng';
 import { useEffect, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
@@ -153,7 +154,7 @@ export function MatchScreen({
       if (cancelled) return;
       eng = new MatchEngine(host.current!, cfg, input.current, onEvent, asset);
       engine.current = eng;
-      if (import.meta.env.DEV) (window as unknown as { __engine: MatchEngine }).__engine = eng;
+      if (import.meta.env.DEV) Object.assign(window, { __engine: eng, __rand: rand });
       setLoading(false);
       let seen = false;
       try {
