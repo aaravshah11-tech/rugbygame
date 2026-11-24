@@ -7,6 +7,7 @@ import { WorldCup } from './screens/WorldCup';
 import { SquadBuilder } from './screens/SquadBuilder';
 import { Challenges } from './screens/Challenges';
 import { KickChallenge } from './screens/KickChallenge';
+import { ControlsEditor } from './screens/ControlsEditor';
 import { Training } from './screens/Training';
 import { Settings } from './screens/Settings';
 import { SquadViewer } from './screens/SquadViewer';
@@ -27,6 +28,7 @@ export type Route =
   | { name: 'training' }
   | { name: 'challenges' }
   | { name: 'kicking' }
+  | { name: 'controls' }
   | { name: 'settings' }
   | { name: 'viewer' }
   | { name: 'comp'; kind: CompKind }
@@ -84,6 +86,9 @@ export function App() {
       break;
     case 'kicking':
       screen = <KickChallenge go={go} />;
+      break;
+    case 'controls':
+      screen = <ControlsEditor go={go} />;
       break;
     case 'settings':
       screen = <Settings go={go} />;

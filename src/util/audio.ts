@@ -119,6 +119,41 @@ class AudioEngine {
     src.start();
   }
 
+  /** A short, original brass-style fanfare for the walk-out (not any real anthem). */
+  fanfare() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.05;
+    // [semitones from C4, beats]
+    const tune: [number, number][] = [[0, 1], [4, 1], [7, 1], [12, 2], [11, 1], [7, 1], [9, 1], [12, 3]];
+    const beat = 0.32;
+    let t = t0;
+    const master = ctx.createGain();
+    master.gain.value = 0.16;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1800;
+    master.connect(lp).connect(this.sfx);
+    for (const [st, beats] of tune) {
+      const f = 261.63 * Math.pow(2, st / 12);
+      const dur = beats * beat;
+      for (const [mult, type] of [[1, 'sawtooth'], [0.5, 'triangle'], [2, 'square']] as [number, OscillatorType][]) {
+        const o = ctx.createOscillator();
+        o.type = type;
+        o.frequency.value = f * mult;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(mult === 2 ? 0.15 : 0.6, t + 0.04);
+        g.gain.setValueAtTime(mult === 2 ? 0.12 : 0.5, t + dur - 0.06);
+        g.gain.linearRampToValueAtTime(0, t + dur);
+        o.connect(g).connect(master);
+        o.start(t);
+        o.stop(t + dur + 0.02);
+      }
+      t += dur;
+    }
+  }
+
   /** Crowd groan: a low falling murmur (knock-ons, missed kicks). */
   groan(strength = 1) {
     if (!this.ctx) return;

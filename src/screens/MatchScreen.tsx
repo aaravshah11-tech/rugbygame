@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type KickKind, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
-import { ActionButtons, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker, KickTypeChooser } from '../ui/controls';
+import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker, KickTypeChooser } from '../ui/controls';
 import { MiniGame, PlaceKickUI, ScoreBug, ScrumBattle, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { TacticsPanel } from '../ui/tactics';
@@ -26,7 +26,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null, catchPrompt: false, wind: { deg: 0, kmh: 0 }, isNine: false, call: null, penTouch: false, atBase: false, nineWait: false, chargePrompt: null, canDiveTry: false, kickoffAim: false, advantage: null, sinBin: [],
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null, catchPrompt: false, wind: { deg: 0, kmh: 0 }, isNine: false, call: null, penTouch: false, atBase: false, nineWait: false, chargePrompt: null, canDiveTry: false, kickoffAim: false, maulDefend: false, advantage: null, sinBin: [],
 };
 
 export function MatchScreen({
@@ -55,6 +55,7 @@ export function MatchScreen({
   const [pauseTab, setPauseTab] = useState<'menu' | 'tactics' | 'subs'>('menu');
   const [plays, setPlays] = useState(false);
   const [drill, setDrill] = useState<{ text: string; progress: string } | null>(null);
+  setControlLayout(profile.settings.controlLayout);
   const [kickMenu, setKickMenu] = useState(false);
   const contestStart = useRef<{ y: number; t: number } | null>(null);
   const [designing, setDesigning] = useState(false);
@@ -308,6 +309,12 @@ export function MatchScreen({
           <button className="dive-try-btn" onPointerDown={() => input.current.actions.push({ type: 'diveTry' })}>
             DIVE!
             <small>for the line</small>
+          </button>
+        )}
+        {hud.maulDefend && (
+          <button className="collapse-btn" onPointerDown={() => input.current.actions.push({ type: 'collapseMaul' })}>
+            COLLAPSE
+            <small>stop the drive · penalty risk</small>
           </button>
         )}
         {hud.nineWait && <div className="base-tag wait">WAITING FOR THE 9…</div>}

@@ -23,7 +23,7 @@ export const COMP_INFO: Record<CompKind, { title: string; accent: string; blurb:
   league: {
     title: 'Nations',
     accent: 'League',
-    blurb: 'North v South: play all six nations from the other hemisphere, then the conference winners meet in the final.',
+    blurb: 'North v South: play all six nations from the other hemisphere, then finals weekend: 1st v 1st for the title, 2nd v 2nd and so on.',
     teams: [...LEAGUE_NORTH, ...LEAGUE_SOUTH],
   },
   prem: { title: 'The', accent: 'Prem', blurb: 'Ten clubs, nine rounds, then semi-finals (1v4, 2v3) and the final.', teams: PREM_CLUBS },
@@ -76,7 +76,7 @@ export function createComp(kind: CompKind, user: string): CompState {
 export function compUserFixture(c: CompState): Fixture | undefined {
   if (c.stage === 'done' || c.eliminated) return undefined;
   const stage = c.stage === 'league' ? `R${c.round}` : c.stage === 'semi' ? 'SF' : 'Final';
-  return c.fixtures.find((f) => f.stage === stage && !f.played && (f.home === c.user || f.away === c.user));
+  return c.fixtures.find((f) => (f.stage === stage || (stage === 'Final' && f.stage === 'FW')) && !f.played && (f.home === c.user || f.away === c.user));
 }
 
 const winner = (f: Fixture) => ((f.homeScore ?? 0) >= (f.awayScore ?? 0) ? f.home : f.away);
@@ -94,10 +94,10 @@ export function advanceComp(c: CompState) {
       return;
     }
     if (c.kind === 'league') {
-      const top = c.groups.map((g) => computeTable(g.teams, league)[0].team);
-      c.fixtures.push(fx('Final', top[0], top[1]));
+      // Finals weekend: 1st v 1st for the title, then 2nd v 2nd ... 6th v 6th
+      const [north, south] = c.groups.map((g) => computeTable(g.teams, league).map((r) => r.team));
+      north.forEach((n, i) => c.fixtures.push(fx(i === 0 ? 'Final' : 'FW', n, south[i])));
       c.stage = 'final';
-      if (!top.includes(c.user)) c.eliminated = true;
       return;
     }
     const t = computeTable(c.teams, league).map((r) => r.team);
@@ -107,10 +107,11 @@ export function advanceComp(c: CompState) {
     return;
   }
   const stage = c.stage === 'semi' ? 'SF' : 'Final';
+  if (stage === 'Final') for (const f of c.fixtures) if (f.stage === 'FW' && !f.played) simulateFixture(f, true);
   const games = c.fixtures.filter((f) => f.stage === stage);
   for (const f of games) if (!f.played) simulateFixture(f, true);
   const winners = games.map(winner);
-  if (!winners.includes(c.user)) c.eliminated = true;
+  if (!winners.includes(c.user) && games.some((g) => g.home === c.user || g.away === c.user)) c.eliminated = true;
   if (stage === 'SF') {
     c.fixtures.push(fx('Final', winners[0], winners[1]));
     c.stage = 'final';

@@ -543,7 +543,19 @@ export class MatchEngine {
     this.timers = [];
     this.introT = 0;
     this.camMode = 'intro';
+    // the teams walk out side by side from the tunnel to their kick-off spots
+    this.teams.forEach((team, side) =>
+      team.forEach((p, i) => {
+        const tx = p.x;
+        const tz = p.z;
+        this.place(p, (side === 0 ? -1.5 : 1.5) - (i % 2) * 0.8 * (side === 0 ? 1 : -1), -FIELD.halfW - 3 - i * 1.1);
+        p.tx = p.gx = tx;
+        p.tz = p.gz = tz;
+        p.urgency = 0.32;
+      }),
+    );
     audio.cheer(0.5);
+    audio.fanfare();
     this.emit({ type: 'intro', on: true, title: `${this.cfg.user.name} v ${this.cfg.cpu.name}`, sub: `${this.venue.name}, ${this.venue.city}${this.cfg.weather === 'rain' ? ' · rain falling' : ''}` });
   }
 
@@ -681,6 +693,7 @@ export class MatchEngine {
   // ---------------------------------------------------------------- main loop
   /** freeze-frame on big hits (seconds of real time) */
   private hitStopT = 0;
+  private lastHitReplay = -99;
   /** slow motion while the offload window is open */
   private timeScale = 1;
   private offload: null | { c: P; t: P; left: number } = null;
@@ -807,6 +820,7 @@ export class MatchEngine {
       nearDef: !!(c && this.ball.carrier === c && c.side === 0 && this.phase === 'play' && this.nearestOpponent(c, 3.2)),
       offload: !!this.offload,
       penTouch: !!this.penTouch,
+      maulDefend: !!(this.maul && this.maul.att === 1),
       kickoffAim: !!this.kickoffAim,
       chargePrompt: this.chargeT >= 0 && this.phase === 'placekick' && this.ball.state === 'dead' ? (this.chargeT < 1.4 ? 'wait' : 'go') : null,
       canDiveTry: !!(c && this.ball.carrier === c && c.side === 0 && this.phase === 'play' && FIELD.tryX - c.x * dirOf(0) < 6 && FIELD.tryX - c.x * dirOf(0) > 0),
@@ -916,6 +930,29 @@ export class MatchEngine {
           this.pop('DIVE!', 'good');
         }
         break;
+      case 'collapseMaul': {
+        const m = this.maul;
+        if (!m || m.att !== 1) break;
+        this.emit({ type: 'minigameCancel' });
+        this.activeMini = null;
+        if (rand.chance(0.4 * this.strict())) {
+          this.maul = null;
+          for (const p of this.players) if (p.state === 'bound') p.state = 'free';
+          this.whistle();
+          this.say('Collapsing the maul', 'bad', `Penalty ${this.teamShort(1)}`);
+          this.stoppage(() => this.awardPenalty(1, m.x, m.z));
+        } else {
+          // brought down legally: the drive is over, they have to use it
+          this.maul = null;
+          for (const p of this.players) if (p.state === 'bound') {
+            p.state = 'down';
+            p.timer = 0.4;
+          }
+          this.pop('MAUL STOPPED!', 'good');
+          this.ballToNine(1, m.x, m.z);
+        }
+        break;
+      }
       case 'call':
         this.resolveCall(a.id);
         break;
@@ -1695,6 +1732,14 @@ export class MatchEngine {
       this.say(line('bigHit'), t.side === 0 ? 'good' : 'bad');
       this.pop('BIG HIT!', 'big');
       this.hitStopT = 0.06;
+      // the best hits get a quick slow-mo replay (skippable); play resumes from the ruck after it
+      if (!this.cfg.drill && (t.side === 0 || c.side === 0) && this.time - this.lastHitReplay > 40 && rand.chance(0.5)) {
+        this.lastHitReplay = this.time;
+        const clip = this.history.slice(-60);
+        this.after(0.5, () => {
+          if (!this.replay && (this.phase === 'ruck' || this.phase === 'play')) this.startReplay(clip, () => {});
+        });
+      }
     }
     c.state = 'down';
     c.timer = 1.5; // tackled players are back on their feet after 1.5s

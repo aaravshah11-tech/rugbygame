@@ -127,6 +127,8 @@ export interface HudState {
   nineWait: boolean;
   /** your kick-off / drop-out: drag to aim */
   kickoffAim: boolean;
+  /** CPU driving a maul at you: collapse it (penalty risk) or counter-drive */
+  maulDefend: boolean;
   /** lining up a penalty kick to touch: show the kick aim */
   penTouch: boolean;
   /** offload window open: PASS now to offload in the tackle */
@@ -198,6 +200,7 @@ export type InputAction =
   | { type: 'basePass'; dir: -1 | 1 }
   | { type: 'pickGo' }
   | { type: 'charge' }
+  | { type: 'collapseMaul' }
   | { type: 'diveTry' }
   | { type: 'snipe' }
   | { type: 'dodge'; dir: -1 | 1 }

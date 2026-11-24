@@ -11,7 +11,7 @@ import { finishCompMatch } from '../state/outcomes';
 import { FixtureRow, StandingsTable } from './Championship';
 import { audio } from '../util/audio';
 
-const STAGE_LABEL: Record<string, string> = { SF: 'SEMI-FINALS', Final: 'FINAL' };
+const STAGE_LABEL: Record<string, string> = { SF: 'SEMI-FINALS', Final: 'FINAL', FW: 'FINALS WEEKEND (2nd v 2nd … 6th v 6th)' };
 
 /** Nations Championship, Nations League and The Prem share this screen. */
 export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
@@ -105,7 +105,7 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
             {tab === 'fixtures' ? (
               <>
                 {knockouts.length > 0 &&
-                  ['SF', 'Final'].map((st) =>
+                  ['SF', 'Final', 'FW'].map((st) =>
                     knockouts.some((f) => f.stage === st) ? (
                       <div key={st} style={{ marginBottom: 8 }}>
                         <div className="muted italic" style={{ fontSize: 12 }}>{STAGE_LABEL[st]}</div>
@@ -156,7 +156,7 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
               <h3>{nationById(c.user).name}</h3>
               {next && (
                 <p className="muted">
-                  {next.stage.startsWith('R') ? `Round ${next.stage.slice(1)}` : next.stage === 'SF' ? 'Semi-final' : 'Final'} ·{' '}
+                  {next.stage.startsWith('R') ? `Round ${next.stage.slice(1)}` : next.stage === 'SF' ? 'Semi-final' : next.stage === 'FW' ? 'Finals weekend' : 'Final'} ·{' '}
                   {next.home === c.user ? 'Home' : 'Away'} v {nationById(next.home === c.user ? next.away : next.home).name}
                 </p>
               )}

@@ -121,6 +121,9 @@ export function Settings({ go }: { go: Go }) {
               <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Hand</div>
               <Seg<'r' | 'l'> value={s.leftHanded ? 'l' : 'r'} options={[{ v: 'r', label: 'Right-handed' }, { v: 'l', label: 'Left-handed' }]} onChange={(v) => update((x) => (x.settings.leftHanded = v === 'l'))} />
             </div>
+            <button className="btn cyan" onClick={() => go({ name: 'controls' })}>
+              Edit control layout (move / resize buttons)
+            </button>
             <label>
               <div className="muted italic" style={{ fontSize: 12 }}>Button size ({Math.round(s.buttonScale * 100)}%)</div>
               <input type="range" min={0.8} max={1.3} step={0.05} value={s.buttonScale} onChange={(e) => update((x) => (x.settings.buttonScale = +e.target.value))} />

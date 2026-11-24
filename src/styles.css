@@ -2971,3 +2971,49 @@ input[type='email'] {
   letter-spacing: 0.06em;
   backdrop-filter: blur(3px);
 }
+
+.controls-stage {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+  border-radius: 16px;
+  background: linear-gradient(#2f6b2a, #24561f);
+  overflow: hidden;
+}
+.controls-stage .actions {
+  bottom: 12px;
+  right: 14px;
+}
+.abtn.editing {
+  outline: 3px dashed #ffcf3a;
+  outline-offset: 4px;
+}
+
+.collapse-btn {
+  position: absolute;
+  left: calc(var(--sal, 0px) + 24px);
+  bottom: calc(var(--sab, 0px) + 30px);
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 2.5px solid #ff6a8b;
+  background: rgba(20, 26, 36, 0.4);
+  color: #fff;
+  font: 900 italic 17px/1 inherit;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: auto;
+  z-index: 26;
+}
+.collapse-btn small {
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.controls-editor {
+  overflow-y: auto;
+}

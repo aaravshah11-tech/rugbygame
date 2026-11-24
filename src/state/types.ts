@@ -46,6 +46,8 @@ export interface Settings {
   /** action button size multiplier */
   buttonScale: number;
   customPlays?: CustomPlay[];
+  /** moved/resized action buttons */
+  controlLayout?: Record<string, { dx: number; dy: number; s: number }>;
 }
 
 export interface Fixture {

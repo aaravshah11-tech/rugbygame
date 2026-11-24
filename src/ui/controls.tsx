@@ -86,14 +86,54 @@ type BtnProps = {
   children?: React.ReactNode;
 };
 
+/** Saved control positions: offset (px) and size per button, keyed by its default slot. */
+export type ControlLayout = Record<string, { dx: number; dy: number; s: number }>;
+const LAYOUT: { map: ControlLayout; edit: null | { selected: string | null; onChange: (m: ControlLayout, selected: string | null) => void } } = { map: {}, edit: null };
+export function setControlLayout(map: ControlLayout | undefined) {
+  LAYOUT.map = map ?? {};
+}
+/** Turn on edit mode (layout editor): drag buttons to move them, tap to select for resizing. */
+export function setLayoutEditing(e: typeof LAYOUT.edit) {
+  LAYOUT.edit = e;
+}
+const slotKey = (label: string, pos: { right: number; bottom: number }) => `${label}@${pos.right},${pos.bottom}`;
+
 function ActionButton({ label, sub, size, color, pos, onDown, onMove, onUp, children, hidden }: BtnProps & { hidden?: boolean }) {
   const [on, setOn] = useState(false);
   const pid = useRef<number | null>(null);
+  const key = slotKey(label, pos);
+  const lay = LAYOUT.map[key] ?? { dx: 0, dy: 0, s: 1 };
+  const drag = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null);
+  if (LAYOUT.edit) {
+    const ed = LAYOUT.edit;
+    return (
+      <button
+        className={`abtn ${size} c-${color} ${ed.selected === key ? 'editing' : ''}`}
+        style={{ right: pos.right - lay.dx, bottom: pos.bottom - lay.dy, zoom: lay.s }}
+        onPointerDown={(e) => {
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          drag.current = { x: e.clientX, y: e.clientY, dx: lay.dx, dy: lay.dy };
+          ed.onChange(LAYOUT.map, key);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const map = { ...LAYOUT.map, [key]: { ...lay, dx: d.dx + (e.clientX - d.x) / lay.s, dy: d.dy + (e.clientY - d.y) / lay.s } };
+          LAYOUT.map = map;
+          ed.onChange(map, key);
+        }}
+        onPointerUp={() => (drag.current = null)}
+      >
+        {children}
+        {label}
+      </button>
+    );
+  }
   return (
     <button
       className={`abtn ${size} c-${color} ${on ? 'on' : ''} ${hidden ? 'ctx-hidden' : ''}`}
       aria-hidden={hidden}
-      style={{ right: pos.right, bottom: pos.bottom }}
+      style={{ right: pos.right - lay.dx, bottom: pos.bottom - lay.dy, zoom: lay.s !== 1 ? lay.s : undefined }}
       onPointerDown={(e) => {
         if (pid.current !== null) return;
         pid.current = e.pointerId;
@@ -391,7 +431,8 @@ export function ActionButtons({
       <ActionButton label="Sprint" size="sm" color="cyan" pos={{ right: 104, bottom: 104 }} {...sprint} />
       {kickButton(kickKind ?? 'punt', 'Kick', kickLabel ?? 'hold · swipe up', { right: 8, bottom: 112 })}
       <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 186, bottom: 14 }} onDown={() => input.actions.push({ type: 'handoff' })} />
-      <ActionButton label="Drop goal" size="sm" color="cyan" hidden={!canDrop} pos={{ right: 168, bottom: 104 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
+      <ActionButton label="Step" sub="sidestep" size="sm" color="cyan" pos={{ right: 186, bottom: 86 }} onDown={() => input.actions.push({ type: 'sidestep' })} />
+      <ActionButton label="Drop goal" size="sm" color="cyan" hidden={!canDrop} pos={{ right: 196, bottom: 160 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
     </div>
   );
 }
