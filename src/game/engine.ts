@@ -1,3 +1,4 @@
+import { disposeScene } from './view/dispose';
 import * as THREE from 'three';
 import { effectiveRatings, playerOvr } from '../data/players';
 import type { Ratings } from '../data/players';
@@ -488,12 +489,8 @@ export class MatchEngine {
     this.resizeObs.disconnect();
     audio.stopCrowd();
     this.post.dispose();
-    this.scene.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.geometry) m.geometry.dispose();
-    });
-    this.renderer.dispose();
-    this.renderer.domElement.remove();
+    this.timers = [];
+    disposeScene(this.scene, this.renderer);
   }
 
   setPaused(p: boolean) {

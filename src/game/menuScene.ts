@@ -1,3 +1,4 @@
+import { disposeScene } from './view/dispose';
 import * as THREE from 'three';
 import { createBall } from './model';
 import type { Kit } from '../data/nations';
@@ -101,7 +102,6 @@ export class MenuScene {
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
     this.post.dispose();
-    this.renderer.dispose();
-    this.renderer.domElement.remove();
+    disposeScene(this.scene, this.renderer);
   }
 }

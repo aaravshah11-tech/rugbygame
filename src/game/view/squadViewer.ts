@@ -1,3 +1,4 @@
+import { disposeScene } from './dispose';
 import * as THREE from 'three';
 import type { Kit } from '../../data/nations';
 import { loadPlayerAsset, type AnimName } from './assets';
@@ -126,7 +127,6 @@ export class SquadViewerScene {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
-    this.renderer.dispose();
-    this.renderer.domElement.remove();
+    disposeScene(this.scene, this.renderer);
   }
 }
