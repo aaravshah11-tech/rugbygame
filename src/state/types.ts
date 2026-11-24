@@ -126,6 +126,8 @@ export interface Profile {
   stats: { matches: number; wins: number; draws: number; losses: number; tries: number; tackles: number };
   trophies: { championship: number; worldCup: number; seasons: number; league?: number; prem?: number };
   trainingDone: Record<string, boolean>;
+  /** Kicking Challenge progress per level */
+  kickLevels?: Record<string, { best: number; passed: boolean }>;
   /** daily challenge scenarios completed today */
   scenarios?: { date: string; done: string[] };
   updatedAt: number;

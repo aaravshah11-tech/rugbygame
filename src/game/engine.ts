@@ -2107,6 +2107,12 @@ export class MatchEngine {
 
   private catchPressT = -9;
   private aimFreeze = false;
+  /** Slow motion while KICK is held and the user lines it up. */
+  setKickHold(on: boolean) {
+    if (this.offload) return;
+    this.timeScale = on ? 0.4 : 1;
+    if (on) this.kickTarget = null;
+  }
   /** Freeze play while the user aims a kick. */
   setAimFreeze(on: boolean) {
     this.aimFreeze = on;
@@ -2520,17 +2526,24 @@ export class MatchEngine {
       return;
     }
     // catch / gather
-    const catchH = b.state === 'ground' ? 0.6 : 2.6;
+    // a timed swipe/CATCH = your player leaps: higher and further reach, and he wins the contest
+    const leap = b.state === 'air' && this.time - this.catchPressT < 0.5;
+    const catchH = b.state === 'ground' ? 0.6 : leap ? 3.3 : 2.6;
     if (b.y > catchH) return;
     let best: P | null = null;
     let bd = 1.3;
     for (const p of this.players) {
       if (p.state !== 'free' || p.catchCD > 0) continue;
-      const d = dist(p.x, p.z, b.x, b.z);
+      const d = dist(p.x, p.z, b.x, b.z) - (leap && p.side === 0 ? 0.9 : 0);
       if (d < bd) {
         bd = d;
         best = p;
       }
+    }
+    if (best && leap && best.side === 0) {
+      best.fx = 'catch';
+      if (b.kicker && b.kicker.side !== 0) this.pop('TAKEN IN THE AIR!', 'good');
+      else this.pop('CONTESTED — WON!', 'good');
     }
     if (!best) return;
     const p = best;
@@ -2649,6 +2662,12 @@ export class MatchEngine {
     if (kind === 'drill') {
       if (good) this.drillScore++;
       this.say(good ? 'Over!' : 'Missed', good ? 'good' : 'bad');
+      // Kicking Challenge: one miss ends the attempt
+      if (!good && this.cfg.kickChallenge) {
+        const total = this.cfg.kickChallenge.spots.length;
+        this.after(1.6, () => this.finishDrill(total));
+        return;
+      }
       this.after(1.6, () => this.drillNext());
       return;
     }
@@ -3853,9 +3872,19 @@ export class MatchEngine {
       return;
     }
     if (drill === 'kicking') {
-      const spots: [number, number][] = [[36, 0], [34, 12], [30, -18], [26, 8], [32, -26]];
+      const kc = this.cfg.kickChallenge;
+      const spots: [number, number][] = kc ? kc.spots : [[36, 0], [34, 12], [30, -18], [26, 8], [32, -26]];
       if (this.drillCount >= spots.length) return this.finishDrill(spots.length);
-      this.emit({ type: 'drill', text: 'Swipe up through the ball: direction aims, speed is power, curve your swipe to bend it. Watch the wind!', progress: `Kick ${this.drillCount + 1} / 5 · ${this.drillScore} scored` });
+      if (kc && this.drillCount === 0) {
+        // fixed wind strength for the level, from a random direction
+        const a = rand.range(0, Math.PI * 2);
+        this.wind = { x: (Math.cos(a) * kc.windKmh) / 3.6, z: (Math.sin(a) * kc.windKmh) / 3.6 };
+      }
+      this.emit({
+        type: 'drill',
+        text: kc ? `${kc.level} — make every kick` : 'Swipe up through the ball: direction aims, speed is power, curve your swipe to bend it. Watch the wind!',
+        progress: `Kick ${this.drillCount + 1} / ${spots.length} · ${this.drillScore} scored`,
+      });
       const [x, z] = spots[this.drillCount];
       this.setupPlaceKick(0, 'drill', x, z);
       return;

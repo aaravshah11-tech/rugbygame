@@ -39,6 +39,8 @@ export interface MatchConfig {
   autoSwitch: boolean;
   /** set plays the user designed */
   customPlays?: CustomPlay[];
+  /** Kicking Challenge: goal kicks from these spots (x along the pitch, z across), wind in km/h; miss one and it's over */
+  kickChallenge?: { level: string; spots: [number, number][]; windKmh: number };
   /** scenario overrides (daily challenges) */
   challenge?: ChallengeSetup;
 }

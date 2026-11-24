@@ -99,6 +99,10 @@ export function MainMenu({ go }: { go: Go }) {
             <b>Challenges</b>
             <small>daily scenarios</small>
           </button>
+          <button onClick={() => nav({ name: 'kicking' })}>
+            <b>Kicking</b>
+            <small>easy → extreme</small>
+          </button>
           <button onClick={() => nav({ name: 'training' })}>
             <b>Training</b>
             <small>tutorials</small>

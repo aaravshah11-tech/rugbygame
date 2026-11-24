@@ -2529,7 +2529,7 @@ input[type='email'] {
 
 .menu-mini {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
   margin-top: 8px;
 }
@@ -2878,4 +2878,96 @@ input[type='email'] {
   right: calc(var(--sar, 0px) + 16px);
   top: calc(var(--sat, 0px) + 12px);
   z-index: 70;
+}
+
+.kick-chip.on {
+  background: #ffffff;
+  box-shadow: 0 5px 0 #9aa3b5, 0 0 0 3px #ffcf3a;
+}
+
+.contest-layer {
+  position: absolute;
+  left: 45%;
+  right: 0;
+  top: 15%;
+  bottom: 0;
+  z-index: 24;
+  pointer-events: auto;
+  touch-action: none;
+}
+.contest-layer span {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 16px;
+  color: #c6ff1a;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  animation: blink 0.7s infinite;
+}
+
+/* ---------- broadcast-style controls: see-through white outlined buttons ---------- */
+.actions .abtn {
+  background: rgba(20, 26, 36, 0.28) !important;
+  border: 2.5px solid rgba(255, 255, 255, 0.88);
+  color: #ffffff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+}
+.actions .abtn small {
+  font-size: 8px;
+  opacity: 0.85;
+}
+.actions .abtn.on {
+  background: rgba(255, 255, 255, 0.35) !important;
+  filter: none;
+}
+.actions .abtn.big {
+  width: 84px;
+  height: 84px;
+}
+.actions .abtn.med {
+  width: 66px;
+  height: 66px;
+}
+.actions .abtn.sm {
+  width: 54px;
+  height: 54px;
+}
+/* a thin colour ring keeps actions recognisable */
+.actions .abtn.c-gold {
+  border-color: #ffcf3a;
+}
+.actions .abtn.c-pink {
+  border-color: #ff6a8b;
+}
+.actions .abtn.c-cyan {
+  border-color: #7af0dc;
+}
+.actions .abtn.c-gold.on,
+.actions .abtn.c-gold:active {
+  background: rgba(255, 207, 58, 0.35) !important;
+}
+.joy-base {
+  background: rgba(20, 26, 36, 0.22);
+  border: 2.5px solid rgba(255, 255, 255, 0.85);
+}
+.joy-knob {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.setplays-btn.pill-bottom {
+  background: rgba(20, 26, 36, 0.3);
+  border: 2.5px solid rgba(255, 255, 255, 0.88);
+  color: #fff;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(3px);
 }

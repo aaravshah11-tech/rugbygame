@@ -401,7 +401,7 @@ export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; en
           {req.kind === 'conversion' ? 'Conversion' : req.kind === 'penalty' ? 'Penalty kick' : 'Kicking practice'} · {req.kicker}
         </div>
         <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-          {msg || 'Swipe up through the ball · direction aims · speed is power · curve to bend it'}
+          {msg || 'Swipe from the ball to the posts — the right speed and angle decide the kick · curve it to beat the wind'}
         </div>
       </div>
     </div>

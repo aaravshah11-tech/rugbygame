@@ -6,6 +6,7 @@ import { Championship } from './screens/Championship';
 import { WorldCup } from './screens/WorldCup';
 import { SquadBuilder } from './screens/SquadBuilder';
 import { Challenges } from './screens/Challenges';
+import { KickChallenge } from './screens/KickChallenge';
 import { Training } from './screens/Training';
 import { Settings } from './screens/Settings';
 import { SquadViewer } from './screens/SquadViewer';
@@ -25,6 +26,7 @@ export type Route =
   | { name: 'squad'; tab?: string }
   | { name: 'training' }
   | { name: 'challenges' }
+  | { name: 'kicking' }
   | { name: 'settings' }
   | { name: 'viewer' }
   | { name: 'comp'; kind: CompKind }
@@ -79,6 +81,9 @@ export function App() {
       break;
     case 'challenges':
       screen = <Challenges go={go} />;
+      break;
+    case 'kicking':
+      screen = <KickChallenge go={go} />;
       break;
     case 'settings':
       screen = <Settings go={go} />;

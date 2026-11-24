@@ -199,10 +199,10 @@ export function ActionButtons({
   ruckDef = 'none',
   ruckBall = null,
   onKick,
-  onKickDrag,
-  onKickRelease,
+  onKickHold,
+  kickKind,
+  kickLabel,
   atBase = false,
-  onBoxKick,
 }: {
   input: InputState;
   attacking: boolean;
@@ -213,19 +213,75 @@ export function ActionButtons({
   ruckDef?: 'none' | 'contest' | 'fan';
   ruckBall?: 'quick' | 'slow' | 'danger' | null;
   onKick?: () => void;
-  /** flick vector (px) from where KICK was pressed */
-  onKickDrag?: (dx: number, dy: number) => void;
-  onKickRelease?: () => void;
+  /** KICK held down (slow motion while aiming) */
+  onKickHold?: (on: boolean) => void;
+  kickKind?: KickKind;
+  kickLabel?: string;
   atBase?: boolean;
-  onBoxKick?: () => void;
 }) {
   const passStart = useRef(0);
-  const kickStart = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const kickStart = useRef<{ x: number; y: number; t: number; pts: { y: number; t: number }[]; angle: number; locked: boolean; peak: number } | null>(null);
   const sprint = {
     onDown: () => (input.sprintHold = true),
     onUp: () => (input.sprintHold = false),
   };
   useEffect(() => () => void (input.sprintHold = false), [input]);
+  const kickButton = (kk: KickKind, label: string, sub: string, pos: { right: number; bottom: number }) => (
+  <ActionButton
+      label={label}
+      sub={sub}
+      size="med"
+      color="gold"
+      pos={pos}
+      onDown={(e) => {
+        kickStart.current = { x: e.clientX, y: e.clientY, t: performance.now(), pts: [{ y: e.clientY, t: performance.now() }], angle: 0, locked: false, peak: 0 };
+        Object.assign(input.kickAim, { active: true, kind: kk, dist: KICKS.find((k) => k.kind === (kk))?.def ?? 35, angle: 0 });
+        onKickHold?.(true);
+      }}
+      onMove={(e) => {
+        const k0 = kickStart.current;
+        if (!k0) return;
+        const now = performance.now();
+        k0.pts.push({ y: e.clientY, t: now });
+        while (k0.pts.length > 2 && now - k0.pts[0].t > 120) k0.pts.shift();
+        // once the upward swipe starts, the aim is locked where it was
+        const vy = (k0.pts[0].y - e.clientY) / Math.max(1, now - k0.pts[0].t);
+        k0.peak = Math.max(k0.peak, vy);
+        if (!k0.locked && vy > 0.6 && k0.y - e.clientY > 25) k0.locked = true;
+        if (!k0.locked) {
+          k0.angle = Math.max(-60, Math.min(60, (e.clientX - k0.x) / 2.2));
+          input.kickAim.angle = k0.angle;
+        }
+      }}
+      onUp={(e, cancelled) => {
+        const k0 = kickStart.current;
+        kickStart.current = null;
+        onKickHold?.(false);
+        input.kickAim.active = false;
+        if (!k0 || cancelled) return;
+        const now = performance.now();
+        const up = k0.y - e.clientY;
+        const first = k0.pts[0];
+        // fastest point of the swipe (px per ms, + = up), so a pause before lifting doesn't kill it
+        const vy = Math.max(k0.peak, (first.y - e.clientY) / Math.max(1, now - first.t));
+        const moved = Math.hypot(e.clientX - k0.x, up);
+        if (moved < 12 && now - k0.t < 260) {
+          onKick?.(); // a tap picks the kick type
+          return;
+        }
+        if (up < 40 || vy < 0.5) return; // no swipe: cancelled
+        const spec = KICKS.find((k) => k.kind === (kk))!;
+        const speed = Math.min(1, (vy - 0.5) / 2.2);
+        const dist = spec.min + (spec.max - spec.min) * speed;
+        const power = vy > 3.4 ? 1.12 : 0.85; // an all-out flick sprays it
+        input.actions.push({ type: 'kick', kind: spec.kind, dist, angle: k0.angle, power });
+        haptic('tackle');
+      }}
+    >
+      <KickIcon />
+    </ActionButton>
+  );
+
 
   if (ruck) {
     const ballTag = ruckBall && (
@@ -294,9 +350,7 @@ export function ActionButtons({
         <ActionButton label="Pass" sub="spin right" size="big" color="neon" pos={{ right: 0, bottom: 40 }} onDown={() => input.actions.push({ type: 'basePass', dir: 1 })}>
           <PassIcon dir={1} />
         </ActionButton>
-        <ActionButton label="Box kick" sub="aim it" size="med" color="gold" pos={{ right: 14, bottom: 150 }} onDown={() => onBoxKick?.()}>
-          <KickIcon />
-        </ActionButton>
+        {kickButton('box', 'Box kick', 'hold · swipe up', { right: 14, bottom: 150 })}
         <ActionButton label="Pick & go" size="sm" color="pink" pos={{ right: 112, bottom: 104 }} onDown={() => input.actions.push({ type: 'pickGo' })} />
         <ActionButton label="Snipe" size="sm" color="cyan" pos={{ right: 200, bottom: 12 }} onDown={() => input.actions.push({ type: 'snipe' })} />
       </div>
@@ -305,49 +359,39 @@ export function ActionButtons({
 
   return (
     <div className="actions">
+      {/* two PASS buttons, left and right, like a broadcast game pad; hold = long pass */}
       <ActionButton
-        label={offload ? 'Offload!' : 'Pass'}
+        label={offload ? 'Offload' : 'Pass'}
         sub={offload ? 'in the tackle' : 'hold = long'}
         size="big"
         color={offload ? 'gold' : 'neon'}
-        pos={{ right: 0, bottom: 40 }}
+        pos={{ right: 92, bottom: 4 }}
         onDown={() => (passStart.current = performance.now())}
         onUp={(_e, cancelled) => {
           if (cancelled) return;
-          // dir 0: the engine passes to the side the joystick points, or the best-placed runner
-          input.actions.push({ type: 'pass', long: !offload && performance.now() - passStart.current > 320, dir: 0 });
+          input.actions.push({ type: 'pass', long: !offload && performance.now() - passStart.current > 320, dir: -1 });
+        }}
+      >
+        <PassIcon dir={-1} />
+      </ActionButton>
+      <ActionButton
+        label={offload ? 'Offload' : 'Pass'}
+        sub={offload ? 'in the tackle' : 'hold = long'}
+        size="big"
+        color={offload ? 'gold' : 'neon'}
+        pos={{ right: 0, bottom: 4 }}
+        onDown={() => (passStart.current = performance.now())}
+        onUp={(_e, cancelled) => {
+          if (cancelled) return;
+          input.actions.push({ type: 'pass', long: !offload && performance.now() - passStart.current > 320, dir: 1 });
         }}
       >
         <PassIcon dir={1} />
       </ActionButton>
-      <ActionButton label="Sprint" size="med" color="cyan" pos={{ right: 104, bottom: 0 }} {...sprint} />
-      <ActionButton
-        label="Kick"
-        sub="drag to aim"
-        size="med"
-        color="gold"
-        pos={{ right: 14, bottom: 150 }}
-        onDown={(e) => {
-          kickStart.current = { x: e.clientX, y: e.clientY, moved: false };
-          onKick?.();
-        }}
-        onMove={(e) => {
-          const k0 = kickStart.current;
-          if (!k0) return;
-          if (Math.hypot(e.clientX - k0.x, e.clientY - k0.y) > 24) k0.moved = true;
-          if (k0.moved) onKickDrag?.(e.clientX - k0.x, e.clientY - k0.y);
-        }}
-        onUp={(_e, cancelled) => {
-          const k0 = kickStart.current;
-          kickStart.current = null;
-          // dragged straight off the button onto the pitch: kick on release; a tap leaves the aim open
-          if (k0?.moved && !cancelled) onKickRelease?.();
-        }}
-      >
-        <KickIcon />
-      </ActionButton>
-      <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 200, bottom: 12 }} onDown={() => input.actions.push({ type: 'handoff' })} />
-      <ActionButton label="Drop goal" size="sm" color="cyan" hidden={!canDrop} pos={{ right: 206, bottom: 96 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
+      <ActionButton label="Sprint" size="sm" color="cyan" pos={{ right: 104, bottom: 104 }} {...sprint} />
+      {kickButton(kickKind ?? 'punt', 'Kick', kickLabel ?? 'hold · swipe up', { right: 8, bottom: 112 })}
+      <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 186, bottom: 14 }} onDown={() => input.actions.push({ type: 'handoff' })} />
+      <ActionButton label="Drop goal" size="sm" color="cyan" hidden={!canDrop} pos={{ right: 168, bottom: 104 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
     </div>
   );
 }
@@ -474,5 +518,31 @@ export function CatchButton({ input }: { input: InputState }) {
       <span className="catch-ring" />
       CATCH
     </button>
+  );
+}
+
+/** Tap KICK: choose the kick type (the next hold-and-swipe uses it). */
+export function KickTypeChooser({ kind, isNine, onPick, onClose }: { kind: KickKind; isNine: boolean; onPick: (k: KickKind) => void; onClose: () => void }) {
+  return (
+    <div className="kick-picker" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="kick-chips">
+        {KICKS.filter((k) => k.kind !== 'box' || isNine).map((k) => (
+          <button
+            key={k.kind}
+            className={`kick-chip ${k.kind === kind ? 'on' : ''}`}
+            onPointerDown={() => {
+              haptic('light');
+              onPick(k.kind);
+            }}
+          >
+            <b>{k.label}</b>
+            <small>{k.desc}</small>
+          </button>
+        ))}
+        <button className="kick-chip cancel" onPointerDown={onClose}>
+          ✕
+        </button>
+      </div>
+    </div>
   );
 }
