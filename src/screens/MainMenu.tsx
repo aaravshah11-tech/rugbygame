@@ -29,11 +29,19 @@ export function MainMenu({ go }: { go: Go }) {
     return () => clearTimeout(t);
   }, [installTip]);
 
+  // Daily Rewards opens by itself at most once per day; after that it's behind the DAILY button.
   useEffect(() => {
-    if (p.daily.pendingReward > 0 && !dailyShown) {
-      dailyShown = true;
-      setDaily(true);
+    if (p.daily.pendingReward <= 0 || dailyShown) return;
+    dailyShown = true;
+    const today = new Date().toISOString().slice(0, 10);
+    let last = '';
+    try {
+      last = localStorage.getItem('tl-daily-auto') ?? '';
+      localStorage.setItem('tl-daily-auto', today);
+    } catch {
+      /* private mode */
     }
+    if (last !== today) setDaily(true);
   }, [p.daily.pendingReward]);
 
   const nav = (r: Parameters<Go>[0]) => {

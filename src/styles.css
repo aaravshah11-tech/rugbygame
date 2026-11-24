@@ -3017,3 +3017,35 @@ input[type='email'] {
 .controls-editor {
   overflow-y: auto;
 }
+
+/* ---------- tiles: tag sits above the title in normal flow, titles shrink to fit ---------- */
+.tile {
+  justify-content: space-between;
+  gap: 2px;
+}
+.tile .tag {
+  position: static;
+  align-self: flex-end;
+  line-height: 1.1;
+  text-align: right;
+}
+.tile h3 {
+  font-size: clamp(15px, 2.5vw, 22px);
+  overflow-wrap: anywhere;
+}
+/* install tip: small banner at the top, out of the way of the tiles */
+.toast {
+  top: calc(var(--sat, 0px) + 8px);
+  bottom: auto;
+  max-width: calc(100vw - 32px);
+  font-size: 12px;
+  padding: 7px 14px;
+  text-align: center;
+}
+
+/* pop-up cards never run off the screen: they scroll inside the safe area */
+.sheet > .card {
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
