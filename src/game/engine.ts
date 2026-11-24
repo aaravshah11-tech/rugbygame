@@ -2875,6 +2875,14 @@ export class MatchEngine {
       this.after(0.8, () => {
         this.kickoffAim = { kicker, atX, kick, side: kickSide };
         this.camMode = 'game';
+        // nobody aims it: kick it 12m to the open side
+        const mine = this.kickoffAim;
+        this.after(8, () => {
+          if (this.kickoffAim === mine) {
+            this.kickTarget = null;
+            this.kickoffKick();
+          }
+        });
         this.say(atX === 0 ? 'Kick-off' : '22 drop-out', 'info', 'Drag to where you want it to land');
         this.emit({ type: 'hud', hud: this.hud() });
       });
@@ -3613,6 +3621,14 @@ export class MatchEngine {
         this.controlled = kicker;
         this.penTouch = { kicker };
         this.camMode = 'game';
+        // nobody aims it: kick for the nearer touchline 25m upfield
+        const mine = this.penTouch;
+        this.after(10, () => {
+          if (this.penTouch !== mine) return;
+          this.kickTarget = { x: px + d * 25, z: (pz >= 0 ? 1 : -1) * (FIELD.halfW + 2) };
+          this.penaltyTouchKick({ type: 'kick', kind: 'touch', dist: 30, angle: 0, power: 0.85, tx: this.kickTarget.x, tz: this.kickTarget.z });
+          this.kickTarget = null;
+        });
         this.say('Kick for touch', 'info', 'Touch the pitch where you want it to go out');
         this.emit({ type: 'hud', hud: this.hud() });
       } else if (c === 'touch') {

@@ -90,7 +90,35 @@ const JUMPERS = [
   { id: 'back', label: 'Back', zone: 0.72, bonus: 0.1, desc: 'Hard to steal, tricky throw' },
 ];
 
-export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; difficulty: Difficulty; onDone: () => void }) {
+/**
+ * Seconds a blocking prompt waits before the game moves on without you (paused time doesn't count).
+ * The engine never waits forever for input.
+ */
+export const PROMPT_TIMEOUT = { pickJumper: 4, timing: 8, guess: 6, placeKick: 20, penaltyChoice: 15 };
+
+/** Calls fn once `seconds` of un-paused time have passed (restarts when deps change). */
+export function usePromptTimeout(seconds: number, paused: boolean, fn: () => void, active = true) {
+  const left = useRef(seconds);
+  const cb = useRef(fn);
+  cb.current = fn;
+  useEffect(() => {
+    left.current = seconds;
+  }, [seconds, active]);
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => {
+      if (paused) return;
+      left.current -= 0.25;
+      if (left.current <= 0) {
+        clearInterval(id);
+        cb.current();
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, [paused, active]);
+}
+
+export function MiniGame({ req, difficulty, onDone, paused = false }: { req: MiniGameRequest; difficulty: Difficulty; onDone: () => void; paused?: boolean }) {
   const spec = MINI[req.kind];
   const [jumper, setJumper] = useState<(typeof JUMPERS)[number] | null>(spec.pick ? null : JUMPERS[1]);
   const zoneW = { easy: 0.3, medium: 0.185, hard: 0.15, elite: 0.08 }[difficulty] * (jumper?.zone ?? 1);
@@ -126,6 +154,10 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
     return () => cancelAnimationFrame(raf);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const cpuRange = useRef(Math.floor(Math.random() * 3));
+  // never wait forever: pick the middle jumper, then take a weak throw / engage if nothing happens
+  usePromptTimeout(PROMPT_TIMEOUT.pickJumper, paused, () => setJumper((j) => j ?? JUMPERS[1]), !!spec.pick && !jumper);
+  usePromptTimeout(PROMPT_TIMEOUT.timing, paused, () => finish(0.3, 'TOO SLOW'), req.blocking && !!spec.timed && ready && !result);
+  usePromptTimeout(PROMPT_TIMEOUT.guess, paused, () => finish(0.3, 'TOO SLOW'), !!spec.guess && !result);
 
   const finish = (q: number, label?: string) => {
     if (done.current) return;
@@ -294,13 +326,21 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
  * Swipe up through the ball: the swipe's direction aims, its speed sets the power,
  * and bending the swipe curls the kick. The wind is shown top-right.
  */
-export function PlaceKickUI({ req, engine, onDone }: { req: PlaceKickRequest; engine: MatchEngine; onDone: () => void }) {
+export function PlaceKickUI({ req, engine, onDone, paused = false }: { req: PlaceKickRequest; engine: MatchEngine; onDone: () => void; paused?: boolean }) {
   const [trail, setTrail] = useState<{ x: number; y: number }[]>([]);
   const [msg, setMsg] = useState('');
   const [gone, setGone] = useState(false);
   const [distOut, setDistOut] = useState<number | null>(null);
   const pts = useRef<{ x: number; y: number; t: number }[]>([]);
   const active = useRef(false);
+  // no swipe for a long time: the kicker scuffs it
+  usePromptTimeout(PROMPT_TIMEOUT.placeKick, paused, () => {
+    if (gone) return;
+    setGone(true);
+    setMsg('Took too long…');
+    engine.shootPlaceKick((Math.random() - 0.5) * 16, 0.45, 0.6, 0);
+    setTimeout(onDone, 200);
+  }, !gone);
 
   const aimFrom = (a: { x: number; y: number }, b: { x: number; y: number }) => {
     const dx = b.x - a.x;

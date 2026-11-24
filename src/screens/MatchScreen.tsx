@@ -3,7 +3,7 @@ import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type KickKind, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
 import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker, KickTypeChooser } from '../ui/controls';
-import { MiniGame, PlaceKickUI, ScoreBug, ScrumBattle, type Comm } from '../ui/overlays';
+import { MiniGame, PlaceKickUI, PROMPT_TIMEOUT, ScoreBug, ScrumBattle, usePromptTimeout, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { TacticsPanel } from '../ui/tactics';
 import { CustomPlaysEditor } from '../ui/setplays';
@@ -68,6 +68,12 @@ export function MatchScreen({
   const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
   const [replay, setReplay] = useState(false);
   const [howTo, setHowTo] = useState(false);
+  // a penalty decision left too long goes to the obvious option
+  usePromptTimeout(PROMPT_TIMEOUT.penaltyChoice, paused || howTo, () => {
+    if (!penalty) return;
+    penalty.resolve(penalty.canKick ? 'goal' : 'touch');
+    setPenalty(null);
+  }, !!penalty);
   const commId = useRef(0);
   const finished = useRef(false);
 
@@ -407,8 +413,8 @@ export function MatchScreen({
             kickLabel={kickKind === 'punt' ? 'hold · swipe up' : KICKS.find((k) => k.kind === kickKind)?.label}
             atBase={hud.atBase} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
-        {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} onDone={() => setMini(null)} />}
-        {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} onDone={() => {}} />}
+        {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} paused={paused || howTo} onDone={() => setMini(null)} />}
+        {pk && engine.current && <PlaceKickUI key={pk.kind + pk.distance} req={pk} engine={engine.current} paused={paused || howTo} onDone={() => {}} />}
       </div>
 
       {howTo && (
