@@ -39,12 +39,18 @@ export function ruckBall(_eng: MatchEngine, r: NonNullable<MatchEngine['ruck']>)
   return dur <= 1.35 ? 'quick' : 'slow';
 }
 
+const ARC_SEGS = 24;
+
 /** The two meshes of the ruck arc (made once, hidden until the first ruck). */
 export function ensureRuckArcs(eng: MatchEngine): { bg: THREE.Mesh; fg: THREE.Mesh } {
   const mk = (color: string, opacity: number, order: number) => {
-    const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
+    // one buffer for the whole match, rewritten in place while a ruck is on
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARC_SEGS * 18), 3).setUsage(THREE.DynamicDrawUsage));
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
     m.renderOrder = order;
     m.visible = false;
+    m.frustumCulled = false;
     eng.scene.add(m);
     return m;
   };
@@ -65,18 +71,26 @@ export function updateRuckArc(eng: MatchEngine, r: { x: number; z: number; att: 
     // smile-shaped arc on the camera side (-x) of the ruck
     const a0 = Math.PI - 0.95;
     const a1 = a0 + 1.9 * frac;
-    const segs = 24;
-    const pos: number[] = [];
-    for (let i = 0; i < segs; i++) {
-      const t0 = a0 + ((a1 - a0) * i) / segs;
-      const t1 = a0 + ((a1 - a0) * (i + 1)) / segs;
-      const p = (a: number, rad: number) => [r.x + Math.cos(a) * rad, 0.06, r.z + Math.sin(a) * rad];
-      pos.push(...p(t0, r0), ...p(t0, r1), ...p(t1, r1), ...p(t0, r0), ...p(t1, r1), ...p(t1, r0));
+    const attr = mesh.geometry.attributes.position as THREE.BufferAttribute;
+    const pos = attr.array as Float32Array;
+    let k = 0;
+    const put = (a: number, rad: number) => {
+      pos[k++] = r.x + Math.cos(a) * rad;
+      pos[k++] = 0.06;
+      pos[k++] = r.z + Math.sin(a) * rad;
+    };
+    for (let i = 0; i < ARC_SEGS; i++) {
+      const t0 = a0 + ((a1 - a0) * i) / ARC_SEGS;
+      const t1 = a0 + ((a1 - a0) * (i + 1)) / ARC_SEGS;
+      // two triangles per segment
+      put(t0, r0);
+      put(t0, r1);
+      put(t1, r1);
+      put(t0, r0);
+      put(t1, r1);
+      put(t1, r0);
     }
-    mesh.geometry.dispose();
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    mesh.geometry = g;
+    attr.needsUpdate = true;
     mesh.visible = true;
   };
   build(bg, 1, 2.6, 3.0);
