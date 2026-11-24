@@ -28,6 +28,87 @@ function trimmedMaterial(main: string, trim: string, roughness: number) {
   return m;
 }
 
+const PATTERN_ID: Record<string, number> = { plain: 0, hoops: 1, stripes: 2, halves: 3, quarters: 4, band: 5, shoulders: 6, chevron: 7, sash: 8, zigzag: 0 };
+
+/**
+ * Shirt material with the real kit pattern drawn in the mesh's own (bind-pose) space, so hoops,
+ * quarters etc. stay put on the body as it moves. Trim (collar/cuffs) still comes from aTrim.
+ */
+function shirtMaterial(kit: Kit, roughness: number, withTrim: boolean) {
+  const m = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness });
+  const u = {
+    uPri: { value: new THREE.Color(kit.primary) },
+    uSec: { value: new THREE.Color(kit.secondary) },
+    uAcc: { value: new THREE.Color(kit.accent) },
+    uFourth: { value: new THREE.Color(kit.fourth ?? kit.accent) },
+    uTrim: { value: new THREE.Color(kit.collar ?? kit.secondary) },
+    uPat: { value: PATTERN_ID[kit.pattern] ?? 0 },
+    uY0: { value: 0 },
+    uY1: { value: 1 },
+    uXW: { value: 0.25 },
+  };
+  m.userData.kitUniforms = u;
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aTrim;\nvarying float vTrim;\nvarying vec3 vObj;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTrim = aTrim;\nvObj = position;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+uniform vec3 uPri; uniform vec3 uSec; uniform vec3 uAcc; uniform vec3 uFourth; uniform vec3 uTrim;
+uniform float uPat; uniform float uY0; uniform float uY1; uniform float uXW;
+varying float vTrim; varying vec3 vObj;
+vec3 kitColor() {
+  float ty = clamp((vObj.y - uY0) / max(0.0001, uY1 - uY0), 0.0, 1.0);
+  float tx = clamp(vObj.x / uXW, -1.5, 1.5);
+  vec3 c = uPri;
+  if (uPat > 0.5 && uPat < 1.5) c = mix(uPri, uSec, step(0.5, fract(ty * 6.0)));
+  else if (uPat < 2.5 && uPat > 1.5) c = mix(uPri, uSec, step(0.5, fract(tx * 2.5 + 0.25)));
+  else if (uPat < 3.5 && uPat > 2.5) c = tx > 0.0 ? uSec : uPri;
+  else if (uPat < 4.5 && uPat > 3.5) {
+    bool r = tx > 0.0; bool up = ty > 0.62;
+    c = up ? (r ? uSec : uPri) : (r ? uFourth : uAcc);
+  }
+  else if (uPat < 5.5 && uPat > 4.5) c = (ty > 0.5 && ty < 0.66) ? uSec : uPri;
+  else if (uPat < 6.5 && uPat > 5.5) c = ty > 0.8 ? uSec : uPri;
+  else if (uPat < 7.5 && uPat > 6.5) { float v = ty + abs(tx) * 0.3; c = (v > 0.64 && v < 0.76) ? uSec : uPri; }
+  else if (uPat > 7.5) c = abs(ty - (0.55 + tx * 0.25)) < 0.07 ? uSec : uPri;
+  return c;
+}`,
+      )
+      .replace('#include <color_fragment>', `#include <color_fragment>\ndiffuseColor.rgb = kitColor();${withTrim ? '\ndiffuseColor.rgb = mix(diffuseColor.rgb, uTrim, step(0.5, vTrim));' : ''}`);
+  };
+  m.customProgramCacheKey = () => (withTrim ? 'kitshirt-t' : 'kitshirt');
+  return m;
+}
+
+/** Fit the pattern to the shirt mesh once we know its size. */
+function fitShirt(mat: THREE.Material, geo: THREE.BufferGeometry) {
+  const u = (mat as THREE.MeshStandardMaterial).userData.kitUniforms;
+  if (!u || u.fitted) return;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox!;
+  const h = bb.max.y - bb.min.y;
+  // the torso: from the waist to the top of the shoulders, about a third of the arm span wide
+  u.uY0.value = bb.min.y + h * 0.05;
+  u.uY1.value = bb.max.y;
+  u.uXW.value = Math.max(0.0001, (bb.max.x - bb.min.x) * 0.16);
+  u.fitted = true;
+}
+
+function setKitUniforms(mat: THREE.MeshStandardMaterial, kit: Kit) {
+  const u = mat.userData.kitUniforms;
+  if (!u) return;
+  u.uPri.value.set(kit.primary);
+  u.uSec.value.set(kit.secondary);
+  u.uAcc.value.set(kit.accent);
+  u.uFourth.value.set(kit.fourth ?? kit.accent);
+  u.uTrim.value.set(kit.collar ?? kit.secondary);
+  u.uPat.value = PATTERN_ID[kit.pattern] ?? 0;
+}
+
 export interface TeamKit {
   shirt: THREE.MeshStandardMaterial;
   panel: THREE.MeshStandardMaterial;
@@ -40,8 +121,8 @@ export interface TeamKit {
 /** Shirt (primary + secondary collar/cuffs), shorts, socks (with secondary hoops): separate, recolourable materials. */
 export function makeTeamKit(kit: Kit): TeamKit {
   return {
-    shirt: trimmedMaterial(kit.primary, kit.secondary, 0.85),
-    panel: new THREE.MeshStandardMaterial({ color: kit.primary, roughness: 0.85 }),
+    shirt: shirtMaterial(kit, 0.85, true),
+    panel: shirtMaterial(kit, 0.85, false),
     shorts: new THREE.MeshStandardMaterial({ color: kit.shorts, roughness: 0.7 }),
     socks: trimmedMaterial(kit.socks, kit.secondary, 0.9),
     cap: new THREE.MeshStandardMaterial({ color: kit.secondary === kit.primary ? '#1a1a1a' : kit.secondary, roughness: 0.6 }),
@@ -50,8 +131,8 @@ export function makeTeamKit(kit: Kit): TeamKit {
 }
 
 export function recolourKit(t: TeamKit, kit: Kit) {
-  t.shirt.color.set(kit.primary);
-  t.panel.color.set(kit.primary);
+  setKitUniforms(t.shirt, kit);
+  setKitUniforms(t.panel, kit);
   t.shorts.color.set(kit.shorts);
   t.socks.color.set(kit.socks);
   t.kit = kit;
@@ -131,8 +212,13 @@ export class Avatar {
       const name = (m.material as THREE.Material).name.toLowerCase();
       let mat: THREE.Material | THREE.Material[];
       if (name === 'pants' && m.userData.legSplit) mat = [team.shorts, skinMats[o.skin % skinMats.length], team.socks];
-      else if (name === 'shirt') mat = team.shirt;
-      else if (name === 'shirt2') mat = team.panel;
+      else if (name === 'shirt') {
+        mat = team.shirt;
+        fitShirt(team.shirt, m.geometry);
+      } else if (name === 'shirt2') {
+        mat = team.panel;
+        fitShirt(team.panel, m.geometry);
+      }
       else if (name === 'pants') mat = team.shorts;
       else if (name.startsWith('sock')) mat = team.socks;
       else if (name.startsWith('shoe')) mat = bootMat;

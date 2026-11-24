@@ -66,12 +66,22 @@ export function drawKit(ctx: CanvasRenderingContext2D, kit: Kit, w: number, h: n
       ctx.fillRect(0, h * 0.4, w, h * 0.025);
       ctx.fillRect(0, h * 0.575, w, h * 0.025);
       break;
+    case 'quarters':
+      ctx.fillStyle = kit.primary;
+      ctx.fillRect(0, 0, w / 2, h / 2);
+      ctx.fillStyle = kit.secondary;
+      ctx.fillRect(w / 2, 0, w / 2, h / 2);
+      ctx.fillStyle = kit.accent;
+      ctx.fillRect(0, h / 2, w / 2, h / 2);
+      ctx.fillStyle = kit.fourth ?? kit.accent;
+      ctx.fillRect(w / 2, h / 2, w / 2, h / 2);
+      break;
     case 'plain':
     default:
       break;
   }
   // collar
-  ctx.fillStyle = kit.accent;
+  ctx.fillStyle = kit.collar ?? kit.accent;
   ctx.beginPath();
   ctx.moveTo(w * 0.35, 0);
   ctx.lineTo(w * 0.5, h * 0.1);

@@ -2797,3 +2797,85 @@ input[type='email'] {
   opacity: 0.7;
   font-size: 11px;
 }
+
+.pitch-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pitch-svg {
+  width: 100%;
+  max-height: 58vh;
+  border-radius: 12px;
+  touch-action: none;
+  user-select: none;
+}
+
+.flick-trail {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.flick-trail line {
+  stroke: #ffcf3a;
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.flick-trail circle {
+  fill: rgba(255, 207, 58, 0.35);
+  stroke: #ffcf3a;
+  stroke-width: 3;
+}
+
+.charge-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  pointer-events: auto;
+}
+.charge-layer.go {
+  background: radial-gradient(ellipse at center, rgba(255, 61, 94, 0.12), rgba(255, 61, 94, 0.3));
+}
+.charge-banner {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-weight: 900;
+  font-style: italic;
+  font-size: clamp(26px, 6vw, 50px);
+  text-shadow: 0 4px 0 #0b0f17, 0 10px 30px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.charge-banner small {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  color: #ffcf3a;
+}
+.charge-layer.go .charge-banner {
+  color: #ff3d5e;
+  animation: blink 0.45s infinite;
+}
+
+.play-editor.full {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow-y: auto;
+  padding: calc(var(--sat, 0px) + 12px) calc(var(--sar, 0px) + 14px) calc(var(--sab, 0px) + 14px) calc(var(--sal, 0px) + 14px);
+  background: var(--bg, #0b0f17);
+}
+.play-editor.full .pitch-svg {
+  max-height: 72vh;
+}
+
+.design-done {
+  position: fixed;
+  right: calc(var(--sar, 0px) + 16px);
+  top: calc(var(--sat, 0px) + 12px);
+  z-index: 70;
+}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { QualityPreset } from './quality';
+import { DEFAULT_VENUE, type Venue } from '../../data/venues';
 
 /** Original, made-up sponsor names for the LED boards. */
 export const SPONSORS = ['VOLTARA', 'IRONBARK ALES', 'QUASAR MOBILE', 'ZEPHYRA AIR', 'BOLTWAVE', 'SUMMIT TYRES', 'HEXA ENERGY', 'PULSEFIT', 'TRY LINE', 'NORTHGATE BANK', 'KESTREL WATCHES'];
@@ -51,11 +52,13 @@ class StripBuilder {
   col: number[] = [];
   uv: number[] = [];
   /** quad strip between ring (d0,y0) and ring (d1,y1) */
-  strip(d0: number, y0: number, d1: number, y1: number, color: THREE.Color, uvScale = 0) {
+  strip(d0: number, y0: number, d1: number, y1: number, color: THREE.Color | ((i: number) => THREE.Color), uvScale = 0, mask?: (i: number) => boolean) {
     const n = RING.length;
     let s = 0;
     for (let i = 0; i < n; i++) {
       const a = RING[i];
+      if (mask && !mask(i)) continue;
+      const col = typeof color === 'function' ? color(i) : color;
       const b = RING[(i + 1) % n];
       const [ax0, az0] = ringPoint(a, d0);
       const [bx0, bz0] = ringPoint(b, d0);
@@ -67,7 +70,7 @@ class StripBuilder {
       s += seg;
       this.pos.push(ax0, y0, az0, bx0, y0, bz0, bx1, y1, bz1, ax0, y0, az0, bx1, y1, bz1, ax1, y1, az1);
       this.uv.push(u0, 0, u1, 0, u1, 1, u0, 0, u1, 1, u0, 1);
-      for (let k = 0; k < 6; k++) this.col.push(color.r, color.g, color.b);
+      for (let k = 0; k < 6; k++) this.col.push(col.r, col.g, col.b);
     }
   }
   build(): THREE.BufferGeometry {
@@ -89,8 +92,13 @@ interface Tier {
 }
 const LOWER: Tier = { d: 0, y: 1.3, rows: 16, depth: 0.85, riser: 0.42 };
 const UPPER: Tier = { d: 12.5, y: 12.4, rows: 16, depth: 0.9, riser: 0.56 };
+const TOP: Tier = { d: 25, y: 23.8, rows: 13, depth: 0.95, riser: 0.62 };
 
-function ledTexture() {
+type SideKey = 'main' | 'opp' | 'endL' | 'endR' | 'corners';
+/** Which stand a ring segment belongs to. main = far long side (-z), opp = near long side (+z). */
+const SIDE: SideKey[] = RING.map((p) => (Math.abs(p.dx) > 0.92 ? (p.dx > 0 ? 'endR' : 'endL') : Math.abs(p.dz) > 0.92 ? (p.dz < 0 ? 'main' : 'opp') : 'corners'));
+
+function ledTexture(extra: string[] = []) {
   const c = document.createElement('canvas');
   c.width = 2048;
   c.height = 64;
@@ -103,7 +111,8 @@ function ledTexture() {
   let x = 16;
   let i = 0;
   while (x < 2048) {
-    const w = SPONSORS[i % SPONSORS.length];
+    const list = [...extra, ...SPONSORS];
+    const w = list[i % list.length];
     g.fillStyle = colors[i % colors.length];
     g.fillText(w, x, 34);
     x += g.measureText(w).width + 70;
@@ -213,7 +222,7 @@ export interface StadiumView {
   update(time: number, excite: number, camera: THREE.Camera): void;
 }
 
-export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, q: QualityPreset, crowdColors: string[]): StadiumView {
+export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, q: QualityPreset, crowdColors: string[], venue?: Venue): StadiumView {
   const group = new THREE.Group();
   scene.add(group);
 
@@ -263,47 +272,104 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   fill2.position.set(40, 50, 50);
   scene.add(fill1, fill2);
 
-  // ---------- the bowl
+  // ---------- the stands, built from the venue description
+  const V: Venue = venue ?? DEFAULT_VENUE;
+  const lower: Tier = { ...LOWER, rows: V.lowerRows };
+  const upper: Tier = { ...UPPER, d: lower.rows * lower.depth + 2.4, y: lower.y + lower.rows * lower.riser + 3.6 };
+  const top: Tier = { ...TOP, d: upper.d + upper.rows * upper.depth + 2.4, y: upper.y + upper.rows * upper.riser + 3.6 };
+  const tiersAll = [lower, upper, top];
+  const nTiers = (i: number) => V.tiers[SIDE[i]];
+  const has = (k: number) => (i: number) => nTiers(i) > k;
+  const seatCols = V.seats.map((c) => new THREE.Color(c));
+  const seat = (r: number) => (i: number) => {
+    if (V.mosaic) return seatCols[(i * 7 + r * 13 + ((i * r) % 5)) % seatCols.length];
+    return seatCols[r % seatCols.length];
+  };
   const sb = new StripBuilder();
-  const seatA = new THREE.Color('#1b2438');
-  const seatB = new THREE.Color('#232f4a');
   const concrete = new THREE.Color('#3a4050');
-  sb.strip(-0.5, 0, -0.5, LOWER.y, concrete); // pitch-side wall
-  for (const tier of [LOWER, UPPER]) {
+  sb.strip(-0.5, 0, -0.5, lower.y, concrete, 0, has(0)); // pitch-side wall
+  tiersAll.forEach((tier, k) => {
     for (let r = 0; r < tier.rows; r++) {
       const d0 = tier.d + r * tier.depth;
       const y = tier.y + r * tier.riser;
-      const c = r % 2 ? seatA : seatB;
-      sb.strip(d0, y, d0 + tier.depth, y, c);
-      sb.strip(d0 + tier.depth, y, d0 + tier.depth, y + tier.riser, c.clone().multiplyScalar(0.8));
+      sb.strip(d0, y, d0 + tier.depth, y, seat(r), 0, has(k));
+      sb.strip(d0 + tier.depth, y, d0 + tier.depth, y + tier.riser, (i) => seat(r)(i).clone().multiplyScalar(0.75), 0, has(k));
     }
+    const tTop = tier.y + tier.rows * tier.riser;
+    const tBack = tier.d + tier.rows * tier.depth;
+    const next = tiersAll[k + 1];
+    // back of this tier: concourse wall up to the next tier where there is one, a short back wall where not
+    sb.strip(tBack, tTop, tBack, next ? next.y - 1.4 : tTop + 3, concrete, 0, (i) => nTiers(i) === k + 1 || (!!next && nTiers(i) > k + 1));
+    if (next) sb.strip(next.d - 0.4, next.y - 1.4, tBack, next.y - 1.4, concrete.clone().multiplyScalar(0.6), 0, has(k + 1));
+  });
+  // grass banks / open ends where there is no stand
+  if (V.bank) {
+    const bank = new THREE.Color(V.bank);
+    sb.strip(0, 0.2, 9, 3.2, bank, 0, (i) => nTiers(i) === 0);
   }
-  const lowerTop = LOWER.y + LOWER.rows * LOWER.riser;
-  const lowerBack = LOWER.d + LOWER.rows * LOWER.depth;
-  sb.strip(lowerBack, lowerTop, lowerBack, UPPER.y - 1.4, concrete); // concourse wall
-  sb.strip(UPPER.d - 0.4, UPPER.y - 1.4, lowerBack, UPPER.y - 1.4, concrete.clone().multiplyScalar(0.6)); // overhang underside
-  const upperTop = UPPER.y + UPPER.rows * UPPER.riser;
-  const upperBack = UPPER.d + UPPER.rows * UPPER.depth;
-  sb.strip(upperBack, upperTop, upperBack + 0.5, upperTop + 4, concrete);
   const bowl = new THREE.Mesh(sb.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.05, side: THREE.DoubleSide }));
   group.add(bowl);
 
-  // LED ribbon on the front of the upper tier + roof
-  const led = ledTexture();
+  // athletics track (Rome)
+  if (V.track) {
+    const tr = new StripBuilder();
+    tr.strip(-11, 0.02, -1, 0.02, new THREE.Color(V.track));
+    group.add(new THREE.Mesh(tr.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 })));
+  }
+
+  // LED ribbon on the front of the upper tier
+  const led = ledTexture([V.name.toUpperCase(), V.city.toUpperCase()]);
   const ribbon = new StripBuilder();
-  ribbon.strip(UPPER.d - 0.4, UPPER.y - 1.4, UPPER.d - 0.4, UPPER.y, new THREE.Color(1, 1, 1), 1 / 60);
+  ribbon.strip(upper.d - 0.4, upper.y - 1.4, upper.d - 0.4, upper.y, new THREE.Color(1, 1, 1), 1 / 60, has(1));
   const ribbonMat = new THREE.MeshBasicMaterial({ map: led, side: THREE.DoubleSide });
   ribbonMat.color.setScalar(1.5);
   group.add(new THREE.Mesh(ribbon.build(), ribbonMat));
 
-  const roof = new StripBuilder();
-  roof.strip(upperBack + 0.5, upperTop + 4, 2, upperTop + 7, new THREE.Color('#141a26'));
-  const roofMesh = new THREE.Mesh(roof.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.5, side: THREE.DoubleSide }));
-  group.add(roofMesh);
-  const roofEdge = new StripBuilder();
-  roofEdge.strip(2, upperTop + 6.6, 2, upperTop + 7.1, new THREE.Color(1, 1, 1));
+  // roofs: over each stand at the height of its top tier; a closed roof covers everything
+  const roofOpacity = V.roofOpacity ?? 1;
+  const roofMat = new THREE.MeshStandardMaterial({ color: V.roofColor, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide, transparent: roofOpacity < 1, opacity: roofOpacity, depthWrite: roofOpacity >= 1 });
   const edgeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.3, 2.6) });
-  group.add(new THREE.Mesh(roofEdge.build(), edgeMat));
+  let maxTop = 0;
+  tiersAll.forEach((tier, k) => {
+    const tTop = tier.y + tier.rows * tier.riser;
+    const tBack = tier.d + tier.rows * tier.depth;
+    const roofed = (i: number) => nTiers(i) === k + 1 && V.roof !== 'none' && (V.roof === 'closed' || (V.roofSides ? !!V.roofSides[SIDE[i]] : true));
+    if (!RING.some((_, i) => roofed(i))) return;
+    maxTop = Math.max(maxTop, tTop);
+    const front = Math.max(0, tier.d - 6 - k * 2);
+    const roof = new StripBuilder();
+    roof.strip(tBack + 0.5, tTop + 4, front, tTop + 6.5, new THREE.Color(1, 1, 1), 0, roofed);
+    group.add(new THREE.Mesh(roof.build(), roofMat));
+    const edge = new StripBuilder();
+    edge.strip(front, tTop + 6.1, front, tTop + 6.6, new THREE.Color(1, 1, 1), 0, roofed);
+    group.add(new THREE.Mesh(edge.build(), edgeMat));
+  });
+  if (V.roof === 'closed') {
+    // the retractable roof closed over the pitch
+    const h = maxTop + 9;
+    const lid = new THREE.Mesh(new THREE.PlaneGeometry(2 * (A + 40), 2 * (BZ + 40)), new THREE.MeshStandardMaterial({ color: V.roofColor, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }));
+    lid.rotation.x = Math.PI / 2;
+    lid.position.y = h;
+    group.add(lid);
+    // light rigs under the roof
+    for (let x = -50; x <= 50; x += 25)
+      for (const z of [-30, 30]) {
+        const rig = new THREE.Mesh(new THREE.BoxGeometry(14, 0.6, 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 4, 3.6) }));
+        rig.position.set(x, h - 1, z);
+        group.add(rig);
+      }
+  }
+  // corner masts holding the roof (Cardiff)
+  if (V.masts) {
+    const mastMat = new THREE.MeshStandardMaterial({ color: '#e8ebef', roughness: 0.4, metalness: 0.6 });
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.4, 95, 10), mastMat);
+      m.position.set(sx * (A + 32), 47, sz * (BZ + 26));
+      m.rotation.z = sx * 0.08;
+      m.rotation.x = -sz * 0.08;
+      group.add(m);
+    }
+  }
 
   // ---------- crowd: instanced camera-facing billboards
   const spacing = 0.72 / q.crowdDensity;
@@ -312,19 +378,20 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   const params: number[] = [];
   const palette = crowdColors.map((c) => new THREE.Color(c));
   const neutrals = ['#2b3346', '#4a5366', '#6b7280', '#1f2937', '#8a8f9c', '#b33a3a'].map((c) => new THREE.Color(c));
-  for (const tier of [LOWER, UPPER]) {
+  tiersAll.forEach((tier, k) => {
     for (let r = 0; r < tier.rows; r++) {
       const d = tier.d + r * tier.depth + tier.depth * 0.35;
       const y = tier.y + r * tier.riser;
       let carry = Math.random() * spacing;
       for (let i = 0; i < RING.length; i++) {
+        if (nTiers(i) <= k) continue;
         const [ax, az] = ringPoint(RING[i], d);
         const [bx, bz] = ringPoint(RING[(i + 1) % RING.length], d);
         const seg = Math.hypot(bx - ax, bz - az);
         let s = carry;
         while (s < seg) {
           const t = s / seg;
-          if (Math.random() < 0.93) {
+          if (Math.random() < V.fill) {
             offsets.push(ax + (bx - ax) * t, y, az + (bz - az) * t);
             const team = Math.random() < 0.72;
             const c = (team ? palette[Math.floor(Math.random() * palette.length)] : neutrals[Math.floor(Math.random() * neutrals.length)]).clone();
@@ -337,7 +404,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
         carry = s - seg;
       }
     }
-  }
+  });
   const base = new THREE.PlaneGeometry(0.62, 1.1);
   base.translate(0, 0.55, 0);
   const cg = new THREE.InstancedBufferGeometry();
@@ -392,7 +459,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   const towerMat = new THREE.MeshStandardMaterial({ color: '#59606e', roughness: 0.5, metalness: 0.7 });
   const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6, 5.4) });
   const glowMat = new THREE.SpriteMaterial({ map: GLOW_TEX(), color: '#fff6dd', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-  for (const p of [RING[4], RING[27], RING[46], RING[69]]) {
+  for (const p of V.towers ? [RING[4], RING[27], RING[46], RING[69]] : []) {
     const [x, z] = ringPoint(p, 34);
     const h = 58;
     const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.4, h, 8), towerMat);

@@ -24,7 +24,10 @@ export interface Tactics {
 export interface CustomPlay {
   id: string;
   name: string;
+  /** pass order (num); line is used when no drawn run exists for that player */
   steps: { num: number; line: 'crash' | 'switch' | 'loop' | 'wide' | 'out' }[];
+  /** drawn runs: where each player goes, metres from the breakdown (dx = forward, dz = towards the open side) */
+  runs?: { num: number; dx: number; dz: number }[];
 }
 
 export interface Settings {

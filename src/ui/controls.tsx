@@ -213,7 +213,8 @@ export function ActionButtons({
   ruckDef?: 'none' | 'contest' | 'fan';
   ruckBall?: 'quick' | 'slow' | 'danger' | null;
   onKick?: () => void;
-  onKickDrag?: (x: number, y: number) => void;
+  /** flick vector (px) from where KICK was pressed */
+  onKickDrag?: (dx: number, dy: number) => void;
   onKickRelease?: () => void;
   atBase?: boolean;
   onBoxKick?: () => void;
@@ -334,7 +335,7 @@ export function ActionButtons({
           const k0 = kickStart.current;
           if (!k0) return;
           if (Math.hypot(e.clientX - k0.x, e.clientY - k0.y) > 24) k0.moved = true;
-          if (k0.moved) onKickDrag?.(e.clientX, e.clientY);
+          if (k0.moved) onKickDrag?.(e.clientX - k0.x, e.clientY - k0.y);
         }}
         onUp={(_e, cancelled) => {
           const k0 = kickStart.current;
@@ -374,24 +375,31 @@ export function KickPicker({
   aimAt,
   locked = false,
   title,
+  flick,
 }: {
   input: InputState;
   isNine: boolean;
   kind: KickKind;
   setKind?: (k: KickKind) => void;
-  onClose: () => void;
+  onClose: (kicked?: boolean) => void;
   aimAt: (x: number, y: number, kind: KickKind) => number | null;
+  /** flick aim: swipe vector (px) -> metres */
+  flick?: (dx: number, dy: number, kind: KickKind) => number | null;
   /** kick type fixed (kick-off, penalty to touch); no cancel */
   locked?: boolean;
   title?: string;
 }) {
   const [dist, setDist] = useState<number | null>(null);
-  const st = useRef<number | null>(null);
+  const st = useRef<{ id: number; x: number; y: number } | null>(null);
+  const [trail, setTrail] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   useEffect(() => {
     Object.assign(input.kickAim, { active: true, kind, dist: 30, angle: 0 });
   }, [input, kind]);
   const point = (e: React.PointerEvent) => {
-    const d = aimAt(e.clientX, e.clientY, kind);
+    const s0 = st.current;
+    // flick: aim from the swipe vector; otherwise the spot under your finger
+    const d = flick && s0 ? flick(e.clientX - s0.x, e.clientY - s0.y, kind) : aimAt(e.clientX, e.clientY, kind);
+    if (s0) setTrail({ x0: s0.x, y0: s0.y, x1: e.clientX, y1: e.clientY });
     if (d !== null) setDist(d);
   };
   const k = KICKS.find((x) => x.kind === kind);
@@ -399,20 +407,22 @@ export function KickPicker({
     <div
       className="kick-aim"
       onPointerDown={(e) => {
-        st.current = e.pointerId;
-        point(e);
+        st.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        setDist(null);
+        if (!flick) point(e);
       }}
       onPointerMove={(e) => {
-        if (st.current === e.pointerId) point(e);
+        if (st.current?.id === e.pointerId) point(e);
       }}
       onPointerUp={(e) => {
-        if (st.current !== e.pointerId) return;
+        if (st.current?.id !== e.pointerId) return;
         st.current = null;
+        setTrail(null);
         if (dist === null) return;
         input.actions.push({ type: 'kick', kind, dist, angle: 0, power: 0.85 });
         input.kickAim.active = false;
         haptic('tackle');
-        onClose();
+        onClose(true);
       }}
     >
       {!locked && setKind && (
@@ -424,10 +434,16 @@ export function KickPicker({
           ))}
         </div>
       )}
+      {trail && (
+        <svg className="flick-trail" width="100%" height="100%">
+          <line x1={trail.x0} y1={trail.y0} x2={trail.x1} y2={trail.y1} />
+          <circle cx={trail.x0} cy={trail.y0} r={10} />
+        </svg>
+      )}
       <div className="kick-aim-hud">
         <b>{(title ?? k?.label ?? 'Kick').toUpperCase()}</b>
         {dist !== null ? ` · ${Math.round(dist)}m` : ''}
-        <small>{dist === null ? 'Drag your finger to where you want it to land' : 'Slide to adjust · let go to kick'}</small>
+        <small>{dist === null ? (flick ? 'FLICK: swipe the way you want it to go — longer swipe, longer kick' : 'Drag your finger to where you want it to land') : 'Watch the ring · let go to kick'}</small>
       </div>
       {!locked && (
         <button

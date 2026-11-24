@@ -6,6 +6,7 @@ import { ActionButtons, CatchButton, DodgeLayer, Joystick, KickPicker } from '..
 import { MiniGame, PlaceKickUI, ScoreBug, ScrumBattle, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { TacticsPanel } from '../ui/tactics';
+import { CustomPlaysEditor } from '../ui/setplays';
 import { update, useProfile } from '../state/store';
 import type { CameraMode } from '../state/types';
 
@@ -55,6 +56,7 @@ export function MatchScreen({
   const [plays, setPlays] = useState(false);
   const [drill, setDrill] = useState<{ text: string; progress: string } | null>(null);
   const [kickMenu, setKickMenu] = useState(false);
+  const [designing, setDesigning] = useState(false);
   const [boxKick, setBoxKick] = useState(false);
   const [kickKind, setKickKind] = useState<KickKind>('punt');
   const openKick = (k?: KickKind) => {
@@ -62,11 +64,12 @@ export function MatchScreen({
     setKickMenu(true);
     engine.current?.setAimFreeze(true);
   };
-  const closeKick = () => {
+  /** kicked = keep the aimed spot for the kick that's about to happen; otherwise forget it */
+  const closeKick = (kicked = false) => {
     setKickMenu(false);
     setBoxKick(false);
     engine.current?.setAimFreeze(false);
-    engine.current?.clearKickTarget();
+    if (!kicked) engine.current?.clearKickTarget();
   };
   const [intro, setIntro] = useState<null | { title: string; sub: string }>(null);
   const [fullStats, setFullStats] = useState<import('../game/types').MatchStats | null>(null);
@@ -300,7 +303,8 @@ export function MatchScreen({
             kind={kickKind}
             setKind={setKickKind}
             aimAt={(x, y, k) => engine.current?.aimKickAt(x, y, k) ?? null}
-            onClose={closeKick}
+            flick={(dx, dy, k) => engine.current?.aimKickFlick(dx, dy, k) ?? null}
+            onClose={(kicked?: boolean) => closeKick(kicked)}
           />
         )}
         {hud.atBase && !boxKick && (
@@ -309,13 +313,16 @@ export function MatchScreen({
           </div>
         )}
         {hud.chargePrompt && (
-          <button
-            className={`charge-btn ${hud.chargePrompt}`}
-            onPointerDown={() => input.current.actions.push({ type: 'charge' })}
-          >
-            CHARGE
-            <small>{hud.chargePrompt === 'wait' ? 'wait for the run-up…' : 'GO NOW!'}</small>
-          </button>
+          <div className={`charge-layer ${hud.chargePrompt}`} onPointerDown={() => input.current.actions.push({ type: 'charge' })}>
+            <div className="charge-banner">
+              <small>THEIR CONVERSION</small>
+              {hud.chargePrompt === 'wait' ? 'WAIT FOR THE RUN-UP…' : 'CHARGE! TAP!'}
+            </div>
+            <div className={`charge-btn ${hud.chargePrompt}`}>
+              CHARGE
+              <small>{hud.chargePrompt === 'wait' ? 'too early = wasted' : 'GO NOW!'}</small>
+            </div>
+          </div>
         )}
         {showControls && hud.canDiveTry && (
           <button className="dive-try-btn" onPointerDown={() => input.current.actions.push({ type: 'diveTry' })}>
@@ -325,10 +332,12 @@ export function MatchScreen({
         )}
         {hud.nineWait && <div className="base-tag wait">WAITING FOR THE 9…</div>}
         {hud.penTouch && !penalty && (
-          <KickPicker key="pen" input={input.current} isNine={false} kind="touch" locked title="Kick for touch" aimAt={(x, y, k) => engine.current?.aimKickAt(x, y, k) ?? null} onClose={() => {}} />
+          <KickPicker key="pen" input={input.current} isNine={false} kind="touch" locked title="Kick for touch" aimAt={(x, y, k) => engine.current?.aimKickAt(x, y, k) ?? null}
+            flick={(dx, dy, k) => engine.current?.aimKickFlick(dx, dy, k) ?? null} onClose={() => {}} />
         )}
         {hud.kickoffAim && (
-          <KickPicker key="ko" input={input.current} isNine={false} kind="high" locked title="Kick-off" aimAt={(x, y, k) => engine.current?.aimKickAt(x, y, k) ?? null} onClose={() => {}} />
+          <KickPicker key="ko" input={input.current} isNine={false} kind="high" locked title="Kick-off" aimAt={(x, y, k) => engine.current?.aimKickAt(x, y, k) ?? null}
+            flick={(dx, dy, k) => engine.current?.aimKickFlick(dx, dy, k) ?? null} onClose={() => {}} />
         )}
         {showControls && hud.catchPrompt && <CatchButton input={input.current} />}
         {hud.advantage && <div className={`adv-chip ${hud.advantage}`}>ADVANTAGE {hud.advantage === 'user' ? cfg.user.short : cfg.cpu.short}</div>}
@@ -370,14 +379,14 @@ export function MatchScreen({
         {showControls && <Joystick input={input.current} />}
         {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
         {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} ruckDef={hud.ruckDef} ruckBall={hud.ruckBall} onKick={() => openKick(hud.isNine && hud.atBase ? 'box' : undefined)}
-            onKickDrag={(x, y) => {
+            onKickDrag={(dx, dy) => {
               input.current.kickAim.active = true;
               input.current.kickAim.kind = kickKind;
-              engine.current?.aimKickAt(x, y, kickKind);
+              engine.current?.aimKickFlick(dx, dy, kickKind);
             }}
             onKickRelease={() => {
               input.current.actions.push({ type: 'kick', kind: kickKind, dist: 30, angle: 0, power: 0.85 });
-              closeKick();
+              closeKick(true);
             }}
             atBase={hud.atBase && !boxKick} onBoxKick={() => openKick('box')} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
@@ -446,10 +455,40 @@ export function MatchScreen({
                 </button>
               ))}
             </div>
+            <button
+              className="btn cyan"
+              style={{ marginTop: 10 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setPlays(false);
+                setDesigning(true);
+                engine.current?.setPaused(true);
+              }}
+            >
+              + Design a play on the pitch
+            </button>
           </div>
         </div>
       )}
 
+      {designing && (
+        <div className="sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="card" style={{ minWidth: 320, maxHeight: '88vh', overflowY: 'auto' }}>
+          <h3>My set plays</h3>
+          <CustomPlaysEditor
+            plays={profile.settings.customPlays ?? []}
+            onChange={(pl) => {
+              update((p) => (p.settings.customPlays = pl));
+              cfg.customPlays = pl;
+              engine.current?.setCustomPlays(pl);
+            }}
+          />
+          </div>
+          <button className="btn primary design-done" onClick={() => (setDesigning(false), engine.current?.setPaused(false))}>
+            Done
+          </button>
+        </div>
+      )}
       {penalty && (
         <div className="sheet">
           <div className="card" style={{ textAlign: 'center' }}>
