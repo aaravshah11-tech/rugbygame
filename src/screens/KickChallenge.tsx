@@ -71,7 +71,7 @@ export function KickChallenge({ go }: { go: Go }) {
                 </div>
                 <p className="muted" style={{ margin: '4px 0', fontSize: 13 }}>{lv.desc}</p>
                 <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>
-                  {lv.spots.length} kicks · wind {lv.wind} km/h{st ? ` · best ${st.best}/${lv.spots.length}` : ''}
+                  {lv.spots.length} kicks · wind {Math.round(lv.wind / 1.609)} mph{st ? ` · best ${st.best}/${lv.spots.length}` : ''}
                 </p>
                 <button className={`btn ${st?.passed ? 'ghost' : 'primary'}`} disabled={!unlocked} onClick={() => play(i)}>
                   {!unlocked ? 'Locked 🔒' : st?.passed ? 'Passed ✓ — play again' : 'Start'}

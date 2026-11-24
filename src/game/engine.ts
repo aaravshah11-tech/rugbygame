@@ -626,7 +626,7 @@ export class MatchEngine {
     const { fx, fz, rx, rz } = this.camAxes();
     const up = this.wind.x * fx + this.wind.z * fz;
     const right = this.wind.x * rx + this.wind.z * rz;
-    return { deg: Math.round((Math.atan2(right, up) * 180) / Math.PI), kmh: Math.round(Math.hypot(this.wind.x, this.wind.z) * 3.6) };
+    return { deg: Math.round((Math.atan2(right, up) * 180) / Math.PI), mph: Math.round(Math.hypot(this.wind.x, this.wind.z) * 2.237) };
   }
 
   pop(text: string, tone: 'good' | 'bad' | 'big') {

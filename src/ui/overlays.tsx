@@ -404,7 +404,7 @@ export function PlaceKickUI({ req, engine, onDone, paused = false }: { req: Plac
         <div className="arrow" style={{ transform: `rotate(${windDeg}deg)` }}>
           ↑
         </div>
-        {Math.round(req.windSpeed)} km/h
+        {Math.round(req.windSpeed / 1.609)} mph
         <div className="muted" style={{ fontSize: 10 }}>{Math.round(distOut ?? req.distance)}m out</div>
       </div>
       {req.kind === 'conversion' && !gone && (

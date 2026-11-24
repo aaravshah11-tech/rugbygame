@@ -27,7 +27,7 @@ const SET_PLAYS: { id: SetPlayId; name: string; desc: string }[] = [
 
 const emptyHud: HudState = {
   userScore: 0, cpuScore: 0, clock: '00:00', half: 1, attacking: false, canAct: false,
-  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null, catchPrompt: false, wind: { deg: 0, kmh: 0 }, isNine: false, call: null, penTouch: false, atBase: false, nineWait: false, chargePrompt: null, canDiveTry: false, kickoffAim: false, maulDefend: false, advantage: null, sinBin: [],
+  controlledName: '', controlledNum: 0, stamina: 1, timeUp: false, phase: 'pre', phaseNum: 0, ruck: null, canDrop: false, mph: 0, scrum: null, nearDef: false, offload: false, ruckDef: 'none', ruckBall: null, catchPrompt: false, wind: { deg: 0, mph: 0 }, isNine: false, call: null, penTouch: false, atBase: false, nineWait: false, chargePrompt: null, canDiveTry: false, kickoffAim: false, maulDefend: false, advantage: null, sinBin: [],
 };
 
 export function MatchScreen({
@@ -395,10 +395,10 @@ export function MatchScreen({
             </div>
           </div>
         )}
-        {!cfg.drill && hud.wind.kmh > 0 && (
+        {!cfg.drill && hud.wind.mph > 0 && (
           <div className="wind-chip">
             <span style={{ transform: `rotate(${hud.wind.deg}deg)` }}>↑</span>
-            {hud.wind.kmh} km/h
+            {hud.wind.mph} mph
           </div>
         )}
         {hud.scrum && !mini && <ScrumBattle s={hud.scrum} input={input.current} userShort={cfg.user.short} cpuShort={cfg.cpu.short} />}

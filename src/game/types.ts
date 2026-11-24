@@ -113,8 +113,8 @@ export interface HudState {
   call: null | { title: string; opts: { id: string; label: string; sub?: string }[]; left: number };
   /** a high ball is dropping onto your player: tap CATCH */
   catchPrompt: boolean;
-  /** wind as seen on screen: angle (deg, 0 = up the screen) and km/h */
-  wind: { deg: number; kmh: number };
+  /** wind as seen on screen: angle (deg, 0 = up the screen) and mph (same unit as player speed) */
+  wind: { deg: number; mph: number };
   /** the carrier is the scrum-half (box kick available) */
   isNine: boolean;
   /** CPU conversion: wait for the run-up, then CHARGE */
