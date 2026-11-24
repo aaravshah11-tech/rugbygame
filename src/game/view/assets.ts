@@ -83,6 +83,8 @@ export interface PlayerAsset {
   headCenter: THREE.Vector3;
   headRadius: number;
   eyes: THREE.Vector3[];
+  /** ground speed (m/s) of the walk / run clips at normal playback */
+  gaitSpeed?: Partial<Record<AnimName, number>>;
 }
 
 let pending: Promise<PlayerAsset | null> | null = null;
@@ -345,13 +347,40 @@ function prepare(gltfScene: THREE.Object3D, animations: THREE.AnimationClip[]): 
   const all: AnimName[] = ['idle', 'walk', 'run', 'sidestepL', 'sidestepR', 'pass', 'catch', 'kick', 'tackle', 'dive', 'fall', 'getup', 'celebrate', 'handoff', 'bind', 'lying', 'carry', 'base'];
   for (const n of all) if (!clips.has(n)) clips.set(n, idle);
 
+  // Measure how fast each gait really travels (stride length / cycle time), so playback can be
+  // matched to the player's ground speed and the feet stop sliding.
+  const gaitSpeed: Partial<Record<AnimName, number>> = {};
+  const unit = 1.83 / (height * 1.02); // model units -> metres for an average player
+  for (const name of ['walk', 'run'] as AnimName[]) {
+    const clip = clips.get(name);
+    const foot = findBone(scene, 'LFoot');
+    if (!clip || !foot || clip.duration <= 0) continue;
+    mixer.stopAllAction();
+    const act = mixer.clipAction(clip);
+    act.reset().play();
+    let lo = Infinity;
+    let hi = -Infinity;
+    const wp = new THREE.Vector3();
+    for (let i = 0; i <= 24; i++) {
+      mixer.setTime((clip.duration * i) / 24);
+      scene.updateMatrixWorld(true);
+      foot.getWorldPosition(wp);
+      lo = Math.min(lo, wp.z);
+      hi = Math.max(hi, wp.z);
+    }
+    act.stop();
+    const speed = (2 * (hi - lo) * unit) / clip.duration;
+    const [min, max] = name === 'run' ? [3, 9.5] : [0.8, 3];
+    if (Number.isFinite(speed) && speed >= min && speed <= max) gaitSpeed[name] = speed;
+  }
+
   // Leave the template in the Idle pose so every clone starts from it.
   mixer.stopAllAction();
   mixer.clipAction(idle).play();
   mixer.update(0);
   mixer.uncacheRoot(scene);
   scene.updateMatrixWorld(true);
-  return { scene, clips, height, backZ, backY, headCenter, headRadius, eyes };
+  return { scene, clips, height, backZ, backY, headCenter, headRadius, eyes, gaitSpeed };
 }
 
 // ------------------------------------------------------------------ procedural clips

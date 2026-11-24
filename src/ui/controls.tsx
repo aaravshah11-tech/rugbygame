@@ -199,6 +199,8 @@ export function ActionButtons({
   ruckDef = 'none',
   ruckBall = null,
   onKick,
+  onKickDrag,
+  onKickRelease,
   atBase = false,
   onBoxKick,
 }: {
@@ -211,10 +213,13 @@ export function ActionButtons({
   ruckDef?: 'none' | 'contest' | 'fan';
   ruckBall?: 'quick' | 'slow' | 'danger' | null;
   onKick?: () => void;
+  onKickDrag?: (x: number, y: number) => void;
+  onKickRelease?: () => void;
   atBase?: boolean;
   onBoxKick?: () => void;
 }) {
   const passStart = useRef(0);
+  const kickStart = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const sprint = {
     onDown: () => (input.sprintHold = true),
     onUp: () => (input.sprintHold = false),
@@ -315,7 +320,29 @@ export function ActionButtons({
         <PassIcon dir={1} />
       </ActionButton>
       <ActionButton label="Sprint" size="med" color="cyan" pos={{ right: 104, bottom: 0 }} {...sprint} />
-      <ActionButton label="Kick" sub="choose kick" size="med" color="gold" pos={{ right: 14, bottom: 150 }} onDown={() => onKick?.()}>
+      <ActionButton
+        label="Kick"
+        sub="drag to aim"
+        size="med"
+        color="gold"
+        pos={{ right: 14, bottom: 150 }}
+        onDown={(e) => {
+          kickStart.current = { x: e.clientX, y: e.clientY, moved: false };
+          onKick?.();
+        }}
+        onMove={(e) => {
+          const k0 = kickStart.current;
+          if (!k0) return;
+          if (Math.hypot(e.clientX - k0.x, e.clientY - k0.y) > 24) k0.moved = true;
+          if (k0.moved) onKickDrag?.(e.clientX, e.clientY);
+        }}
+        onUp={(_e, cancelled) => {
+          const k0 = kickStart.current;
+          kickStart.current = null;
+          // dragged straight off the button onto the pitch: kick on release; a tap leaves the aim open
+          if (k0?.moved && !cancelled) onKickRelease?.();
+        }}
+      >
         <KickIcon />
       </ActionButton>
       <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 200, bottom: 12 }} onDown={() => input.actions.push({ type: 'handoff' })} />
@@ -335,109 +362,74 @@ export const KICKS: { kind: KickKind; label: string; desc: string; def: number; 
 ];
 
 /**
- * Kick picker: choose a kick, then touch the pitch where you want it to land.
- * Hold to build power (green = right, red = overcooked), drag to move the spot, let go to kick.
+ * Kick aim. Play is frozen: drag your finger to where you want the ball to land (the arc and
+ * landing ring follow you) and let go to kick. The chips along the top change the kick type.
  */
 export function KickPicker({
   input,
   isNine,
+  kind,
+  setKind,
   onClose,
   aimAt,
-  preset,
+  locked = false,
+  title,
 }: {
   input: InputState;
   isNine: boolean;
+  kind: KickKind;
+  setKind?: (k: KickKind) => void;
   onClose: () => void;
-  /** screen point -> metres to the landing spot (or null if off the pitch) */
   aimAt: (x: number, y: number, kind: KickKind) => number | null;
-  /** start already armed with this kick (penalty to touch) and no cancel */
-  preset?: KickKind;
+  /** kick type fixed (kick-off, penalty to touch); no cancel */
+  locked?: boolean;
+  title?: string;
 }) {
-  const [armed, setArmed] = useState<(typeof KICKS)[number] | null>(preset ? KICKS.find((k) => k.kind === preset)! : null);
-  const [power, setPower] = useState(0);
   const [dist, setDist] = useState<number | null>(null);
-  const st = useRef<{ t: number; id: number } | null>(null);
-  const raf = useRef(0);
-  const target = useRef<{ x: number; y: number } | null>(null);
+  const st = useRef<number | null>(null);
   useEffect(() => {
-    if (preset) Object.assign(input.kickAim, { active: true, kind: preset, dist: 30, angle: 0 });
-    return () => {
-      cancelAnimationFrame(raf.current);
-      input.kickAim.active = false;
-    };
-  }, [input, preset]);
-  if (!armed) {
-    return (
-      <div className="kick-picker" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="kick-chips">
-          {KICKS.filter((k) => k.kind !== 'box' || isNine).map((k) => (
-            <button
-              key={k.kind}
-              className="kick-chip"
-              onPointerDown={() => {
-                haptic('light');
-                setArmed(k);
-                Object.assign(input.kickAim, { active: true, kind: k.kind, dist: k.def, angle: 0 });
-              }}
-            >
-              <b>{k.label}</b>
-              <small>{k.desc}</small>
-            </button>
-          ))}
-          <button className="kick-chip cancel" onPointerDown={onClose}>
-            ✕
-          </button>
-        </div>
-      </div>
-    );
-  }
-  const k = armed;
+    Object.assign(input.kickAim, { active: true, kind, dist: 30, angle: 0 });
+  }, [input, kind]);
   const point = (e: React.PointerEvent) => {
-    const d = aimAt(e.clientX, e.clientY, k.kind);
-    if (d !== null) {
-      target.current = { x: e.clientX, y: e.clientY };
-      setDist(d);
-    }
+    const d = aimAt(e.clientX, e.clientY, kind);
+    if (d !== null) setDist(d);
   };
+  const k = KICKS.find((x) => x.kind === kind);
   return (
     <div
       className="kick-aim"
       onPointerDown={(e) => {
-        st.current = { t: performance.now(), id: e.pointerId };
+        st.current = e.pointerId;
         point(e);
-        const loop = () => {
-          if (!st.current) return;
-          setPower(Math.min(1.25, (performance.now() - st.current.t) / 1000));
-          raf.current = requestAnimationFrame(loop);
-        };
-        raf.current = requestAnimationFrame(loop);
       }}
       onPointerMove={(e) => {
-        if (st.current && st.current.id === e.pointerId) point(e);
+        if (st.current === e.pointerId) point(e);
       }}
       onPointerUp={(e) => {
-        const s0 = st.current;
-        if (!s0 || s0.id !== e.pointerId) return;
+        if (st.current !== e.pointerId) return;
         st.current = null;
-        cancelAnimationFrame(raf.current);
-        if (!target.current) return;
-        const pw = Math.min(1.25, (performance.now() - s0.t) / 1000);
-        input.actions.push({ type: 'kick', kind: k.kind, dist: dist ?? k.def, angle: 0, power: Math.max(0.3, pw), tx: NaN, tz: NaN });
+        if (dist === null) return;
+        input.actions.push({ type: 'kick', kind, dist, angle: 0, power: 0.85 });
         input.kickAim.active = false;
+        haptic('tackle');
         onClose();
       }}
     >
-      {target.current && st.current && <div className="kick-target" style={{ left: target.current.x, top: target.current.y }} />}
-      <div className="kick-aim-hud">
-        <b>{k.label.toUpperCase()}</b>
-        {dist !== null ? ` · ${Math.round(dist)}m` : ''}
-        <div className="kick-power">
-          <div className="kick-power-fill" style={{ width: `${(Math.min(power, 1.25) / 1.25) * 100}%`, background: power > 1 ? '#ff3d5e' : power > 0.6 ? '#7dff3a' : '#ffb020' }} />
-          <div className="kick-power-zone" />
+      {!locked && setKind && (
+        <div className="kick-types" onPointerDown={(e) => e.stopPropagation()}>
+          {KICKS.filter((x) => x.kind !== 'box' || isNine).map((x) => (
+            <button key={x.kind} className={`kick-type ${x.kind === kind ? 'on' : ''}`} onPointerDown={(e) => (e.stopPropagation(), setKind(x.kind), setDist(null))}>
+              {x.label}
+            </button>
+          ))}
         </div>
-        <small>{dist === null ? 'Touch the pitch where you want it to land' : 'Hold for power (green zone) · slide to move the spot · let go to kick'}</small>
+      )}
+      <div className="kick-aim-hud">
+        <b>{(title ?? k?.label ?? 'Kick').toUpperCase()}</b>
+        {dist !== null ? ` · ${Math.round(dist)}m` : ''}
+        <small>{dist === null ? 'Drag your finger to where you want it to land' : 'Slide to adjust · let go to kick'}</small>
       </div>
-      {!preset && (
+      {!locked && (
         <button
           className="kick-chip cancel kick-aim-cancel"
           onPointerDown={(e) => {

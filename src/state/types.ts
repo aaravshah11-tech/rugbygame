@@ -12,6 +12,19 @@ export interface Tactics {
   attack: AttackStyle;
   defence: DefenceStyle;
   kicking: KickStyle;
+  /** your own tuning, 0.6 .. 1.4 (1 = normal) */
+  depth?: number;
+  width?: number;
+  lineSpeed?: number;
+  /** players committed to each ruck: 1 (keep them in the line) .. 3 (secure every ball) */
+  ruckCommit?: number;
+}
+
+/** A set play you design: who gets the ball and the line they run. */
+export interface CustomPlay {
+  id: string;
+  name: string;
+  steps: { num: number; line: 'crash' | 'switch' | 'loop' | 'wide' | 'out' }[];
 }
 
 export interface Settings {
@@ -29,6 +42,7 @@ export interface Settings {
   leftHanded: boolean;
   /** action button size multiplier */
   buttonScale: number;
+  customPlays?: CustomPlay[];
 }
 
 export interface Fixture {

@@ -5,7 +5,7 @@ import { nationById } from '../data/nations';
 import { TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
-import { nationOvr } from '../state/tournaments';
+import { nationOvr, simulateScore } from '../state/tournaments';
 import { COMP_INFO, compUserFixture, createComp, finishComp, type CompKind } from '../state/comps';
 import { finishCompMatch } from '../state/outcomes';
 import { FixtureRow, StandingsTable } from './Championship';
@@ -19,6 +19,7 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
   const c = p.comps[kind] ?? null;
   const info = COMP_INFO[kind];
   const [tab, setTab] = useState<string>('table0');
+  const [simMsg, setSimMsg] = useState('');
 
   if (!c) {
     return (
@@ -57,6 +58,21 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
     const cfg = buildMatch(nationTeam(c.user), nationTeam(userHome ? next.away : next.home), userHome, p);
     const fid = next.id;
     go({ name: 'match', cfg, back: { name: 'comp', kind }, onFinish: (r) => finishCompMatch(cfg, kind, fid, r) });
+  };
+
+  const simulate = () => {
+    if (!next) return;
+    audio.click();
+    const userHome = next.home === c.user;
+    const cfg = buildMatch(nationTeam(c.user), nationTeam(userHome ? next.away : next.home), userHome, p);
+    const sc = simulateScore(nationOvr(next.home), nationOvr(next.away), !next.stage.startsWith('R'));
+    const us = userHome ? sc.homeScore : sc.awayScore;
+    const them = userHome ? sc.awayScore : sc.homeScore;
+    const out = finishCompMatch(cfg, kind, next.id, {
+      userScore: us, cpuScore: them, userTries: userHome ? sc.homeTries : sc.awayTries, cpuTries: userHome ? sc.awayTries : sc.homeTries,
+      user: { tries: 0, tackles: 0, conversions: 0, passes: 0, penalties: 0, dropGoals: 0 },
+    });
+    setSimMsg(`${nationById(c.user).name} ${us} – ${them} ${nationById(userHome ? next.away : next.home).name}. ${out.lines.slice(1).join(' ')}`);
   };
 
   const league = c.fixtures.filter((f) => f.stage.startsWith('R'));
@@ -147,6 +163,10 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
               <button className="btn primary" style={{ minHeight: 54, fontSize: 19, width: '100%' }} disabled={!next} onClick={play}>
                 Play match
               </button>
+              <button className="btn ghost" style={{ width: '100%' }} disabled={!next} onClick={simulate}>
+                Simulate result
+              </button>
+              {simMsg && <div className="muted" style={{ fontSize: 13 }}>{simMsg}</div>}
             </>
           )}
         </div>

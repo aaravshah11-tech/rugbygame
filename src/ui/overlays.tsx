@@ -117,7 +117,7 @@ export function MiniGame({ req, difficulty, onDone }: { req: MiniGameRequest; di
     let last = performance.now();
     const loop = () => {
       const now = performance.now();
-      fillRef.current = Math.min(1, fillRef.current + (now - last) / 800);
+      fillRef.current = Math.min(1, fillRef.current + (now - last) / 520);
       last = now;
       setFill(fillRef.current);
       if (!done.current) raf = requestAnimationFrame(loop);

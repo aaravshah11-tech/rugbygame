@@ -5,7 +5,7 @@ import { CLUBS, NATIONS, nationById } from '../data/nations';
 import { Seg, TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
-import { nationOvr } from '../state/tournaments';
+import { nationOvr, simulateScore } from '../state/tournaments';
 import { finishQuick } from '../state/outcomes';
 import type { Difficulty, HalfLength, Weather } from '../state/types';
 import { TacticsPanel } from '../ui/tactics';
@@ -34,6 +34,18 @@ export function QuickMatch({ go }: { go: Go }) {
     audio.click();
     const cfg = buildMatch(nationTeam(home), nationTeam(away), true, p);
     go({ name: 'match', cfg, back: { name: 'quick' }, onFinish: (r) => finishQuick(cfg, r) });
+  };
+
+  const [simMsg, setSimMsg] = useState('');
+  const simulate = () => {
+    audio.click();
+    const cfg = buildMatch(nationTeam(home), nationTeam(away), true, p);
+    const sc = simulateScore(nationOvr(home), nationOvr(away));
+    const out = finishQuick(cfg, {
+      userScore: sc.homeScore, cpuScore: sc.awayScore, userTries: sc.homeTries, cpuTries: sc.awayTries,
+      user: { tries: 0, tackles: 0, conversions: 0, passes: 0, penalties: 0, dropGoals: 0 },
+    });
+    setSimMsg(`${out.title} ${nationById(home).short} ${sc.homeScore} – ${sc.awayScore} ${nationById(away).short}${out.coins ? ` · +${out.coins} coins` : ''}`);
   };
 
   const H = nationById(home);
@@ -107,9 +119,15 @@ export function QuickMatch({ go }: { go: Go }) {
             <summary>Tactics</summary>
             <TacticsPanel value={p.settings.tactics} onChange={(t) => update((x) => (x.settings.tactics = t))} />
           </details>
-          <button className="btn primary" style={{ marginTop: 'auto', minHeight: 54, fontSize: 20 }} onClick={start}>
-            Kick off
-          </button>
+          {simMsg && <div className="muted" style={{ fontSize: 13, textAlign: 'center' }}>{simMsg}</div>}
+          <div className="row" style={{ marginTop: 'auto', gap: 8 }}>
+            <button className="btn ghost" style={{ minHeight: 54 }} onClick={simulate}>
+              Simulate
+            </button>
+            <button className="btn primary grow" style={{ minHeight: 54, fontSize: 20 }} onClick={start}>
+              Kick off
+            </button>
+          </div>
         </div>
       </div>
     </div>

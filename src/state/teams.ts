@@ -105,5 +105,6 @@ export function buildMatch(user: TeamSetup, cpu: TeamSetup, userIsHome: boolean,
     tactics: p.settings.tactics ?? { attack: 'balanced', defence: 'balanced', kicking: 'balanced' },
     rules: p.settings.rules ?? 'standard',
     autoSwitch: p.settings.autoSwitch ?? true,
+    customPlays: p.settings.customPlays ?? [],
   };
 }

@@ -4,6 +4,7 @@ import { Seg, TopBar } from '../ui/common';
 import { resetProfile, update, useProfile } from '../state/store';
 import type { CameraMode, Difficulty, HalfLength, RulesMode } from '../state/types';
 import { TacticsPanel } from '../ui/tactics';
+import { CustomPlaysEditor } from '../ui/setplays';
 import { currentUser, pullProfile, pushProfile, sendMagicLink, signOut, syncAvailable } from '../state/sync';
 import { audio } from '../util/audio';
 import { haptic } from '../util/haptics';
@@ -128,6 +129,10 @@ export function Settings({ go }: { go: Go }) {
           <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <h3>Tactics</h3>
             <TacticsPanel value={s.tactics} onChange={(t) => update((x) => (x.settings.tactics = t))} />
+          </div>
+          <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h3>My set plays</h3>
+            <CustomPlaysEditor plays={s.customPlays ?? []} onChange={(pl) => update((x) => (x.settings.customPlays = pl))} />
           </div>
           <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <h3>Account &amp; save</h3>

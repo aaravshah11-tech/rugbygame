@@ -1,6 +1,6 @@
 import type { Kit } from '../data/nations';
 import type { Player, Ratings } from '../data/players';
-import type { CameraMode, Difficulty, RulesMode, Tactics, Weather } from '../state/types';
+import type { CameraMode, CustomPlay, Difficulty, RulesMode, Tactics, Weather } from '../state/types';
 import type { QualitySetting } from './view/quality';
 
 export interface TeamSetup {
@@ -37,6 +37,8 @@ export interface MatchConfig {
   tactics: Tactics;
   rules: RulesMode;
   autoSwitch: boolean;
+  /** set plays the user designed */
+  customPlays?: CustomPlay[];
   /** scenario overrides (daily challenges) */
   challenge?: ChallengeSetup;
 }
@@ -113,10 +115,16 @@ export interface HudState {
   wind: { deg: number; kmh: number };
   /** the carrier is the scrum-half (box kick available) */
   isNine: boolean;
+  /** CPU conversion: wait for the run-up, then CHARGE */
+  chargePrompt: null | 'wait' | 'go';
+  /** close enough to dive for the line */
+  canDiveTry: boolean;
   /** your scrum-half has the ball at the base of a ruck */
   atBase: boolean;
   /** ruck ball is ready but your 9 is still getting there */
   nineWait: boolean;
+  /** your kick-off / drop-out: drag to aim */
+  kickoffAim: boolean;
   /** lining up a penalty kick to touch: show the kick aim */
   penTouch: boolean;
   /** offload window open: PASS now to offload in the tackle */
@@ -187,6 +195,8 @@ export type InputAction =
   | { type: 'call'; id: string }
   | { type: 'basePass'; dir: -1 | 1 }
   | { type: 'pickGo' }
+  | { type: 'charge' }
+  | { type: 'diveTry' }
   | { type: 'snipe' }
   | { type: 'dodge'; dir: -1 | 1 }
   | { type: 'setplay'; id: SetPlayId };
@@ -194,7 +204,7 @@ export type InputAction =
 /** Open-play kicks: punt (long), box (9 only), grubber, chip, high (up-and-under), touch, cross (cross-field). */
 export type KickKind = 'punt' | 'grubber' | 'box' | 'chip' | 'high' | 'touch' | 'cross';
 
-export type SetPlayId = 'crash' | 'loop' | 'miss' | 'switch' | 'upandunder';
+export type SetPlayId = 'crash' | 'loop' | 'miss' | 'switch' | 'upandunder' | `custom:${string}`;
 
 export interface InputState {
   moveX: number;
