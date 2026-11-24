@@ -1,3 +1,4 @@
+import { CFG } from './gameConfig';
 import * as THREE from 'three';
 import { effectiveRatings, playerOvr, type Player, type Ratings } from '../data/players';
 import { FIELD } from './stadium';
@@ -255,6 +256,17 @@ export class MatchEngine {
   private waitingBlocking = false;
   private miniId = 0;
   private activeMini: { id: number; kind: MiniGameKind; q: number | null; taps: number; done: boolean } | null = null;
+  /** Safety net: a blocking prompt that never answers (lost UI, backgrounded tab...) resolves itself. */
+  private blockedFor = 0;
+  private blockingResolve: ((q: number) => void) | null = null;
+  private blockWatchdog(dt: number) {
+    this.blockedFor += dt;
+    if (this.blockedFor < CFG.prompts.engineWatchdog) return;
+    this.blockedFor = 0;
+    const am = this.activeMini;
+    if (am && !am.done && this.blockingResolve) this.blockingResolve(0.3);
+    else this.waitingBlocking = false;
+  }
   private ruck: null | { x: number; z: number; att: Side; t: number; dur: number; progress: number; addAtt: number; addDef: number; contest: number; fan: boolean; userDef: 'none' | 'contest' | 'fan'; nineWait?: boolean } = null;
   private ruckArc: THREE.Mesh | null = null;
   private ruckArcBg: THREE.Mesh | null = null;
@@ -722,6 +734,7 @@ export class MatchEngine {
       this.time += sdt;
       if (this.replay) this.updateReplay(dt);
       else if (!this.waitingBlocking) this.update(sdt);
+      else this.blockWatchdog(dt);
     }
     this.render(this.paused ? 0 : sdt);
   }
@@ -1438,7 +1451,8 @@ export class MatchEngine {
     const depthK = (st === 'forwards' ? 1.2 : st === 'expansive' ? 2.3 : 1.8) * this.customTac(side).depth;
     const widthK = st === 'forwards' ? 0.85 : st === 'expansive' ? 1.12 : 1;
     const gap = clamp((room / n) * widthK * this.customTac(side).width, 2.6, 7);
-    const j = Math.min(k, 6);
+    // first wave: slots 0-6; anyone beyond forms a second wave further back, each in his own lane
+    const j = k >= 7 ? k - 7 : Math.min(k, 6);
     const deep = k >= 7 ? 6 : 0;
     // forwards (1-8) hang a little flatter as pods, wingers always hold the width
     const wing = p.num === 11 || p.num === 14;
@@ -1889,6 +1903,8 @@ export class MatchEngine {
       return lat > 1.8 && behind > -1 && behind < 14 && dist(p.x, p.z, passer.x, passer.z) < (long ? 30 : 20);
     });
     if (!cands.length) return undefined;
+    // prefer runners clearly behind the ball; a level runner only if nobody else is there
+    if (cands.some((p) => (passer.x - p.x) * d > 0.5)) cands.splice(0, cands.length, ...cands.filter((p) => (passer.x - p.x) * d > 0.5));
     const ideal = long ? 15 : 6.5;
     const nearestLat = Math.min(...cands.map((p) => Math.abs(p.z - passer.z)));
     let best: P | undefined;
@@ -3062,7 +3078,7 @@ export class MatchEngine {
       const pod = i % 2 === 0 ? open : -open;
       const k = Math.floor(i / 2);
       if (k < 3) spots.set(p, { x: x - d * (3.2 + (k === 1 ? 1 : 0)), z: cz(z + pod * (3.5 + k * 1.7)) });
-      else spots.set(p, { x: x - d * 7, z: cz(z + pod * 4) });
+      else spots.set(p, { x: x - d * 7, z: cz(z + pod * (4 + (k - 3) * 2.6)) }); // trailing forwards spread out
     });
     for (const p of A) {
       if (p.num <= 8) continue;
@@ -3286,7 +3302,19 @@ export class MatchEngine {
   private requestMini(kind: MiniGameKind, blocking: boolean, duration: number, after?: (q: number) => void) {
     const id = ++this.miniId;
     this.activeMini = { id, kind, q: null, taps: 0, done: false };
-    if (blocking) this.waitingBlocking = true;
+    if (blocking) {
+      this.waitingBlocking = true;
+      this.blockedFor = 0;
+    }
+    const resolve = (q: number) => {
+      const am = this.activeMini;
+      if (!am || am.id !== id || am.done) return;
+      am.q = q;
+      am.done = true;
+      if (blocking) this.waitingBlocking = false;
+      after?.(q);
+    };
+    if (blocking) this.blockingResolve = resolve;
     this.emit({
       type: 'minigame',
       req: {
@@ -3294,14 +3322,7 @@ export class MatchEngine {
         kind,
         blocking,
         duration,
-        resolve: (q) => {
-          const am = this.activeMini;
-          if (!am || am.id !== id || am.done) return;
-          am.q = q;
-          am.done = true;
-          if (blocking) this.waitingBlocking = false;
-          after?.(q);
-        },
+        resolve,
         onTap: () => {
           if (this.maul) this.maul.userPush += 0.8;
         },
