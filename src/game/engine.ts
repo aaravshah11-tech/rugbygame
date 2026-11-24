@@ -487,7 +487,7 @@ export class MatchEngine {
   private venue: Venue;
   private buildTeams(asset: PlayerAsset | null) {
     this.asset = asset;
-    const diffMod = { easy: -8, medium: 3, hard: 6, elite: 12 }[this.cfg.difficulty];
+    const diffMod = CFG.difficulty.cpuRating[this.cfg.difficulty];
     const mk = (team: TeamSetup, side: Side) => {
       const kit = asset ? makeTeamKit(team.kit) : null;
       team.players.slice(0, 15).forEach((pl, i) => {
@@ -650,7 +650,7 @@ export class MatchEngine {
     const remain = this.half === 1 ? 4800 - this.gameSec : 2400 - this.gameSec;
     const frac = clamp(remain / 4800, 0, 1);
     const str = (side: Side) => this.teams[side].reduce((a, p) => a + (p.r.pace + p.r.strength + p.r.handling + p.r.tackling + p.r.passing) / 5, 0) / 15;
-    const edge = (str(0) - str(1)) / 12 + { easy: 0.25, medium: -0.075, hard: -0.15, elite: -0.3 }[this.cfg.difficulty];
+    const edge = (str(0) - str(1)) / 12 + CFG.difficulty.simEdge[this.cfg.difficulty];
     for (const side of [0, 1] as Side[]) {
       const exp = 26 * frac * (1 + (side === 0 ? edge : -edge));
       let pts = 0;
@@ -1006,7 +1006,7 @@ export class MatchEngine {
         break;
       case 'tackle':
         if (c && live && this.atBaseT < 0 && b.carrier && b.carrier.side === 1 && c.state === 'free') {
-          const reach = { easy: 2.4, medium: 1.75, hard: 1.6, elite: 1.3 }[this.cfg.difficulty];
+          const reach = CFG.tackle.userPress[this.cfg.difficulty];
           if (dist(c.x, c.z, b.carrier.x, b.carrier.z) <= reach) this.attemptTackle(c, b.carrier, false);
         }
         break;
@@ -1193,13 +1193,12 @@ export class MatchEngine {
 
   // ---------------------------------------------------------------- movement
   private maxSpeed(p: P) {
-    // Quick, arcade-feel running: ~9.5 m/s for an average back.
-    // Realistic pace: ~7.5 m/s cruising for an average back, a bit more when sprinting.
-    let s = 4.6 + (p.r.pace / 100) * 2.4; // ~6.3 m/s (14 mph) for an average back, ~7.8 m/s sprinting
-    if (this.ball.carrier === p) s *= 0.97;
-    // Tired legs: below half stamina players lose up to 15% of their pace.
-    s *= 0.85 + 0.15 * Math.min(1, p.stamina * 2);
-    if (p === this.controlled && p.side === 0) s *= 1.04;
+    const R = CFG.run;
+    let s = R.base + (p.r.pace / 100) * R.perPace;
+    if (this.ball.carrier === p) s *= R.carrierMult;
+    // Tired legs: below half stamina players lose some pace.
+    s *= R.tiredFloor + (1 - R.tiredFloor) * Math.min(1, p.stamina * 2);
+    if (p === this.controlled && p.side === 0) s *= R.userMult;
     return s;
   }
 
@@ -1244,13 +1243,13 @@ export class MatchEngine {
         const tx = carrierNow.x + carrierNow.vx * lead - p.x;
         const tz = carrierNow.z + carrierNow.vz * lead - p.z;
         const n = Math.hypot(tx, tz) || 1;
-        const spd = max * (p.stamina > 0.05 ? 1.24 : 1);
+        const spd = max * (p.stamina > 0.05 ? CFG.run.sprintMult : 1);
         dvx = (tx / n) * spd;
         dvz = (tz / n) * spd;
-        p.stamina = clamp(p.stamina - 0.1 * dt, 0, 1);
+        p.stamina = clamp(p.stamina - CFG.stamina.chaseDrain * dt, 0, 1);
       } else if (userDriven) {
         const sprinting = (inp.sprint || inp.sprintHold) && p.stamina > 0.05;
-        const spd = max * (sprinting ? 1.24 : 1) * Math.min(1, joy * 1.15);
+        const spd = max * (sprinting ? CFG.run.sprintMult : 1) * Math.min(1, joy * 1.15);
         if (joy > 0.05) {
           const mx = inp.moveX / Math.max(joy, 1);
           const my = inp.moveY / Math.max(joy, 1);
@@ -1260,7 +1259,7 @@ export class MatchEngine {
           dvx = (wx / n) * spd;
           dvz = (wz / n) * spd;
         }
-        p.stamina = clamp(p.stamina + (sprinting && joy > 0.1 ? -0.14 : 0.12) * dt, 0, 1);
+        p.stamina = clamp(p.stamina + (sprinting && joy > 0.1 ? -CFG.stamina.sprintDrain : CFG.stamina.userRecover) * dt, 0, 1);
       } else if (p.state === 'free' || p.state === 'bound') {
         // Ease the goal towards the AI's target so players glide into shape instead of jittering.
         const ease = Math.min(1, dt * (p.urgency >= 1 ? 9 : 3.2));
@@ -1274,7 +1273,7 @@ export class MatchEngine {
           dvx = (dx / d) * spd;
           dvz = (dz / d) * spd;
         }
-        p.stamina = clamp(p.stamina + 0.08 * dt, 0, 1);
+        p.stamina = clamp(p.stamina + CFG.stamina.aiRecover * dt, 0, 1);
       }
       if (p.sidestepT > 0 && this.ball.carrier === p) {
         dvz += p.sideDir * 7;
@@ -1538,7 +1537,7 @@ export class MatchEngine {
     const ds = this.tac[def].defence;
     const lineGap = ds === 'blitz' ? 3.2 : ds === 'drift' ? 6 : 5;
     const lineX = fx + dAtt * (this.atBaseT >= 0 ? 3.4 : lineGap);
-    const lineUrg = (ds === 'blitz' ? 0.95 : ds === 'drift' ? 0.72 : 0.8) * this.customTac(def).lineSpeed + (def === 1 ? { easy: -0.08, medium: 0.025, hard: 0.05, elite: 0.1 }[this.cfg.difficulty] : 0);
+    const lineUrg = (ds === 'blitz' ? 0.95 : ds === 'drift' ? 0.72 : 0.8) * this.customTac(def).lineSpeed + (def === 1 ? CFG.difficulty.cpuLineSpeed[this.cfg.difficulty] : 0);
     const drift = ds === 'drift' ? 0.5 : ds === 'blitz' ? 0.2 : 0.35;
     // Even lanes centred on the ball, nudged towards the attacker in each lane.
     const n = lineDef.length;
@@ -1576,7 +1575,7 @@ export class MatchEngine {
     // Holding TACKLE: the controlled defender tackles automatically once in range.
     const uc = this.controlled;
     if (carrier && this.phase === 'play' && this.atBaseT < 0 && uc && this.input.tackleHold && uc.side !== carrier.side && uc.state === 'free' && uc.tackleCD <= 0) {
-      const reach = { easy: 2.2, medium: 1.65, hard: 1.5, elite: 1.2 }[this.cfg.difficulty];
+      const reach = CFG.tackle.userHold[this.cfg.difficulty];
       if (dist(uc.x, uc.z, carrier.x, carrier.z) <= reach) this.attemptTackle(uc, carrier, false);
     }
     // CPU tackles (the user's controlled defender only tackles when the button is pressed)
@@ -1587,7 +1586,7 @@ export class MatchEngine {
         const d = dist(p.x, p.z, carrier.x, carrier.z);
         // Only tackle from in front or the side, not by catching up from behind on a sprinter.
         const fromBehind = (carrier.x - p.x) * dirOf(carrier.side) > 0.4 && Math.hypot(carrier.vx, carrier.vz) > 5;
-        if (d < 1.05 && !fromBehind) {
+        if (d < CFG.tackle.cpu && !fromBehind) {
           this.attemptTackle(p, carrier, false);
           if (this.ball.carrier !== carrier) break;
         }
@@ -1711,7 +1710,7 @@ export class MatchEngine {
   }
 
   private userAssist() {
-    return { easy: 0.12, medium: -0.005, hard: -0.04, elite: -0.11 }[this.cfg.difficulty];
+    return CFG.difficulty.userAssist[this.cfg.difficulty];
   }
 
   // ---------------------------------------------------------------- tackles
@@ -1975,7 +1974,7 @@ export class MatchEngine {
     let tx = target.x + target.vx * T + d * Math.min(1.2, run * 0.15);
     let tz = target.z + target.vz * T;
     let err = (1 - passer.r.passing / 100) * (long ? 1.8 : 0.9);
-    if (passer.side === 0) err *= { easy: 0.3, medium: 0.725, hard: 0.85, elite: 1.05 }[this.cfg.difficulty];
+    if (passer.side === 0) err *= CFG.difficulty.userPassError[this.cfg.difficulty];
     tx += rand.range(-err, err) * 0.5;
     // A pass always travels slightly backwards: aim at the receiver's line, never in front of the passer.
     if ((tx - passer.x) * d > -0.3) tx = passer.x - d * 0.3;
@@ -2210,7 +2209,7 @@ export class MatchEngine {
         this.say('They are charging!', 'bad', 'Kick it before they get there');
         haptic('tackle');
       }
-      const n = { easy: 1, medium: 2, hard: 3, elite: 3 }[this.cfg.difficulty];
+      const n = CFG.difficulty.cpuChargers[this.cfg.difficulty];
       for (const p of this.teams[1].filter((q) => q.state === 'free').sort((q, r) => dist(q.x, q.z, b.x, b.z) - dist(r.x, r.z, b.x, b.z)).slice(0, n)) {
         p.tx = p.gx = b.x;
         p.tz = p.gz = b.z;
@@ -2906,7 +2905,7 @@ export class MatchEngine {
         this.camMode = 'game';
         // nobody aims it: kick it 12m to the open side
         const mine = this.kickoffAim;
-        this.after(8, () => {
+        this.after(CFG.prompts.kickoffAim, () => {
           if (this.kickoffAim === mine) {
             this.kickTarget = null;
             this.kickoffKick();
@@ -3140,7 +3139,7 @@ export class MatchEngine {
     const att = r.att;
     const def = other(att);
     let pTurn = 0.06;
-    if (def === 1) pTurn += { easy: -0.03, medium: 0.03, hard: 0.05, elite: 0.09 }[this.cfg.difficulty];
+    if (def === 1) pTurn += CFG.difficulty.cpuRuckSteal[this.cfg.difficulty];
     // ADD PLAYER: attackers secure the ball, defenders committing make a steal likelier
     if (att === 0) pTurn *= Math.pow(0.45, r.addAtt);
     else pTurn = Math.min(0.55, pTurn + r.addDef * 0.16);
@@ -3166,7 +3165,7 @@ export class MatchEngine {
       this.stoppage(() => this.awardPenalty(0, r.x, r.z));
       return;
     }
-    const cpuOff = { easy: 0.06, medium: 0.028, hard: 0.02, elite: 0.005 }[this.cfg.difficulty];
+    const cpuOff = CFG.difficulty.cpuRuckOffside[this.cfg.difficulty];
     if (att === 0 && rand.chance(cpuOff * this.strict()) && !this.advantage) {
       // play on: the user has the advantage
       this.advantage = { side: 0, x: r.x, z: r.z, startX: r.x, t: 0 };
@@ -3203,7 +3202,7 @@ export class MatchEngine {
   private startMaul(x: number, z: number, att: Side, carrier: P) {
     this.phase = 'maul';
     this.phaseT = 0;
-    const cpuPush = { easy: 0.9, medium: 1.25, hard: 1.6, elite: 2 }[this.cfg.difficulty] + (this.teamStrength(1) - 75) / 30;
+    const cpuPush = CFG.difficulty.cpuMaulPush[this.cfg.difficulty] + (this.teamStrength(1) - 75) / 30;
     this.maul = { x, z, att, t: 0, dur: 3.4, start: x, carrier, cpuPush, userPush: 0 };
     const b = this.ball;
     b.carrier = carrier;
@@ -3391,7 +3390,7 @@ export class MatchEngine {
     }
     // Push battle: the feeding side has a small edge, a good engage adds to the user's.
     const base = this.players.filter((p) => p.state === 'bound').map((p) => ({ p, x: p.x, z: p.z }));
-    const cpu = { easy: 0.55, medium: 0.79, hard: 0.86, elite: 1 }[this.cfg.difficulty] + (this.teamStrength(1) - this.teamStrength(0)) / 45;
+    const cpu = CFG.difficulty.cpuScrumPush[this.cfg.difficulty] + (this.teamStrength(1) - this.teamStrength(0)) / 45;
     this.scrum = {
       x, z, feed, bal: (q - 0.5) * 0.35, t: 0, dur: 4.2, user: 0, cpu, bias: feed === 0 ? 0.12 : -0.12,
       stage: 'push', chooseT: 0, winner: feed, base,
@@ -3657,7 +3656,7 @@ export class MatchEngine {
         this.camMode = 'game';
         // nobody aims it: kick for the nearer touchline 25m upfield
         const mine = this.penTouch;
-        this.after(10, () => {
+        this.after(CFG.prompts.penaltyTouchAim, () => {
           if (this.penTouch !== mine) return;
           this.kickTarget = { x: px + d * 25, z: (pz >= 0 ? 1 : -1) * (FIELD.halfW + 2) };
           this.penaltyTouchKick({ type: 'kick', kind: 'touch', dist: 30, angle: 0, power: 0.85, tx: this.kickTarget.x, tz: this.kickTarget.z });
@@ -3729,7 +3728,7 @@ export class MatchEngine {
       // CPU kicker
       const angleF = Math.abs(z) / Math.max(goalDist, 1);
       let p = 1.08 - goalDist / 58 - angleF * 0.3 + (kicker.r.kicking - 75) / 140;
-      p += { easy: -0.12, medium: 0.03, hard: 0.06, elite: 0.12 }[this.cfg.difficulty];
+      p += CFG.difficulty.cpuGoalKick[this.cfg.difficulty];
       const success = rand.chance(clamp(p, 0.12, 0.95));
       const aimErr = success ? rand.range(-0.6, 0.6) : (rand.chance(0.5) ? -1 : 1) * rand.range(4, 9);
       // conversions: the kicker's run-up starts at 1.2s, the kick goes at 2.2s; you can charge in between
@@ -3766,7 +3765,7 @@ export class MatchEngine {
     const skill = 1.25 - kicker.r.kicking / 100;
     const D0 = dist(b.x, b.z, d * FIELD.tryX, 0);
     // Real kicks miss: error grows with distance, worse kickers and an overcooked strike.
-    const diffK = side === 0 ? { easy: 0.6, medium: 1.125, hard: 1.25, elite: 1.5 }[this.cfg.difficulty] : 1;
+    const diffK = side === 0 ? CFG.difficulty.userGoalKickError[this.cfg.difficulty] : 1;
     let err = accuracy * 12 * skill + (Math.random() - 0.5) * 2 * skill * (1.4 + D0 / 14) * 2.4 * diffK;
     if (power > 0.66) err += (Math.random() < 0.5 ? -1 : 1) * (power - 0.66) * 30; // too much welly sprays it
     // Charged down?
@@ -4572,9 +4571,9 @@ export class MatchEngine {
   }
 }
 
-const REPLAY_SPEED = 0.45;
+const REPLAY_SPEED = CFG.replaySpeed;
 /** Longest landing distance for each kick type (metres). */
-const KICK_MAX: Record<KickKind, number> = { punt: 60, box: 38, grubber: 32, chip: 20, high: 44, touch: 62, cross: 50 };
+const KICK_MAX: Record<KickKind, number> = CFG.kickMax;
 /** Acceleration and agility from ratings: wingers are sharp, props are slow to get going. */
 function moveStats(p: P): { acc: number; agi: number } {
   const r = p.r;
@@ -4590,10 +4589,10 @@ const SHADOW_BASIS = (() => {
   return { dir, right, up };
 })();
 type KickType = 'punt' | 'grubber' | 'box' | 'drop' | 'chip' | 'high' | 'touch' | 'cross';
-const GRUB_VY = 3.2;
-const GRUB_REST = 0.45;
-const GRUB_KEEP = 0.8;
-const GRUB_FRICTION = 1.0;
+const GRUB_VY = CFG.grubber.vy;
+const GRUB_REST = CFG.grubber.restitution;
+const GRUB_KEEP = CFG.grubber.keep;
+const GRUB_FRICTION = CFG.grubber.friction;
 
 /** Distance a grubber travels before stopping (no random hops), for the aiming solver. */
 function simulateGrubber(vh: number): number {

@@ -1,3 +1,4 @@
+import { CFG } from '../game/gameConfig';
 import { useEffect, useRef, useState } from 'react';
 import { TeamLogo } from './logos';
 import type { CommentaryTone, HudState, InputState, MiniGameRequest, PlaceKickRequest } from '../game/types';
@@ -93,7 +94,7 @@ const JUMPERS = [
  * Seconds a blocking prompt waits before the game moves on without you (paused time doesn't count).
  * The engine never waits forever for input.
  */
-export const PROMPT_TIMEOUT = { pickJumper: 4, timing: 8, guess: 6, placeKick: 20, penaltyChoice: 15 };
+export const PROMPT_TIMEOUT = CFG.prompts;
 
 /** Calls fn once `seconds` of un-paused time have passed (restarts when deps change). */
 export function usePromptTimeout(seconds: number, paused: boolean, fn: () => void, active = true) {
