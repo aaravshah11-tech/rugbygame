@@ -121,6 +121,22 @@ export function Settings({ go }: { go: Go }) {
               <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Hand</div>
               <Seg<'r' | 'l'> value={s.leftHanded ? 'l' : 'r'} options={[{ v: 'r', label: 'Right-handed' }, { v: 'l', label: 'Left-handed' }]} onChange={(v) => update((x) => (x.settings.leftHanded = v === 'l'))} />
             </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Kick controls</div>
+              <Seg<'swipe' | 'aim'>
+                value={s.kickControls ?? 'swipe'}
+                options={[{ v: 'swipe', label: 'Swipe (hold, aim, swipe up)' }, { v: 'aim', label: 'Aim & power' }]}
+                onChange={(v) => update((x) => (x.settings.kickControls = v))}
+              />
+            </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Pass buttons</div>
+              <Seg<'two' | 'one'>
+                value={s.passButtons ?? 'two'}
+                options={[{ v: 'two', label: 'Left + right' }, { v: 'one', label: 'One smart PASS' }]}
+                onChange={(v) => update((x) => (x.settings.passButtons = v))}
+              />
+            </div>
             <button className="btn cyan" onClick={() => go({ name: 'controls' })}>
               Edit control layout (move / resize buttons)
             </button>

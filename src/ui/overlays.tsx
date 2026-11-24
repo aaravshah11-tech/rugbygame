@@ -77,7 +77,7 @@ interface MiniSpec {
 const MINI: Record<MiniGameRequest['kind'], MiniSpec> = {
   scrum: { title: 'Scrum', hint: 'Swipe UP on "SET" when the marker is in the green', dir: 'up', timed: true, calls: true },
   scrumDefend: { title: 'Scrum', hint: 'Swipe UP in the green to drive against their put-in', dir: 'up', timed: true, calls: true },
-  lineout: { title: 'Lineout throw', hint: 'TAP or SWIPE when the marker hits the green', dir: 'any', timed: true },
+  lineout: { title: 'Lineout throw', hint: 'TAP or SWIPE when the marker hits the green', dir: 'any', timed: true, pick: true },
   lineoutDefend: { title: 'Contest the lineout', hint: 'Choose a range to contest: guess where they will throw', dir: 'up', timed: false, guess: true },
   ruck: { title: 'Ruck', hint: 'Swipe UP in the green to secure quick ball', dir: 'up', timed: true },
   counterRuck: { title: 'Contest the ruck', hint: 'Swipe UP fast to jackal the ball', dir: 'up', timed: false },

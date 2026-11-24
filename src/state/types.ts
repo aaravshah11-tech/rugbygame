@@ -46,6 +46,10 @@ export interface Settings {
   /** action button size multiplier */
   buttonScale: number;
   customPlays?: CustomPlay[];
+  /** 'swipe' = hold KICK, aim, swipe up; 'aim' = pick kick, touch the landing spot, hold for power */
+  kickControls?: 'swipe' | 'aim';
+  /** two PASS buttons (left/right) or one smart PASS */
+  passButtons?: 'two' | 'one';
   /** moved/resized action buttons */
   controlLayout?: Record<string, { dx: number; dy: number; s: number }>;
 }

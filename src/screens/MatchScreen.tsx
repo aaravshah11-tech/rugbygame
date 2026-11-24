@@ -285,8 +285,23 @@ export function MatchScreen({
             {p.text}
           </div>
         ))}
-        {kickMenu && hud.attacking && (
+        {kickMenu && hud.attacking && (profile.settings.kickControls ?? 'swipe') === 'swipe' && (
           <KickTypeChooser kind={kickKind} isNine={hud.isNine} onPick={(k) => (setKickKind(k), setKickMenu(false))} onClose={() => setKickMenu(false)} />
+        )}
+        {kickMenu && hud.attacking && profile.settings.kickControls === 'aim' && (
+          <KickPicker
+            input={input.current}
+            isNine={hud.isNine}
+            kind={kickKind}
+            setKind={setKickKind}
+            powerMode
+            aimAt={(x, y, k) => engine.current?.aimKickAt(x, y, k) ?? null}
+            onClose={(kicked) => {
+              setKickMenu(false);
+              engine.current?.setAimFreeze(false);
+              if (!kicked) engine.current?.clearKickTarget();
+            }}
+          />
         )}
         {hud.atBase && (
           <div className="base-tag">
@@ -380,7 +395,13 @@ export function MatchScreen({
         {hud.scrum && !mini && <ScrumBattle s={hud.scrum} input={input.current} userShort={cfg.user.short} cpuShort={cfg.cpu.short} />}
         {showControls && <Joystick input={input.current} />}
         {showControls && hud.attacking && !hud.ruck && <DodgeLayer input={input.current} />}
-        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} ruckDef={hud.ruckDef} ruckBall={hud.ruckBall} onKick={() => setKickMenu(true)}
+        {showControls && <ActionButtons input={input.current} attacking={hud.attacking} ruck={hud.ruck} ruckDef={hud.ruckDef} ruckBall={hud.ruckBall} onKick={(k) => {
+              if (k) setKickKind(k);
+              setKickMenu(true);
+              if (profile.settings.kickControls === 'aim') engine.current?.setAimFreeze(true);
+            }}
+            kickMode={profile.settings.kickControls ?? 'swipe'}
+            passMode={profile.settings.passButtons ?? 'two'}
             onKickHold={(on) => engine.current?.setKickHold(on)}
             kickKind={kickKind}
             kickLabel={kickKind === 'punt' ? 'hold · swipe up' : KICKS.find((k) => k.kind === kickKind)?.label}

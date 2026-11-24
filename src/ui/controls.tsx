@@ -242,6 +242,8 @@ export function ActionButtons({
   onKickHold,
   kickKind,
   kickLabel,
+  kickMode = 'swipe',
+  passMode = 'two',
   atBase = false,
 }: {
   input: InputState;
@@ -252,11 +254,14 @@ export function ActionButtons({
   offload?: boolean;
   ruckDef?: 'none' | 'contest' | 'fan';
   ruckBall?: 'quick' | 'slow' | 'danger' | null;
-  onKick?: () => void;
+  onKick?: (kind?: KickKind) => void;
   /** KICK held down (slow motion while aiming) */
   onKickHold?: (on: boolean) => void;
   kickKind?: KickKind;
   kickLabel?: string;
+  /** 'aim': KICK opens the picker + aim/power screen instead of hold-and-swipe */
+  kickMode?: 'swipe' | 'aim';
+  passMode?: 'two' | 'one';
   atBase?: boolean;
 }) {
   const passStart = useRef(0);
@@ -266,7 +271,12 @@ export function ActionButtons({
     onUp: () => (input.sprintHold = false),
   };
   useEffect(() => () => void (input.sprintHold = false), [input]);
-  const kickButton = (kk: KickKind, label: string, sub: string, pos: { right: number; bottom: number }) => (
+  const kickButton = (kk: KickKind, label: string, sub: string, pos: { right: number; bottom: number }) =>
+    kickMode === 'aim' ? (
+      <ActionButton label={label} sub="aim · power" size="med" color="gold" pos={pos} onDown={() => onKick?.(kk)}>
+        <KickIcon />
+      </ActionButton>
+    ) : (
   <ActionButton
       label={label}
       sub={sub}
@@ -399,6 +409,24 @@ export function ActionButtons({
 
   return (
     <div className="actions">
+      {passMode === 'one' ? (
+        <ActionButton
+          label={offload ? 'Offload' : 'Pass'}
+          sub={offload ? 'in the tackle' : 'hold = long'}
+          size="big"
+          color={offload ? 'gold' : 'neon'}
+          pos={{ right: 0, bottom: 4 }}
+          onDown={() => (passStart.current = performance.now())}
+          onUp={(_e, cancelled) => {
+            if (cancelled) return;
+            // dir 0: to the side the joystick points, or the best-placed runner
+            input.actions.push({ type: 'pass', long: !offload && performance.now() - passStart.current > 320, dir: 0 });
+          }}
+        >
+          <PassIcon dir={1} />
+        </ActionButton>
+      ) : (
+        <>
       {/* two PASS buttons, left and right, like a broadcast game pad; hold = long pass */}
       <ActionButton
         label={offload ? 'Offload' : 'Pass'}
@@ -428,6 +456,8 @@ export function ActionButtons({
       >
         <PassIcon dir={1} />
       </ActionButton>
+        </>
+      )}
       <ActionButton label="Sprint" size="sm" color="cyan" pos={{ right: 104, bottom: 104 }} {...sprint} />
       {kickButton(kickKind ?? 'punt', 'Kick', kickLabel ?? 'hold · swipe up', { right: 8, bottom: 112 })}
       <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 186, bottom: 14 }} onDown={() => input.actions.push({ type: 'handoff' })} />
@@ -461,6 +491,7 @@ export function KickPicker({
   locked = false,
   title,
   flick,
+  powerMode = false,
 }: {
   input: InputState;
   isNine: boolean;
@@ -470,6 +501,8 @@ export function KickPicker({
   aimAt: (x: number, y: number, kind: KickKind) => number | null;
   /** flick aim: swipe vector (px) -> metres */
   flick?: (dx: number, dy: number, kind: KickKind) => number | null;
+  /** hold to fill a power meter; release kicks with that power */
+  powerMode?: boolean;
   /** kick type fixed (kick-off, penalty to touch); no cancel */
   locked?: boolean;
   title?: string;
@@ -477,13 +510,16 @@ export function KickPicker({
   const [dist, setDist] = useState<number | null>(null);
   const st = useRef<{ id: number; x: number; y: number } | null>(null);
   const [trail, setTrail] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [power, setPower] = useState(0);
+  const pRaf = useRef(0);
+  const pT0 = useRef(0);
   useEffect(() => {
     Object.assign(input.kickAim, { active: true, kind, dist: 30, angle: 0 });
   }, [input, kind]);
   const point = (e: React.PointerEvent) => {
     const s0 = st.current;
     // flick: aim from the swipe vector; otherwise the spot under your finger
-    const d = flick && s0 ? flick(e.clientX - s0.x, e.clientY - s0.y, kind) : aimAt(e.clientX, e.clientY, kind);
+    const d = flick && s0 && !powerMode ? flick(e.clientX - s0.x, e.clientY - s0.y, kind) : aimAt(e.clientX, e.clientY, kind);
     if (s0) setTrail({ x0: s0.x, y0: s0.y, x1: e.clientX, y1: e.clientY });
     if (d !== null) setDist(d);
   };
@@ -494,7 +530,15 @@ export function KickPicker({
       onPointerDown={(e) => {
         st.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
         setDist(null);
-        if (!flick) point(e);
+        if (!flick || powerMode) point(e);
+        if (powerMode) {
+          pT0.current = performance.now();
+          const loop = () => {
+            setPower(Math.min(1.25, (performance.now() - pT0.current) / 1000));
+            pRaf.current = requestAnimationFrame(loop);
+          };
+          pRaf.current = requestAnimationFrame(loop);
+        }
       }}
       onPointerMove={(e) => {
         if (st.current?.id === e.pointerId) point(e);
@@ -503,8 +547,11 @@ export function KickPicker({
         if (st.current?.id !== e.pointerId) return;
         st.current = null;
         setTrail(null);
+        cancelAnimationFrame(pRaf.current);
         if (dist === null) return;
-        input.actions.push({ type: 'kick', kind, dist, angle: 0, power: 0.85 });
+        const pw = powerMode ? Math.max(0.25, Math.min(1.25, (performance.now() - pT0.current) / 1000)) : 0.85;
+        setPower(0);
+        input.actions.push({ type: 'kick', kind, dist, angle: 0, power: pw });
         input.kickAim.active = false;
         haptic('tackle');
         onClose(true);
@@ -528,7 +575,13 @@ export function KickPicker({
       <div className="kick-aim-hud">
         <b>{(title ?? k?.label ?? 'Kick').toUpperCase()}</b>
         {dist !== null ? ` · ${Math.round(dist)}m` : ''}
-        <small>{dist === null ? (flick ? 'FLICK: swipe the way you want it to go — longer swipe, longer kick' : 'Drag your finger to where you want it to land') : 'Watch the ring · let go to kick'}</small>
+        {powerMode && (
+          <div className="kick-power">
+            <div className="kick-power-fill" style={{ width: `${(power / 1.25) * 100}%`, background: power > 1 ? '#ff3d5e' : power > 0.6 ? '#7dff3a' : '#ffb020' }} />
+            <div className="kick-power-zone" />
+          </div>
+        )}
+        <small>{powerMode ? (dist === null ? 'Touch where you want it to land and HOLD for power' : 'Hold into the green · slide to move the marker · let go to kick') : dist === null ? (flick ? 'FLICK: swipe the way you want it to go — longer swipe, longer kick' : 'Drag your finger to where you want it to land') : 'Watch the ring · let go to kick'}</small>
       </div>
       {!locked && (
         <button
