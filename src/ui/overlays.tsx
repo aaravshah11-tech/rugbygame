@@ -80,7 +80,6 @@ const MINI: Record<MiniGameRequest['kind'], MiniSpec> = {
   lineout: { title: 'Lineout throw', hint: 'TAP or SWIPE when the marker hits the green', dir: 'any', timed: true, pick: true },
   lineoutDefend: { title: 'Contest the lineout', hint: 'Choose a range to contest: guess where they will throw', dir: 'up', timed: false, guess: true },
   ruck: { title: 'Ruck', hint: 'Swipe UP in the green to secure quick ball', dir: 'up', timed: true },
-  counterRuck: { title: 'Contest the ruck', hint: 'Swipe UP fast to jackal the ball', dir: 'up', timed: false },
   maul: { title: 'Maul!', hint: 'Swipe UP when the arrow is full to push the maul', dir: 'up', timed: false, repeat: true },
   maulDefend: { title: 'Maul!', hint: 'Swipe UP when the arrow is full to push them back', dir: 'up', timed: false, repeat: true },
 };

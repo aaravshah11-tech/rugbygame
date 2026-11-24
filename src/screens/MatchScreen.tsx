@@ -155,14 +155,16 @@ export function MatchScreen({
       engine.current = eng;
       if (import.meta.env.DEV) (window as unknown as { __engine: MatchEngine }).__engine = eng;
       setLoading(false);
-      eng.start();
       let seen = false;
       try {
         seen = localStorage.getItem('tl-howto') === '1';
       } catch {
         /* private mode */
       }
-      if (!cfg.drill && !seen) {
+      const firstTime = !cfg.drill && !cfg.challenge && !seen;
+      // first match: How to Play comes first; the intro only starts once it's closed
+      eng.start(firstTime);
+      if (firstTime) {
         eng.setPaused(true);
         setHowTo(true);
       }
@@ -205,7 +207,7 @@ export function MatchScreen({
           <div className="muted italic">Warming up the players…</div>
         </div>
       )}
-      {intro && (
+      {intro && !howTo && (
         <div className="intro-card" onPointerDown={() => engine.current?.skipIntro()}>
           <div className="intro-title">{intro.title}</div>
           <div className="intro-sub">{intro.sub}</div>
@@ -423,22 +425,33 @@ export function MatchScreen({
             <h2>How to play</h2>
             <div className="howto-grid" style={{ textAlign: 'left' }}>
               <div>
-                <b>Run</b>Floating stick on the left; push to the edge to sprint. Swipe left/right on the right side to dodge.
+                <b>Run</b>The stick appears where your left thumb lands. Push it to the edge or hold SPRINT to sprint. STEP (or swipe up on the right) sidesteps; HAND-OFF lights up when a defender is close.
               </div>
               <div>
-                <b>◀ Pass · Pass ▶ · Kick</b>Arrows show who gets the pass (hold = long). KICK / GRUB: tap, or hold and drag to place the landing ring. DROP GOAL appears in range.
+                <b>Pass</b>
+                {profile.settings.passButtons === 'one'
+                  ? 'PASS goes to the side you push the stick, or the best runner. '
+                  : '◀ PASS and PASS ▶ pass that way. '}
+                Hold for a long pass; swipe left/right on the right half for a quick one. The ! marks who is calling for it. In a tackle, PASS becomes OFFLOAD.
               </div>
               <div>
-                <b>Rucks</b>The arc fills until the ball is out. ADD PLAYER secures it (attacking) or contests it (defending).
+                <b>Kick</b>
+                {profile.settings.kickControls === 'aim'
+                  ? 'KICK pauses play: pick the kick, touch where it should land, hold to fill the power bar into the green, let go. '
+                  : 'Hold KICK, slide to aim, then swipe up fast: the faster the swipe, the longer the kick. Tap KICK to choose the kick type. '}
+                DROP GOAL appears in range.
               </div>
               <div>
-                <b>Defending</b>Hold STAND to chase and tackle; DIVE from further out. You switch to the defender nearest the ball.
+                <b>Rucks</b>Your 9 waits at the base: spin PASS left or right, BOX KICK, PICK &amp; GO or SNIPE. ADD PLAYER for quicker ball. Defending: CONTEST (tap fast) or FAN OUT.
               </div>
               <div>
-                <b>Set pieces</b>Scrum: swipe UP on SET, then keep swiping UP to win the push and call the play. Lineout: pick a jumper, swipe DOWN. Maul: swipe UP when the arrow is full.
+                <b>Defending</b>Hold TACKLE to chase the carrier and tackle him, DIVE for extra reach, SWITCH to change player. Swipe up (or CATCH) to contest high balls; CHARGE their conversions once the kicker runs in.
               </div>
               <div>
-                <b>Kicks at goal</b>Swipe from the ball to the posts. Speed is power; curve your swipe to beat the wind.
+                <b>Set pieces</b>Scrum: swipe UP on SET, then keep swiping UP to push and call the play. Lineout: pick Front / Middle / Back, tap in the green, then PASS, RUN or MAUL. Maul: swipe UP each time the arrow fills; COLLAPSE when defending.
+              </div>
+              <div>
+                <b>Kicks at goal</b>Swipe from the ball to the posts: speed is power, curve it to beat the wind. On conversions you can move the ball back for a better angle.
               </div>
             </div>
             <button
@@ -452,6 +465,7 @@ export function MatchScreen({
                 }
                 setHowTo(false);
                 engine.current?.setPaused(false);
+                engine.current?.beginIntro();
               }}
             >
               Play

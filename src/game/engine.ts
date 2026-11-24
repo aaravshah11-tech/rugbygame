@@ -513,7 +513,8 @@ export class MatchEngine {
     this.particles?.setViewportHeight(h * this.renderer.getPixelRatio(), this.camera.fov);
   }
 
-  start() {
+  /** @param holdIntro the How to Play card is up: line the teams up but keep the intro until beginIntro() */
+  start(holdIntro = false) {
     audio.startCrowd();
     audio.setCrowd(0.2);
     this.last = performance.now();
@@ -533,7 +534,19 @@ export class MatchEngine {
     this.raf = requestAnimationFrame(loop);
     if (this.cfg.drill) this.startDrill();
     else if (this.cfg.challenge) this.startChallenge();
-    else this.startIntro();
+    else if (holdIntro) {
+      this.setupKickoff(this.firstKicker, 0);
+      this.timers = [];
+      this.introHeld = true;
+    } else this.startIntro();
+  }
+
+  private introHeld = false;
+  /** How to Play was closed: now run the walk-out and stadium sweep. */
+  beginIntro() {
+    if (!this.introHeld) return;
+    this.introHeld = false;
+    this.startIntro();
   }
 
   private introT = -1;

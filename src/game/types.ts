@@ -58,7 +58,7 @@ export interface ChallengeSetup {
   target?: number;
 }
 
-export type MiniGameKind = 'ruck' | 'counterRuck' | 'scrum' | 'scrumDefend' | 'lineout' | 'lineoutDefend' | 'maul' | 'maulDefend';
+export type MiniGameKind = 'ruck' | 'scrum' | 'scrumDefend' | 'lineout' | 'lineoutDefend' | 'maul' | 'maulDefend';
 
 export interface MiniGameRequest {
   id: number;
