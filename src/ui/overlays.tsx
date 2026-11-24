@@ -46,19 +46,6 @@ export interface Comm {
   sub?: string;
 }
 
-export function Commentary({ items }: { items: Comm[] }) {
-  return (
-    <div className="commentary">
-      {items.map((c) => (
-        <div key={c.id} className={`comm ${c.tone}`}>
-          {c.text}
-          {c.sub && <small>{c.sub}</small>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- mini-games (swipe gestures)
 type SwipeDir = 'up' | 'down' | 'any';
 interface MiniSpec {

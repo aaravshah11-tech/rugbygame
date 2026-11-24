@@ -650,75 +650,6 @@ table.t tr.me td {
   background: var(--cyan);
 }
 
-.commentary {
-  position: absolute;
-  top: 22%;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: none;
-  gap: 4px;
-}
-
-.comm {
-  font-style: italic;
-  font-weight: 900;
-  text-transform: uppercase;
-  text-align: center;
-  animation: commIn 2.2s ease forwards;
-  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
-}
-
-.comm.big {
-  font-size: 64px;
-  color: var(--neon);
-  -webkit-text-stroke: 2px #0b0f14;
-}
-
-.comm.good {
-  font-size: 34px;
-  color: var(--cyan);
-}
-
-.comm.bad {
-  font-size: 34px;
-  color: var(--pink);
-}
-
-.comm.info {
-  font-size: 26px;
-  color: #fff;
-}
-
-.comm small {
-  display: block;
-  font-size: 15px;
-  color: #fff;
-  -webkit-text-stroke: 0;
-  opacity: 0.9;
-}
-
-@keyframes commIn {
-  0% {
-    opacity: 0;
-    transform: scale(1.6) skewX(-10deg);
-  }
-  12% {
-    opacity: 1;
-    transform: scale(1) skewX(-10deg);
-  }
-  80% {
-    opacity: 1;
-    transform: scale(1) skewX(-10deg);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.95) skewX(-10deg) translateY(-10px);
-  }
-}
-
 /* joystick */
 .joy-zone {
   position: absolute;
@@ -1373,9 +1304,6 @@ input[type='email'] {
   }
   .menu-grid .tile .tag {
     top: 6px;
-  }
-  .comm.big {
-    font-size: 50px;
   }
 }
 

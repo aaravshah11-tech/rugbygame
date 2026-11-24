@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { kitDataUrl } from '../game/kit';
-import { nationById, type Nation } from '../data/nations';
+import { nationById } from '../data/nations';
 import { playerOvr, posInfo, rarityOf, shortName, type Player } from '../data/players';
 import { audio } from '../util/audio';
 import { useProfile } from '../state/store';
@@ -31,11 +31,6 @@ export function TopBar({ title, accent, onBack, right }: { title: string; accent
       </span>
     </div>
   );
-}
-
-export function KitBadge({ nation, size = 34 }: { nation: Nation; size?: number }) {
-  const url = useMemo(() => kitDataUrl(nation.kit, 64), [nation]);
-  return <span className="kit" style={{ backgroundImage: `url(${url})`, width: size, height: size }} />;
 }
 
 export function Silhouette({ color = 'rgba(0,0,0,0.55)' }: { color?: string }) {

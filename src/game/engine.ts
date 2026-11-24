@@ -360,19 +360,6 @@ export class MatchEngine {
   }
 
   /** Dev builds only: put the user's fly-half through on the line to test try/replay/conversion. */
-  debugBreak() {
-    if (!import.meta.env.DEV) return;
-    this.timers = [];
-    this.camMode = 'game';
-    const p = this.teams[0][9];
-    this.resetStates();
-    this.place(p, 38, 6);
-    p.vx = 8;
-    this.giveBall(p);
-    this.phase = 'play';
-    for (const o of this.teams[1]) this.place(o, 20, o.num * 3 - 24);
-  }
-
   get graphicsLevel() {
     return this.quality.level;
   }
@@ -1076,10 +1063,6 @@ export class MatchEngine {
     return Rules.result(this);
   }
 
-  /** Used by "Quit" to finish early. */
-  forfeitResult(): EngineResult {
-    return Rules.forfeitResult(this);
-  }
 
   teamShort(s: Side) {
     return s === 0 ? this.cfg.user.short : this.cfg.cpu.short;

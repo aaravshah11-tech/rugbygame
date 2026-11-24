@@ -243,11 +243,6 @@ export function result(eng: MatchEngine): EngineResult {
   return { userScore: eng.score[0], cpuScore: eng.score[1], userTries: eng.tries[0], cpuTries: eng.tries[1], user: { ...eng.stats }, match: eng.matchStats(), challenge: eng.challengeResult() };
 }
 
-/** Used by "Quit" to finish early. */
-export function forfeitResult(eng: MatchEngine): EngineResult {
-  return eng.result();
-}
-
 // ---------------------------------------------------------------- penalties
 export function awardPenalty(eng: MatchEngine, side: Side, x: number, z: number) {
   eng.penaltyAgainst(other(side));

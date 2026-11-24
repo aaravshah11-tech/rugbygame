@@ -98,17 +98,6 @@ function fitShirt(mat: THREE.Material, geo: THREE.BufferGeometry) {
   u.fitted = true;
 }
 
-function setKitUniforms(mat: THREE.MeshStandardMaterial, kit: Kit) {
-  const u = mat.userData.kitUniforms;
-  if (!u) return;
-  u.uPri.value.set(kit.primary);
-  u.uSec.value.set(kit.secondary);
-  u.uAcc.value.set(kit.accent);
-  u.uFourth.value.set(kit.fourth ?? kit.accent);
-  u.uTrim.value.set(kit.collar ?? kit.secondary);
-  u.uPat.value = PATTERN_ID[kit.pattern] ?? 0;
-}
-
 export interface TeamKit {
   shirt: THREE.MeshStandardMaterial;
   panel: THREE.MeshStandardMaterial;
@@ -128,14 +117,6 @@ export function makeTeamKit(kit: Kit): TeamKit {
     cap: new THREE.MeshStandardMaterial({ color: kit.secondary === kit.primary ? '#1a1a1a' : kit.secondary, roughness: 0.6 }),
     kit,
   };
-}
-
-export function recolourKit(t: TeamKit, kit: Kit) {
-  setKitUniforms(t.shirt, kit);
-  setKitUniforms(t.panel, kit);
-  t.shorts.color.set(kit.shorts);
-  t.socks.color.set(kit.socks);
-  t.kit = kit;
 }
 
 function luminance(hex: string) {
