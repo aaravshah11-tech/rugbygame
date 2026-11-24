@@ -39,20 +39,27 @@ export function ruckBall(_eng: MatchEngine, r: NonNullable<MatchEngine['ruck']>)
   return dur <= 1.35 ? 'quick' : 'slow';
 }
 
-/** Arc under the ruck that fills as the ball becomes available. */
-export function updateRuckArc(eng: MatchEngine, r: { x: number; z: number; att: Side; progress: number }) {
+/** The two meshes of the ruck arc (made once, hidden until the first ruck). */
+export function ensureRuckArcs(eng: MatchEngine): { bg: THREE.Mesh; fg: THREE.Mesh } {
   const mk = (color: string, opacity: number, order: number) => {
     const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
     m.renderOrder = order;
+    m.visible = false;
     eng.scene.add(m);
     return m;
   };
   eng.ruckArcBg ??= mk('#13204a', 0.85, 3);
   eng.ruckArc ??= mk('#ffffff', 1, 4);
+  return { bg: eng.ruckArcBg, fg: eng.ruckArc };
+}
+
+/** Arc under the ruck that fills as the ball becomes available. */
+export function updateRuckArc(eng: MatchEngine, r: { x: number; z: number; att: Side; progress: number }) {
+  const { bg, fg } = ensureRuckArcs(eng);
   const rr = eng.ruck;
   if (rr) {
     const col = { quick: '#7dff3a', slow: '#ffb020', danger: '#ff3d5e' }[eng.ruckBall(rr)];
-    (eng.ruckArc.material as THREE.MeshBasicMaterial).color.set(col);
+    (fg.material as THREE.MeshBasicMaterial).color.set(col);
   }
   const build = (mesh: THREE.Mesh, frac: number, r0: number, r1: number) => {
     // smile-shaped arc on the camera side (-x) of the ruck
@@ -72,8 +79,8 @@ export function updateRuckArc(eng: MatchEngine, r: { x: number; z: number; att: 
     mesh.geometry = g;
     mesh.visible = true;
   };
-  build(eng.ruckArcBg, 1, 2.6, 3.0);
-  build(eng.ruckArc, r.progress, 2.65, 2.95);
+  build(bg, 1, 2.6, 3.0);
+  build(fg, r.progress, 2.65, 2.95);
 }
 
 // ---------------------------------------------------------------- restarts

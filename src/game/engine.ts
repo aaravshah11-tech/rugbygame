@@ -343,6 +343,24 @@ export class MatchEngine {
     const ws = rand.range(0, 22) / 3.6;
     const wa = rand.range(0, Math.PI * 2);
     this.wind = { x: Math.cos(wa) * ws, z: Math.sin(wa) * ws };
+    this.warmShaders();
+  }
+
+  /**
+   * Compile every material now, including ones hidden until later (aim arcs, effects, the
+   * kicking tee...), so their first appearance mid-match doesn't hitch while a shader builds.
+   */
+  private warmShaders() {
+    SetPieces.ensureRuckArcs(this);
+    const hidden: THREE.Object3D[] = [];
+    this.scene.traverse((o) => {
+      if (!o.visible) {
+        hidden.push(o);
+        o.visible = true;
+      }
+    });
+    this.renderer.compile(this.scene, this.camera);
+    for (const o of hidden) o.visible = false;
   }
 
   /** Steps graphics down one level (auto quality). Returns false when already at Low. */
@@ -360,7 +378,6 @@ export class MatchEngine {
     return true;
   }
 
-  /** Dev builds only: put the user's fly-half through on the line to test try/replay/conversion. */
   get graphicsLevel() {
     return this.quality.level;
   }
