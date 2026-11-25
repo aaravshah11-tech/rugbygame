@@ -322,11 +322,9 @@ html[data-gfx='low'] .mlogo .l {
   text-align: left;
   overflow: hidden;
   border: 1px solid var(--glass-border);
-  background: var(--glass);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, transparent) 0%, rgba(255, 255, 255, 0.02) 55%), var(--glass);
+  background: rgba(13, 19, 34, 0.82);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, transparent) 0%, rgba(255, 255, 255, 0.02) 55%), rgba(13, 19, 34, 0.82);
   box-shadow: var(--glass-inner), var(--shadow-1);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
   opacity: 0.78;
   transform: scale(0.97);
   transform-origin: left center;
@@ -397,10 +395,8 @@ html[data-gfx='low'] .mlogo .l {
   height: 26px;
   border-radius: 13px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(13, 19, 34, 0.82);
   border: 1px solid var(--glass-border);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
   flex-shrink: 0;
 }
 .ticker-tag {
