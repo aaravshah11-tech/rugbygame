@@ -295,7 +295,7 @@ html[data-gfx='low'] .mlogo .l {
   gap: 10px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  scroll-padding-left: 0;
+  scroll-padding-left: 2px;
   padding: 6px 2px 8px;
   margin: 0 -2px;
   scrollbar-width: none;
@@ -719,7 +719,8 @@ html[data-gfx='low'] .mlogo .l {
 /* portrait (iPad upright): menu runs down the lower half */
 @media (orientation: portrait) {
   .menu-shade {
-    background: linear-gradient(0deg, rgba(5, 7, 13, 0.96) 0%, rgba(5, 7, 13, 0.82) 42%, rgba(5, 7, 13, 0) 70%);
+    background: linear-gradient(0deg, rgba(5, 7, 13, 0.96) 0%, rgba(5, 7, 13, 0.82) 42%, rgba(5, 7, 13, 0) 70%),
+      linear-gradient(180deg, rgba(5, 7, 13, 0.8) 0%, rgba(5, 7, 13, 0) 12%);
   }
   .hero {
     width: 100%;
