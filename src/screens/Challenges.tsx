@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { Go } from '../App';
 import { TopBar } from '../ui/common';
+import { BrandLogo, sponsorsOn } from '../ui/BrandLogo';
+import { COMP_TITLE } from '../data/sponsors';
 import { TeamLogo } from '../ui/logos';
 import { nationById } from '../data/nations';
 import { getProfile, update, useProfile } from '../state/store';
@@ -68,6 +70,11 @@ export function Challenges({ go }: { go: Go }) {
   return (
     <div className="screen">
       <TopBar title="Daily" accent="Challenges" onBack={() => go({ name: 'menu' })} />
+      {sponsorsOn() && (
+        <div className="presented-by">
+          presented by <BrandLogo id={COMP_TITLE.challenge} height={16} />
+        </div>
+      )}
       <p className="muted italic" style={{ margin: 0 }}>Three new scenarios every day. Complete one for coins.</p>
       <div className="scroll">
         <div className="challenge-grid">

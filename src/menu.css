@@ -733,3 +733,36 @@ html[data-gfx='low'] .mlogo .l {
     width: auto;
   }
 }
+
+/* sponsor marks on the menu */
+.mtile-sponsor {
+  position: absolute;
+  right: 10px;
+  top: 9px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(5, 7, 13, 0.55);
+  opacity: 0.95;
+}
+.hero-sponsor {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.hero-sponsor small,
+.presented-by {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.presented-by {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -6px;
+}

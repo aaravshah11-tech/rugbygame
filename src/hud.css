@@ -200,3 +200,133 @@ html[data-gfx='low'] .actions .abtn {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* ---------------------------------------------------------------- sponsor graphics */
+.brand-logo {
+  vertical-align: middle;
+}
+.bug-sponsor {
+  position: absolute;
+  top: calc(var(--sat) + 44px);
+  left: calc(var(--sal) + 14px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 0 0 7px 7px;
+  background: rgba(8, 11, 20, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 0;
+  pointer-events: none;
+}
+.bug-sponsor small,
+.vs-sponsor small,
+.replay-sting small,
+.loading-partners small {
+  font-family: var(--font-body);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* the controlled player's name and the wind sit under the score bug: make room */
+.hud:has(.bug-sponsor) .ctrl-name {
+  top: calc(var(--sat) + 68px);
+}
+.hud:has(.bug-sponsor) .wind-chip {
+  transform: translateY(20px);
+}
+.vs-sponsor {
+  grid-column: 1 / -1;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: rgba(8, 11, 20, 0.7);
+  animation: fadeUp 0.5s 0.7s var(--ease-out) backwards;
+}
+/* replay: a branded sting slides in with a light sweep */
+.replay-sting {
+  position: absolute;
+  left: calc(var(--sal) + 14px);
+  bottom: calc(var(--sab) + 16px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 14px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--b), color-mix(in srgb, var(--b) 70%, #000));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  animation: stingIn 0.55s var(--ease-out) backwards;
+  pointer-events: none;
+}
+.replay-sting small {
+  color: rgba(255, 255, 255, 0.85);
+}
+.replay-sting::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%) no-repeat;
+  background-size: 250% 100%;
+  animation: tryShine2 1.1s 0.5s ease-out backwards;
+}
+@keyframes stingIn {
+  from {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-20px);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.loading-partners {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.loading-brand {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  animation: brandIn 0.45s var(--ease-out);
+}
+@keyframes brandIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(4px);
+  }
+}
+.potm-sponsor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stats-powered {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}

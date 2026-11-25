@@ -1,5 +1,7 @@
 import type { Go } from '../App';
 import { TopBar } from '../ui/common';
+import { BrandLogo, sponsorsOn } from '../ui/BrandLogo';
+import { COMP_TITLE } from '../data/sponsors';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
 import type { MatchConfig } from '../game/types';
@@ -54,6 +56,11 @@ export function KickChallenge({ go }: { go: Go }) {
   return (
     <div className="screen">
       <TopBar title="Kicking" accent="Challenge" onBack={() => go({ name: 'menu' })} />
+      {sponsorsOn() && (
+        <div className="presented-by">
+          presented by <BrandLogo id={COMP_TITLE.kick} height={16} />
+        </div>
+      )}
       <p className="muted italic" style={{ margin: 0 }}>Conversions from every angle. Make every kick to pass a level and unlock the next.</p>
       <div className="scroll">
         <div className="challenge-grid">

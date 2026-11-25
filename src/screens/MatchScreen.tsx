@@ -1,5 +1,5 @@
 import { rand } from '../util/rng';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type KickKind, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
@@ -7,6 +7,9 @@ import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KIC
 import { MiniGame, PlaceKickUI, PROMPT_TIMEOUT, ScoreBug, ScrumBattle, usePromptTimeout, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { TeamLogo } from '../ui/logos';
+import { BrandLogo } from '../ui/BrandLogo';
+import { COMP_TITLE, SPONSOR_BY_ID, TEAM_DEALS } from '../data/sponsors';
+import type { MatchSponsors } from '../sponsors/manager';
 import { TacticsPanel } from '../ui/tactics';
 import { CustomPlaysEditor } from '../ui/setplays';
 import { update, useProfile } from '../state/store';
@@ -67,6 +70,20 @@ export function MatchScreen({
   const [tmo, setTmo] = useState<null | 'check' | 'try' | 'notry'>(null);
   const [pops, setPops] = useState<{ id: number; text: string; tone: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sp, setSp] = useState<MatchSponsors | null>(null);
+  // loading screen: the competition's title sponsor and the home side's partners, rotating
+  const loadingBrands = useMemo(() => {
+    if (cfg.realSponsors === false) return [];
+    const home = cfg.userIsHome ? cfg.user.id : cfg.cpu.id;
+    const ids = [COMP_TITLE[cfg.competition ?? 'quick'], ...(TEAM_DEALS[home]?.partners ?? [])].filter((id, i, a) => id && a.indexOf(id) === i);
+    return ids.map((id) => SPONSOR_BY_ID[id]).filter(Boolean);
+  }, [cfg]);
+  const [brandI, setBrandI] = useState(0);
+  useEffect(() => {
+    if (!loading || loadingBrands.length < 2) return;
+    const t = setInterval(() => setBrandI((i) => i + 1), 1100);
+    return () => clearInterval(t);
+  }, [loading, loadingBrands.length]);
   const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
   const [replay, setReplay] = useState(false);
   const [howTo, setHowTo] = useState(false);
@@ -155,6 +172,7 @@ export function MatchScreen({
       if (cancelled) return;
       eng = new MatchEngine(host.current!, cfg, input.current, onEvent, asset);
       engine.current = eng;
+      setSp(eng.sponsors);
       if (import.meta.env.DEV) Object.assign(window, { __engine: eng, __rand: rand });
       setLoading(false);
       let seen = false;
@@ -207,6 +225,14 @@ export function MatchScreen({
             TRY <span>LINE</span>
           </div>
           <div className="muted italic">Warming up the players…</div>
+          {loadingBrands.length > 0 && (
+            <div className="loading-partners">
+              <small>Official partners</small>
+              <div className="loading-brand" key={brandI}>
+                <BrandLogo sponsor={loadingBrands[brandI % loadingBrands.length]} height={30} />
+              </div>
+            </div>
+          )}
         </div>
       )}
       {intro && !howTo && (
@@ -230,6 +256,11 @@ export function MatchScreen({
                 <span className="vs-wx" aria-label={cfg.weather === 'rain' ? 'Rain' : 'Dry'}>{cfg.weather === 'rain' ? '🌧' : '☾'}</span>
                 {intro.sub}
               </div>
+              {sp && (
+                <div className="vs-sponsor">
+                  <small>In association with</small> <BrandLogo sponsor={sp.title} height={20} />
+                </div>
+              )}
               <button className="btn primary vs-go" onPointerDown={(e) => (e.stopPropagation(), engine.current?.skipIntro())}>
                 Kick off
               </button>
@@ -312,6 +343,17 @@ export function MatchScreen({
           <button className="replay-tag" onClick={() => engine.current?.skipReplay()}>
             <span className="rec" /> REPLAY <small>tap to skip</small>
           </button>
+        )}
+        {replay && sp && (
+          <div className="replay-sting" style={{ '--b': sp.replay.colors.bg } as React.CSSProperties}>
+            <small>Replay brought to you by</small>
+            <BrandLogo sponsor={sp.replay} height={22} />
+          </div>
+        )}
+        {sp && !cfg.drill && !loading && hud.phase !== 'pre' && (
+          <div className="bug-sponsor">
+            <small>in association with</small> <BrandLogo sponsor={sp.title} height={13} />
+          </div>
         )}
         {pops.map((p) => (
           <div key={p.id} className={`pop-text pop-${p.tone}`}>
@@ -581,7 +623,7 @@ export function MatchScreen({
             <div className="result-score">
               {cfg.user.short} {hud.userScore} – {hud.cpuScore} {cfg.cpu.short}
             </div>
-            {engine.current && <StatsTable st={engine.current.matchStats()} user={cfg.user.short} cpu={cfg.cpu.short} />}
+            {engine.current && <StatsTable st={engine.current.matchStats()} user={cfg.user.short} cpu={cfg.cpu.short} sp={sp} />}
             <button
               className="btn primary"
               onClick={() => {
@@ -684,7 +726,7 @@ export function MatchScreen({
                 {cfg.user.short} {hud.userScore} – {hud.cpuScore} {cfg.cpu.short}
               </div>
             )}
-            {fullStats && !cfg.drill && <StatsTable st={fullStats} user={cfg.user.short} cpu={cfg.cpu.short} potm />}
+            {fullStats && !cfg.drill && <StatsTable st={fullStats} user={cfg.user.short} cpu={cfg.cpu.short} potm sp={sp} />}
             {outcome.lines.map((l, i) => (
               <div key={i} className="muted">
                 {l}
@@ -758,7 +800,7 @@ function SubsPanel({ engine }: { engine: MatchEngine }) {
   );
 }
 
-function StatsTable({ st, user, cpu, potm = false }: { st: import('../game/types').MatchStats; user: string; cpu: string; potm?: boolean }) {
+function StatsTable({ st, user, cpu, potm = false, sp = null }: { st: import('../game/types').MatchStats; user: string; cpu: string; potm?: boolean; sp?: MatchSponsors | null }) {
   const rows: [string, [number, number], string?][] = [
     ['Possession', st.possession, '%'],
     ['Territory', st.territory, '%'],
@@ -771,6 +813,11 @@ function StatsTable({ st, user, cpu, potm = false }: { st: import('../game/types
   ];
   return (
     <div className="stats-table">
+      {sp && (
+        <div className="stats-powered">
+          Powered by <BrandLogo sponsor={sp.stats} height={12} />
+        </div>
+      )}
       <div className="stats-head">
         <b>{user}</b>
         <span />
@@ -794,6 +841,11 @@ function StatsTable({ st, user, cpu, potm = false }: { st: import('../game/types
       {potm && st.potm && (
         <div className="potm">
           <small>PLAYER OF THE MATCH</small>
+          {sp && (
+            <span className="potm-sponsor">
+              presented by <BrandLogo sponsor={sp.potm} height={14} />
+            </span>
+          )}
           <b>{st.potm.name}</b> <span>({st.potm.team})</span>
           {st.potm.line && <div className="muted">{st.potm.line}</div>}
         </div>

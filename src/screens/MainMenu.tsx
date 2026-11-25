@@ -7,11 +7,16 @@ import { claimChallenge, claimLoginReward, LOGIN_REWARDS, reduceMotion, useProfi
 import { clubOvr } from '../state/teams';
 import type { Profile } from '../state/types';
 import { TeamLogo } from '../ui/logos';
+import { BrandLogo } from '../ui/BrandLogo';
+import { COMP_TITLE } from '../data/sponsors';
+import { pickMatchSponsors } from '../sponsors/manager';
 import { IconCards, IconCrown, IconGear, IconGift, IconGlobe, IconPosts, IconShield, IconTarget, IconTrophy, IconWhistle } from '../ui/icons';
 import { audio } from '../util/audio';
 import { isStandalone } from '../util/device';
 
 let dailyShown = false;
+/** title sponsor on each mode tile */
+const TILE_SPONSOR: Record<string, string> = { league: COMP_TITLE.league, six: COMP_TITLE.six, prem: COMP_TITLE.prem, wc: COMP_TITLE.wc, squad: COMP_TITLE.club, ch: COMP_TITLE.challenge, kick: COMP_TITLE.kick, train: COMP_TITLE.training };
 const today = () => new Date().toISOString().slice(0, 10);
 /** the launch intro plays once per app launch */
 let introPlayed = false;
@@ -123,7 +128,7 @@ export function MainMenu({ go }: { go: Go }) {
   const favKit = (p.lastQuick ? fav : CLUB_NATION).kit;
 
   useEffect(() => {
-    const s = new MenuScene(host.current!, favKit, { reduceMotion: !motion, intro: !introPlayed && motion });
+    const s = new MenuScene(host.current!, favKit, { reduceMotion: !motion, intro: !introPlayed && motion, sponsors: p.settings.realSponsors !== false ? pickMatchSponsors('quick', p.lastQuick?.home ?? 'ENG', p.lastQuick?.away ?? 'NZL') : null });
     scene.current = s;
     if (import.meta.env.DEV) Object.assign(window, { __menu: s });
     audio.startMusic();
@@ -175,6 +180,7 @@ export function MainMenu({ go }: { go: Go }) {
   };
   const unclaimed = p.daily.challenges.filter((c) => !c.claimed && c.progress >= c.target).length + (p.daily.pendingReward > 0 ? 1 : 0);
   const lv = levelOf(p);
+  const sponsored = p.settings.realSponsors !== false;
   const coins = useCountUp(p.coins, motion);
 
   // hero fixture: the teams last played in Quick Match (or the classic)
@@ -315,6 +321,11 @@ export function MainMenu({ go }: { go: Go }) {
             </span>
           </span>
           <span className="hero-venue">{venueFor(home).name}</span>
+          {sponsored && (
+            <span className="hero-sponsor">
+              <small>in association with</small> <BrandLogo id={COMP_TITLE.quick} height={14} />
+            </span>
+          )}
         </button>
 
         <div className="rail" ref={rail} onScroll={onRail}>
@@ -329,6 +340,11 @@ export function MainMenu({ go }: { go: Go }) {
               <span className="mtile-sub">{t.sub}</span>
               <h3>{t.title}</h3>
               <span className="mtile-hint">{t.hint}</span>
+              {sponsored && TILE_SPONSOR[t.key] && (
+                <span className="mtile-sponsor">
+                  <BrandLogo id={TILE_SPONSOR[t.key]} height={12} />
+                </span>
+              )}
             </button>
           ))}
         </div>

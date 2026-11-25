@@ -56,6 +56,7 @@ function devRoute(): Route {
   if (tod === 'afternoon' || tod === 'golden' || tod === 'night') cfg.timeOfDay = tod;
   if (q.get('wx') === 'rain') cfg.weather = 'rain';
   if (q.get('imp')) cfg.importance = Number(q.get('imp'));
+  if (q.get('sponsors') === 'off') cfg.realSponsors = false;
   const gfx = q.get('gfx');
   if (gfx === 'low' || gfx === 'medium' || gfx === 'high') cfg.quality = gfx;
   return { name: 'match', cfg, back: { name: 'menu' } };

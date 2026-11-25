@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createBall } from './model';
 import type { Kit } from '../data/nations';
 import { buildStadium, DEFAULT_SPEC, GLOW_TEX } from './stadium/index';
+import type { MatchSponsors } from '../sponsors/manager';
 import { PostFX } from './view/effects';
 import { preset, resolveQuality } from './view/quality';
 import { loadPlayerAsset, type AnimName } from './view/assets';
@@ -14,6 +15,8 @@ export interface MenuSceneOptions {
   reduceMotion?: boolean;
   /** start dark: the floodlight banks come on one by one (launch intro) */
   intro?: boolean;
+  /** real sponsors on the boards (null/undefined = the made-up ones) */
+  sponsors?: MatchSponsors | null;
 }
 
 /** The player stands here, on the pitch near the touchline. */
@@ -70,7 +73,7 @@ export class MenuScene {
       this.scene,
       this.renderer,
       DEFAULT_SPEC,
-      { quality: q, home: { primary: kit.primary, secondary: '#21e6c1' }, away: { primary: kit.secondary, secondary: '#c6ff1a' }, time: 'night', weather: 'dry', importance: 0.6 },
+      { quality: q, home: { primary: kit.primary, secondary: '#21e6c1' }, away: { primary: kit.secondary, secondary: '#c6ff1a' }, time: 'night', weather: 'dry', importance: 0.6, sponsors: opts.sponsors ?? null },
       9,
       [kit.primary, kit.secondary],
     );

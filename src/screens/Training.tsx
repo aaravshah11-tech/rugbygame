@@ -1,5 +1,7 @@
 import type { Go } from '../App';
 import { TopBar } from '../ui/common';
+import { BrandLogo, sponsorsOn } from '../ui/BrandLogo';
+import { COMP_TITLE } from '../data/sponsors';
 import { useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
 import { finishDrill } from '../state/outcomes';
@@ -47,6 +49,11 @@ export function Training({ go }: { go: Go }) {
   return (
     <div className="screen">
       <TopBar title="Training" accent="Ground" onBack={() => go({ name: 'settings' })} />
+      {sponsorsOn() && (
+        <div className="presented-by">
+          presented by <BrandLogo id={COMP_TITLE.training} height={16} />
+        </div>
+      )}
       <div className="scroll">
         <div className="nation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
           {DRILLS.map((d) => (

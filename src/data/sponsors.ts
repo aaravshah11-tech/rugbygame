@@ -1,5 +1,5 @@
 /**
- * Real-world sponsors (private build, never published). Logos come from simple-icons where the
+ * Real-world sponsors (private build, never published): 99 brands. Logos come from simple-icons where the
  * brand is there (see SI_ICONS in src/sponsors/icons.ts); everything else is drawn as a wordmark
  * in the brand's colours. Drop your own logo into public/sponsors/<id>.svg or .png to override.
  */
@@ -52,7 +52,7 @@ export const SPONSORS: Sponsor[] = [
   S({ id: 'allianz', name: 'Allianz', category: 'finance', colors: { primary: '#ffffff', secondary: '#3db2e6', bg: '#003781' }, wordmark: { font: SANS, weight: 700, text: 'Allianz' }, tier: 'title', where: ALL, local: ['ENG', 'LDN'] }),
   S({ id: 'heineken', name: 'Heineken', category: 'drink', colors: { primary: '#ffffff', secondary: '#e2001a', bg: '#00843d' }, wordmark: { font: SANS, weight: 800, text: 'Heineken', italic: true }, tier: 'title', where: ALL }),
   S({ id: 'mastercard', name: 'Mastercard', category: 'finance', colors: { primary: '#eb001b', secondary: '#f79e1b', bg: '#ffffff' }, icon: 'mastercard', withName: true, tier: 'title', where: ALL }),
-  S({ id: 'emirates', name: 'Emirates', category: 'airline', colors: { primary: '#d71921', secondary: '#ffffff', bg: '#ffffff' }, icon: 'emirates', tier: 'title', where: ALL }),
+  S({ id: 'emirates', name: 'Emirates', category: 'airline', colors: { primary: '#d71921', secondary: '#ffffff', bg: '#ffffff' }, icon: 'emirates', withName: true, tier: 'title', where: ALL }),
   S({ id: 'flyemirates', name: 'Fly Emirates', category: 'airline', colors: { primary: '#ffffff', secondary: '#d71921', bg: '#d71921' }, wordmark: { font: SERIF, weight: 700, text: 'Fly Emirates', italic: true }, tier: 'premium', where: ['boards', 'screens', 'shirts'] }),
   S({ id: 'dhl', name: 'DHL', category: 'rugby', colors: { primary: '#d40511', secondary: '#ffcc00', bg: '#ffcc00' }, icon: 'dhl', tier: 'premium', where: BOARD_PITCH }),
   S({ id: 'landrover', name: 'Land Rover', category: 'car', colors: { primary: '#ffffff', secondary: '#005a2b', bg: '#005a2b' }, wordmark: { font: SANS, weight: 700, text: 'LAND ROVER', tracking: 0.12 }, tier: 'premium', where: BOARD_PITCH, local: ['ENG'] }),
@@ -73,7 +73,7 @@ export const SPONSORS: Sponsor[] = [
   S({ id: 'adidas', name: 'adidas', category: 'kit', colors: { primary: '#ffffff', secondary: '#000000', bg: '#000000' }, icon: 'adidas', withName: true, tier: 'premium', where: ['boards', 'shirts', 'screens'], local: ['NZL'] }),
   S({ id: 'nike', name: 'Nike', category: 'kit', colors: { primary: '#ffffff', secondary: '#111111', bg: '#111111' }, icon: 'nike', tier: 'premium', where: ['boards', 'shirts', 'screens'], local: ['RSA'] }),
   S({ id: 'puma', name: 'PUMA', category: 'kit', colors: { primary: '#ffffff', secondary: '#242b2f', bg: '#242b2f' }, icon: 'puma', withName: true, tier: 'standard', where: ['boards', 'shirts'] }),
-  S({ id: 'underarmour', name: 'Under Armour', category: 'kit', colors: { primary: '#ffffff', secondary: '#1d1d1d', bg: '#1d1d1d' }, icon: 'underarmour', tier: 'standard', where: ['boards', 'shirts'] }),
+  S({ id: 'underarmour', name: 'Under Armour', category: 'kit', colors: { primary: '#ffffff', secondary: '#1d1d1d', bg: '#1d1d1d' }, icon: 'underarmour', withName: true, tier: 'standard', where: ['boards', 'shirts'] }),
   S({ id: 'asics', name: 'ASICS', category: 'kit', colors: { primary: '#ffffff', secondary: '#001e62', bg: '#001e62' }, wordmark: { font: BLACK, weight: 900, text: 'asics', italic: true }, tier: 'standard', where: ['boards', 'shirts'] }),
   S({ id: 'umbro', name: 'Umbro', category: 'kit', colors: { primary: '#ffffff', secondary: '#000000', bg: '#000000' }, wordmark: { font: SANS, weight: 800, text: 'umbro' }, tier: 'standard', where: ['boards', 'shirts'] }),
   S({ id: 'macron', name: 'Macron', category: 'kit', colors: { primary: '#ffffff', secondary: '#0a2240', bg: '#0a2240' }, wordmark: { font: BLACK, weight: 900, text: 'macron' }, tier: 'standard', where: ['boards', 'shirts'] }),
@@ -97,12 +97,12 @@ export const SPONSORS: Sponsor[] = [
   S({ id: 'mercedes', name: 'Mercedes-Benz', category: 'car', colors: { primary: '#ffffff', secondary: '#a8adb3', bg: '#000000' }, wordmark: { font: SERIF, weight: 400, text: 'Mercedes-Benz' }, tier: 'premium', where: BOARD_PITCH }),
   S({ id: 'audi', name: 'Audi', category: 'car', colors: { primary: '#ffffff', secondary: '#bb0a30', bg: '#000000' }, icon: 'audi', withName: true, tier: 'premium', where: BOARD }),
   S({ id: 'jaguar', name: 'Jaguar', category: 'car', colors: { primary: '#ffffff', secondary: '#9c8f6e', bg: '#1a1a1a' }, wordmark: { font: SANS, weight: 300, text: 'JAGUAR', tracking: 0.35 }, tier: 'standard', where: BOARD, local: ['ENG'] }),
-  S({ id: 'porsche', name: 'Porsche', category: 'car', colors: { primary: '#ffffff', secondary: '#b12b28', bg: '#000000' }, icon: 'porsche', tier: 'standard', where: BOARD }),
+  S({ id: 'porsche', name: 'Porsche', category: 'car', colors: { primary: '#ffffff', secondary: '#b12b28', bg: '#000000' }, icon: 'porsche', withName: true, tier: 'standard', where: BOARD }),
   S({ id: 'lamborghini', name: 'Lamborghini', category: 'car', colors: { primary: '#d1a33f', secondary: '#000000', bg: '#000000' }, icon: 'lamborghini', withName: true, tier: 'standard', where: BOARD, local: ['ITA'] }),
   S({ id: 'ferrari', name: 'Ferrari', category: 'car', colors: { primary: '#ffeb00', secondary: '#000000', bg: '#d40000' }, icon: 'ferrari', withName: true, tier: 'standard', where: BOARD, local: ['ITA'] }),
-  S({ id: 'mclaren', name: 'McLaren', category: 'car', colors: { primary: '#ff8000', secondary: '#ffffff', bg: '#111111' }, icon: 'mclaren', withName: true, tier: 'standard', where: BOARD }),
+  S({ id: 'mclaren', name: 'McLaren', category: 'car', colors: { primary: '#ff8000', secondary: '#ffffff', bg: '#111111' }, icon: 'mclaren', tier: 'standard', where: BOARD }),
   S({ id: 'tesla', name: 'Tesla', category: 'car', colors: { primary: '#ffffff', secondary: '#cc0000', bg: '#cc0000' }, icon: 'tesla', withName: true, tier: 'standard', where: BOARD }),
-  S({ id: 'volvo', name: 'Volvo', category: 'car', colors: { primary: '#ffffff', secondary: '#003057', bg: '#003057' }, icon: 'volvo', tier: 'standard', where: BOARD }),
+  S({ id: 'volvo', name: 'Volvo', category: 'car', colors: { primary: '#ffffff', secondary: '#003057', bg: '#003057' }, icon: 'volvo', withName: true, tier: 'standard', where: BOARD }),
   S({ id: 'ford', name: 'Ford', category: 'car', colors: { primary: '#ffffff', secondary: '#00274e', bg: '#00274e' }, icon: 'ford', tier: 'standard', where: BOARD }),
   // ------------------------------------------------------------------ tech & gaming
   S({ id: 'apple', name: 'Apple', category: 'tech', colors: { primary: '#ffffff', secondary: '#a2aaad', bg: '#000000' }, icon: 'apple', withName: true, tier: 'standard', where: BOARD }),
@@ -128,7 +128,7 @@ export const SPONSORS: Sponsor[] = [
   S({ id: 'netflix', name: 'Netflix', category: 'broadcast', colors: { primary: '#e50914', secondary: '#ffffff', bg: '#000000' }, icon: 'netflix', withName: true, tier: 'standard', where: BOARD }),
   // ------------------------------------------------------------------ finance & business
   S({ id: 'visa', name: 'Visa', category: 'finance', colors: { primary: '#ffffff', secondary: '#f7b600', bg: '#1a1f71' }, icon: 'visa', tier: 'premium', where: BOARD_PITCH }),
-  S({ id: 'amex', name: 'American Express', category: 'finance', colors: { primary: '#ffffff', secondary: '#2e77bc', bg: '#2e77bc' }, icon: 'americanexpress', tier: 'standard', where: BOARD }),
+  S({ id: 'amex', name: 'American Express', category: 'finance', colors: { primary: '#2e77bc', secondary: '#ffffff', bg: '#ffffff' }, icon: 'americanexpress', tier: 'standard', where: BOARD }),
   S({ id: 'paypal', name: 'PayPal', category: 'finance', colors: { primary: '#ffffff', secondary: '#009cde', bg: '#003087' }, icon: 'paypal', withName: true, tier: 'standard', where: BOARD }),
   S({ id: 'hsbc', name: 'HSBC', category: 'finance', colors: { primary: '#db0011', secondary: '#000000', bg: '#ffffff' }, icon: 'hsbc', withName: true, tier: 'premium', where: BOARD_PITCH, local: ['ENG'] }),
   S({ id: 'barclays', name: 'Barclays', category: 'finance', colors: { primary: '#ffffff', secondary: '#00aeef', bg: '#00395d' }, icon: 'barclays', withName: true, tier: 'standard', where: SHIRT, local: ['ENG', 'SAL'] }),
@@ -141,7 +141,7 @@ export const SPONSORS: Sponsor[] = [
   S({ id: 'britishairways', name: 'British Airways', category: 'airline', colors: { primary: '#ffffff', secondary: '#eb2226', bg: '#075aaa' }, icon: 'britishairways', withName: true, tier: 'premium', where: BOARD_PITCH, local: ['ENG'] }),
   S({ id: 'virginatlantic', name: 'Virgin Atlantic', category: 'airline', colors: { primary: '#ffffff', secondary: '#da0530', bg: '#da0530' }, icon: 'virginatlantic', withName: true, tier: 'standard', where: BOARD }),
   S({ id: 'airnz', name: 'Air New Zealand', category: 'airline', colors: { primary: '#ffffff', secondary: '#00b5ad', bg: '#000000' }, wordmark: { font: SANS, weight: 700, text: 'AIR NEW ZEALAND', tracking: 0.08 }, tier: 'premium', where: SHIRT.concat('pitch'), local: ['NZL'] }),
-  S({ id: 'etihad', name: 'Etihad', category: 'airline', colors: { primary: '#bd8b13', secondary: '#ffffff', bg: '#2b2a29' }, icon: 'etihadairways', withName: true, tier: 'standard', where: BOARD }),
+  S({ id: 'etihad', name: 'Etihad', category: 'airline', colors: { primary: '#bd8b13', secondary: '#ffffff', bg: '#2b2a29' }, icon: 'etihadairways', tier: 'standard', where: BOARD }),
   S({ id: 'airbnb', name: 'Airbnb', category: 'airline', colors: { primary: '#ffffff', secondary: '#ff5a5f', bg: '#ff5a5f' }, icon: 'airbnb', withName: true, tier: 'standard', where: BOARD }),
   S({ id: 'booking', name: 'Booking.com', category: 'airline', colors: { primary: '#ffffff', secondary: '#feba02', bg: '#003a9a' }, icon: 'bookingdotcom', withName: true, tier: 'standard', where: BOARD }),
   S({ id: 'uber', name: 'Uber', category: 'airline', colors: { primary: '#ffffff', secondary: '#000000', bg: '#000000' }, icon: 'uber', tier: 'standard', where: BOARD }),
