@@ -1,0 +1,738 @@
+/* =====================================================================
+   Main menu: the showpiece. Uses the tokens in theme.css only.
+   ===================================================================== */
+.menu {
+  background: var(--bg);
+  animation: none;
+}
+
+/* readable left side: the scene fades to near-black behind the menu */
+.menu-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(5, 7, 13, 0.94) 0%, rgba(5, 7, 13, 0.78) 34%, rgba(5, 7, 13, 0.25) 62%, rgba(5, 7, 13, 0) 78%),
+    linear-gradient(0deg, rgba(5, 7, 13, 0.85) 0%, rgba(5, 7, 13, 0) 32%), linear-gradient(180deg, rgba(5, 7, 13, 0.45) 0%, rgba(5, 7, 13, 0) 18%);
+}
+
+/* the 3D player on the right takes taps (celebrate) and drags (parallax) */
+.menu-player-hit {
+  position: absolute;
+  top: 18%;
+  bottom: 36%;
+  right: calc(var(--sar) + 4%);
+  width: 26%;
+  touch-action: none;
+}
+
+.menu-layer2 {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: calc(var(--sat) + 10px) calc(var(--sar) + 16px) calc(var(--sab) + 8px) calc(var(--sal) + 16px);
+  pointer-events: none;
+}
+.menu-layer2 > * {
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------------------- top bar */
+.mtop {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 44px;
+}
+.mlogo {
+  position: relative;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-style: italic;
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  padding-right: 4px;
+}
+.mlogo .t,
+.mlogo .l {
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: logoShine 5s 2.2s infinite;
+}
+.mlogo .t {
+  background-image: linear-gradient(100deg, #fff 40%, #ffffff 46%, #c6e0ff 50%, #fff 54%, #fff 60%);
+  margin-right: 0.18em;
+}
+.mlogo .l {
+  background-image: linear-gradient(100deg, var(--neon) 40%, #f4ffd0 50%, var(--neon) 60%);
+  filter: drop-shadow(0 0 10px rgba(var(--neon-rgb), 0.6));
+}
+@keyframes logoShine {
+  0% {
+    background-position: 100% 0;
+  }
+  18%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+html[data-gfx='low'] .mlogo .l {
+  filter: none;
+}
+
+.mlevel {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 74px;
+}
+.mlevel b {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+}
+.mlevel .xp {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.mlevel .xp i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan), #9ffff9);
+  box-shadow: var(--glow-cyan);
+}
+
+.mchip {
+  position: relative;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 22px;
+  background: rgba(10, 14, 26, 0.62);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: transform var(--t-fast) var(--ease-out);
+}
+.mchip:active {
+  transform: scale(0.93);
+}
+.mchip.icon {
+  padding: 0;
+  width: 44px;
+}
+.mchip .ic {
+  width: 20px;
+  height: 20px;
+}
+.mchip .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--pink);
+  box-shadow: var(--glow-pink);
+  color: #fff;
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+}
+
+.mtop .coins {
+  background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.18), rgba(var(--gold-rgb), 0.06)), rgba(10, 14, 26, 0.62);
+  height: 44px;
+  border-radius: 22px;
+}
+
+/* ---------------------------------------------------------------- hero: PLAY */
+.hero {
+  position: relative;
+  align-self: flex-start;
+  width: min(54%, 470px);
+  min-height: 112px;
+  margin-top: auto;
+  padding: 12px 18px 12px 20px;
+  border-radius: var(--r-xl);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  align-items: end;
+  text-align: left;
+  overflow: hidden;
+  border: 1px solid rgba(var(--neon-rgb), 0.55);
+  background: linear-gradient(115deg, rgba(var(--neon-rgb), 0.2) 0%, rgba(var(--neon-rgb), 0.05) 45%, rgba(255, 255, 255, 0.02) 100%), var(--glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 40px rgba(var(--neon-rgb), 0.08), 0 0 30px rgba(var(--neon-rgb), 0.18), var(--shadow-2);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  transition: transform var(--t-fast) var(--ease-out), box-shadow 0.25s;
+}
+.hero:active {
+  transform: scale(0.97);
+}
+/* kit-colour strips down the left edge */
+.hero::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: linear-gradient(180deg, var(--h) 0 50%, var(--a) 50% 100%);
+}
+.hero-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.16) 45%, transparent 60%) no-repeat;
+  background-size: 250% 100%;
+  animation: heroSweep 4.5s 3s infinite;
+  pointer-events: none;
+}
+@keyframes heroSweep {
+  0% {
+    background-position: 130% 0;
+  }
+  25%,
+  100% {
+    background-position: -30% 0;
+  }
+}
+.hero-label {
+  grid-column: 1 / -1;
+  align-self: start;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--neon);
+}
+.hero-play {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-style: italic;
+  font-size: 54px;
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 26px rgba(var(--neon-rgb), 0.45);
+}
+.hero-play .arrow {
+  display: inline-block;
+  font-size: 26px;
+  vertical-align: middle;
+  color: var(--neon);
+  animation: nudge 1.6s ease-in-out infinite;
+}
+@keyframes nudge {
+  50% {
+    transform: translateX(5px);
+  }
+}
+.hero-fix {
+  grid-row: 2 / 4;
+  grid-column: 2;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 17px;
+}
+.hero-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.hero-fix .v {
+  color: var(--muted);
+  font-size: 14px;
+}
+.hero-venue {
+  grid-column: 1;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------- mode carousel */
+.rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 0;
+  padding: 6px 2px 8px;
+  margin: 0 -2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  /* fade the tiles out under the right edge */
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.mtile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 168px;
+  min-height: 100px;
+  padding: 12px 14px 11px;
+  scroll-snap-align: start;
+  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+  text-align: left;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, transparent) 0%, rgba(255, 255, 255, 0.02) 55%), var(--glass);
+  box-shadow: var(--glass-inner), var(--shadow-1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  opacity: 0.78;
+  transform: scale(0.97);
+  transform-origin: left center;
+  transition: transform 0.25s var(--ease-out), opacity 0.25s, box-shadow 0.25s, border-color 0.25s;
+}
+.mtile.focus {
+  opacity: 1;
+  transform: scale(1);
+  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: var(--glass-inner), 0 0 24px color-mix(in srgb, var(--accent) 35%, transparent), var(--shadow-2);
+}
+.mtile:active {
+  transform: scale(0.94);
+}
+.mtile::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 14px var(--accent);
+}
+.mtile-ic {
+  position: absolute;
+  right: -14px;
+  top: -10px;
+  width: 92px;
+  height: 92px;
+  color: var(--accent);
+  opacity: 0.16;
+  pointer-events: none;
+}
+.mtile-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.mtile h3 {
+  font-size: 22px;
+  line-height: 0.92;
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+.mtile-hint {
+  margin-top: 2px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------- ticker */
+.ticker {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  border-radius: 13px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  flex-shrink: 0;
+}
+.ticker-tag {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  background: var(--pink);
+  color: #fff;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ticker-tag::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: blink 1.2s infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.ticker-track {
+  flex: 1;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+.ticker-run {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: tick 40s linear infinite;
+}
+.ticker-run span {
+  padding: 0 22px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: #cfd6e6;
+}
+.ticker-run span::before {
+  content: '◆';
+  color: var(--neon);
+  font-size: 8px;
+  margin-right: 10px;
+  vertical-align: 2px;
+}
+@keyframes tick {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------------------------------------------------------------- entrance */
+.menu.in .mtop {
+  animation: slideDown 0.45s var(--ease-out) backwards;
+}
+.menu.in .hero {
+  animation: slideIn 0.5s 0.06s var(--ease-out) backwards;
+}
+.menu.in .mtile {
+  animation: tileIn 0.5s calc(0.14s + var(--i) * 0.05s) var(--ease-out) backwards;
+}
+.menu.in .ticker {
+  animation: fadeUp 0.5s 0.4s var(--ease-out) backwards;
+}
+.menu.pre .menu-layer2 {
+  visibility: hidden;
+}
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+@keyframes tileIn {
+  from {
+    opacity: 0;
+    transform: translateX(34px) scale(0.95);
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* ---------------------------------------------------------------- launch intro */
+.launch {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(80% 60% at 50% 45%, rgba(5, 8, 16, 0.55), rgba(3, 4, 8, 0.96) 70%);
+  animation: launchOut 0.35s 1.55s ease forwards;
+  overflow: hidden;
+}
+.launch-lights {
+  position: absolute;
+  top: 6%;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 16%;
+}
+.launch-lights i {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fffaf0 0 8%, rgba(255, 246, 220, 0.75) 14%, rgba(255, 240, 200, 0.18) 38%, transparent 68%);
+  opacity: 0;
+  animation: lampOn 0.4s ease-out forwards;
+}
+@keyframes lampOn {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  55% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.launch-logo {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-style: italic;
+  font-size: clamp(64px, 14vw, 140px);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  opacity: 0;
+  animation: logoSlam 0.5s 0.95s cubic-bezier(0.3, 1.5, 0.5, 1) forwards, shake 0.35s 1.05s;
+}
+.launch-logo span {
+  color: var(--neon);
+  text-shadow: 0 0 40px rgba(var(--neon-rgb), 0.8);
+}
+@keyframes logoSlam {
+  0% {
+    opacity: 0;
+    transform: scale(2.6) skewX(-8deg);
+    filter: blur(8px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes shake {
+  20% {
+    translate: -6px 3px;
+  }
+  40% {
+    translate: 5px -4px;
+  }
+  60% {
+    translate: -3px 2px;
+  }
+  80% {
+    translate: 2px -1px;
+  }
+}
+.launch-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(var(--neon-rgb), 0.45), rgba(var(--neon-rgb), 0) 60%);
+  opacity: 0;
+  animation: flash 0.5s 1.02s ease-out;
+  pointer-events: none;
+}
+@keyframes flash {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes launchOut {
+  to {
+    opacity: 0;
+    transform: scale(1.06);
+    visibility: hidden;
+  }
+}
+.launch-skip {
+  position: absolute;
+  bottom: calc(var(--sab) + 14px);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* daily reward chips */
+.day-chip {
+  flex: 1;
+  text-align: center;
+  padding: 6px 2px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+}
+.day-chip small {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.day-chip b {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--gold);
+}
+.day-chip.now {
+  border-color: var(--gold);
+  box-shadow: var(--glow-gold);
+}
+
+/* ---------------------------------------------------------------- sizes */
+/* short phones (SE): a touch more compact */
+@media (max-height: 380px) {
+  .mlogo {
+    font-size: 32px;
+  }
+  .hero {
+    min-height: 100px;
+  }
+  .hero-play {
+    font-size: 46px;
+  }
+  .mtile {
+    width: 154px;
+    min-height: 92px;
+  }
+  .mtile h3 {
+    font-size: 20px;
+  }
+}
+/* narrow landscape phones: hide the level text, keep the bar */
+@media (max-width: 700px) {
+  .mlevel {
+    display: none;
+  }
+}
+/* tablets (landscape or portrait): bigger everything */
+@media (min-width: 1000px) and (min-height: 600px), (min-width: 700px) and (min-height: 1000px) {
+  .mlogo {
+    font-size: 54px;
+  }
+  .hero {
+    min-height: 150px;
+    width: min(50%, 560px);
+    padding: 18px 24px 16px 26px;
+  }
+  .hero-play {
+    font-size: 76px;
+  }
+  .hero-fix {
+    font-size: 22px;
+  }
+  .mtile {
+    width: 220px;
+    min-height: 132px;
+    padding: 16px 18px 14px;
+  }
+  .mtile h3 {
+    font-size: 28px;
+  }
+  .mtile-ic {
+    width: 120px;
+    height: 120px;
+  }
+  .mtile-hint {
+    font-size: 13px;
+  }
+  .ticker {
+    height: 32px;
+    border-radius: 16px;
+  }
+  .ticker-run span {
+    font-size: 14px;
+  }
+}
+/* portrait (iPad upright): menu runs down the lower half */
+@media (orientation: portrait) {
+  .menu-shade {
+    background: linear-gradient(0deg, rgba(5, 7, 13, 0.96) 0%, rgba(5, 7, 13, 0.82) 42%, rgba(5, 7, 13, 0) 70%);
+  }
+  .hero {
+    width: 100%;
+  }
+  .menu-player-hit {
+    top: 12%;
+    bottom: 52%;
+    left: 30%;
+    right: 30%;
+    width: auto;
+  }
+}
