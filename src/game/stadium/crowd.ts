@@ -284,12 +284,17 @@ export function buildCrowd(group: THREE.Group, stands: StandsResult, spec: Stadi
     }
     const texHome = bannerTexture(ctx.home.primary, ctx.home.secondary, ctx.homeName ?? 'HOME');
     const texAway = bannerTexture(ctx.away.primary, ctx.away.secondary, ctx.awayName ?? 'AWAY');
-    const geo = new THREE.PlaneGeometry(5, 1);
-    for (const b of banners) {
-      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: b.away ? texAway : texHome, roughness: 0.9, side: THREE.DoubleSide }));
-      m.position.set(b.x, 0.75, b.z);
-      m.rotation.y = b.ang + Math.PI;
-      group.add(m);
+    // one instanced draw per side's banner design
+    for (const away of [false, true]) {
+      const list = banners.filter((b) => b.away === away);
+      if (!list.length) continue;
+      const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(5, 1), new THREE.MeshStandardMaterial({ map: away ? texAway : texHome, roughness: 0.9, side: THREE.DoubleSide }), list.length);
+      const m = new THREE.Matrix4();
+      list.forEach((b, i) => {
+        m.compose(new THREE.Vector3(b.x, 0.75, b.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.ang + Math.PI), new THREE.Vector3(1, 1, 1));
+        im.setMatrixAt(i, m);
+      });
+      group.add(im);
     }
   }
 

@@ -127,10 +127,11 @@ export function buildPitchside(group: THREE.Group, spec: StadiumSpec, ctx: Stadi
       const home = new THREE.MeshStandardMaterial({ color: ctx.home.primary, roughness: 0.55 });
       const trim = new THREE.MeshStandardMaterial({ color: ctx.home.secondary, roughness: 0.55 });
       const arch = new THREE.TorusGeometry(2.1, 0.32, 8, 18, Math.PI);
-      for (let i = 0; i < n; i++) {
-        const m = new THREE.Mesh(arch, i % 2 ? trim : home);
-        m.position.set(0, 0, from + 0.4 + (i * (len - 0.4)) / (n - 1));
-        group.add(m);
+      for (const [mat, odd] of [[home, 0], [trim, 1]] as const) {
+        const idx = Array.from({ length: n }, (_, i) => i).filter((i) => i % 2 === odd);
+        const im = new THREE.InstancedMesh(arch, mat, idx.length);
+        idx.forEach((i, k) => im.setMatrixAt(k, new THREE.Matrix4().makeTranslation(0, 0, from + 0.4 + (i * (len - 0.4)) / (n - 1))));
+        group.add(im);
       }
     }
   }

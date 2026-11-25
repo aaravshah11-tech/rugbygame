@@ -20,7 +20,7 @@ export function preset(level: QualityLevel): QualityPreset {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   switch (level) {
     case 'high':
-      return { level, pixelRatio: dpr, shadows: true, shadowMapSize: 2048, shadowCasters: 6, bloom: true, msaa: 4, crowdDensity: 1, pitchPxPerMetre: 16, particles: 1, targetFps: 60 };
+      return { level, pixelRatio: Math.min(dpr, 2), shadows: true, shadowMapSize: 2048, shadowCasters: 6, bloom: true, msaa: 4, crowdDensity: 1, pitchPxPerMetre: 16, particles: 1, targetFps: 60 };
     case 'medium':
       return { level, pixelRatio: Math.min(dpr, 1.5), shadows: true, shadowMapSize: 1024, shadowCasters: 6, bloom: true, msaa: 0, crowdDensity: 0.6, pitchPxPerMetre: 12, particles: 0.7, targetFps: 60 };
     case 'low':

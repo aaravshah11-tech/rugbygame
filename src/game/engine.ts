@@ -42,6 +42,7 @@ export class MatchEngine {
   camera: THREE.PerspectiveCamera;
   stadium: StadiumView;
   shadowBasis: { dir: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3 } | null = null;
+  stadiumBuildMs = 0;
   post: PostFX;
   particles: Particles;
   ballFx: BallFx;
@@ -242,6 +243,7 @@ export class MatchEngine {
     // light snow, sometimes, for a dry winter fixture at a temperate ground (looks only)
     const devWx = import.meta.env.DEV ? new URLSearchParams(location.search).get('wx') : null;
     const snow = devWx === 'snow' || (!devWx && !cfg.drill && cfg.weather === 'dry' && (spec.climate ?? 'temperate') === 'temperate' && spec.layout !== 'fields' && Math.random() < 0.08);
+    const t0 = performance.now();
     this.stadium = buildStadium(
       this.scene,
       this.renderer,
@@ -250,6 +252,7 @@ export class MatchEngine {
       this.quality.pitchPxPerMetre,
       [cfg.user.kit.primary, cfg.cpu.kit.primary],
     );
+    this.stadiumBuildMs = performance.now() - t0;
     this.buildTeams(asset);
 
     this.ballMesh = createBall();

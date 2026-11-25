@@ -55,10 +55,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   bakeStandShadows(group, spec, stands, sunDir, ctx.time, ctx.quality.level === 'low');
   // floodlights, roof strips and box windows only matter after dark (just coming on at golden hour)
   const lightsOn = ctx.time === 'night' ? 1 : ctx.time === 'golden' ? 0.45 : 0;
-  for (const s of roofs.glowSprites) {
-    s.visible = lightsOn > 0;
-    s.scale.multiplyScalar(0.6 + 0.4 * lightsOn);
-  }
+  roofs.setGlow(lightsOn);
   for (const m of [...roofs.nightGlow, ...stands.nightGlow]) {
     if (m instanceof THREE.SpriteMaterial) m.opacity = 0.9 * lightsOn;
     else if (m instanceof THREE.MeshBasicMaterial) m.color.multiplyScalar(0.25 + 0.75 * lightsOn);

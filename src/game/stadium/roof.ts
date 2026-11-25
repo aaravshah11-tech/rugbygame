@@ -8,6 +8,8 @@ export interface RoofResult {
   /** lights that only matter at night: roof underside strips and floodlight lamp glows */
   nightGlow: THREE.Material[];
   glowSprites: THREE.Sprite[];
+  /** floodlight glow strength 0..1 (all lamp flares are one points draw call) */
+  setGlow(k: number): void;
   /** highest roof edge (for cameras and the closing lid) */
   maxY: number;
 }
@@ -38,6 +40,8 @@ export function buildRoofs(group: THREE.Group, spec: StadiumSpec, ctx: StadiumCo
   const stripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.4, 2.2) });
   const nightGlow: THREE.Material[] = [stripMat];
   const glowSprites: THREE.Sprite[] = [];
+  /** x, y, z, world size per flare */
+  const flares: number[] = [];
   const pos: number[] = [];
   const fas: number[] = [];
   const strip: number[] = [];
@@ -138,11 +142,7 @@ export function buildRoofs(group: THREE.Group, spec: StadiumSpec, ctx: StadiumCo
       if ((spec.lights === 'roof' || spec.lights === 'both') && p.s >= nextLamp) {
         nextLamp = p.s + lampEvery;
         const [lx, lz] = at(p, g.front + 0.6);
-        const s = new THREE.Sprite(glowMat);
-        s.position.set(lx, g.yF - 1.1, lz);
-        s.scale.setScalar(7);
-        group.add(s);
-        glowSprites.push(s);
+        flares.push(lx, g.yF - 1.1, lz, 7);
       }
     }
   }
@@ -198,30 +198,68 @@ export function buildRoofs(group: THREE.Group, spec: StadiumSpec, ctx: StadiumCo
     const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6, 5.4) });
     nightGlow.push(lampMat);
     const h = Math.max(42, maxY + 16);
-    for (const [x, z] of stands.pylonSpots) {
-      const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.4, h, 8), towerMat);
-      tower.position.set(x, h / 2, z);
-      group.add(tower);
-      const head = new THREE.Group();
+    // towers + frames + lamps: three instanced draws for all pylons
+    const spots = stands.pylonSpots;
+    const towers = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.7, 1.4, 1, 8), towerMat, spots.length);
+    const frames = new THREE.InstancedMesh(new THREE.BoxGeometry(14, 7, 0.8), towerMat, spots.length);
+    const lamps = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 2.4, 0.3), lampMat, spots.length * 8);
+    const head = new THREE.Object3D();
+    const lamp = new THREE.Object3D();
+    head.add(lamp);
+    spots.forEach(([x, z], k) => {
+      towers.setMatrixAt(k, new THREE.Matrix4().compose(new THREE.Vector3(x, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(1, h, 1)));
       head.position.set(x, h + 3, z);
       head.lookAt(0, 0, 0);
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(14, 7, 0.8), towerMat);
-      head.add(frame);
+      head.updateMatrixWorld(true);
+      frames.setMatrixAt(k, head.matrixWorld);
       for (let i = 0; i < 4; i++)
         for (let j = 0; j < 2; j++) {
-          const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 0.3), lampMat);
           lamp.position.set(-5 + i * 3.35, -1.6 + j * 3.2, 0.5);
-          head.add(lamp);
+          lamp.updateMatrixWorld(true);
+          lamps.setMatrixAt(k * 8 + i * 2 + j, lamp.matrixWorld);
         }
-      group.add(head);
-      const glow = new THREE.Sprite(glowMat);
-      glow.scale.setScalar(36);
-      glow.position.copy(head.position).add(new THREE.Vector3(-x, -h, -z).normalize().multiplyScalar(2));
-      group.add(glow);
-      glowSprites.push(glow);
-    }
+      const gp = head.position.clone().add(new THREE.Vector3(-x, -h, -z).normalize().multiplyScalar(2));
+      flares.push(gp.x, gp.y, gp.z, 36);
+    });
+    group.add(towers, frames, lamps);
   }
-  return { nightGlow, glowSprites, maxY };
+  // all flares in one draw call: points sized in world units, additive glow texture
+  const flareU = { uMap: { value: GLOW_TEX() }, uOpacity: { value: 0.9 }, uScale: { value: 1 } };
+  if (flares.length) {
+    const n = flares.length / 4;
+    const pos = new Float32Array(n * 3);
+    const size = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      pos.set(flares.slice(i * 4, i * 4 + 3), i * 3);
+      size[i] = flares[i * 4 + 3];
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: flareU,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `attribute float aSize; uniform float uScale;
+        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = uScale * aSize * 220.0 / max(-mv.z, 1.0); gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform sampler2D uMap; uniform float uOpacity;
+        void main(){ vec4 t = texture2D(uMap, gl_PointCoord); gl_FragColor = vec4(vec3(1.0, 0.97, 0.88) * t.a * uOpacity, t.a * uOpacity); }`,
+    });
+    const pts = new THREE.Points(g, mat);
+    pts.frustumCulled = false;
+    pts.onBeforeRender = (r) => (flareU.uScale.value = r.getPixelRatio() * (r.domElement.height / r.getPixelRatio()) / 390);
+    group.add(pts);
+  }
+  void glowMat;
+  return {
+    nightGlow,
+    glowSprites,
+    maxY,
+    setGlow(k: number) {
+      flareU.uOpacity.value = 0.9 * k;
+    },
+  };
 }
 
 /** A unit box stretched between two points (for ribs, stays and pillars). */
