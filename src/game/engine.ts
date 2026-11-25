@@ -728,8 +728,15 @@ export class MatchEngine {
     if (this.hudT <= 0) {
       this.hudT = 0.12;
       this.emit({ type: 'hud', hud: this.hud() });
+      // big screens: home score first
+      const sc = this.cfg.userIsHome ? `${this.score[0]} - ${this.score[1]}` : `${this.score[1]} - ${this.score[0]}`;
+      if (sc !== this.screenScore) {
+        this.screenScore = sc;
+        this.stadium.setScore(sc);
+      }
     }
   }
+  private screenScore = '0 - 0';
 
   hud(): HudState {
     const totalMin = Math.floor((this.half - 1) * 40 + Math.min(this.gameSec, 2400) / 60);

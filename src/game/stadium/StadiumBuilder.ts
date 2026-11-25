@@ -9,6 +9,8 @@ import { buildPitch } from './pitch';
 import { buildPitchside } from './pitchside';
 import { bakeStandShadows } from './shadows';
 import { buildSnow } from './weather';
+import { buildSurroundings } from './surroundings';
+import { buildScreens, buildSignature } from './signature';
 import type { StadiumContext, StadiumEvent, StadiumSpec, StadiumView } from './types';
 
 /**
@@ -48,15 +50,6 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     return { spec, group, key, sunDir, time: ctx.time, event, setScore: () => {}, setWind: side.setWind, setTorches: () => {}, update: (t, ex, cam) => (ground.update(t, ex, cam), side.update(t, cam), sky.update(t), snow?.update(t, cam)) };
   }
 
-  // the ground the stadium stands on: a plaza ring, then grass out to the horizon
-  const plaza = new THREE.Mesh(new THREE.CircleGeometry(190, 48), new THREE.MeshStandardMaterial({ color: '#4b4f57', roughness: 0.95 }));
-  plaza.rotation.x = -Math.PI / 2;
-  plaza.position.y = -0.06;
-  group.add(plaza);
-  const land = new THREE.Mesh(new THREE.CircleGeometry(1400, 48), new THREE.MeshStandardMaterial({ color: '#2f4a28', roughness: 1 }));
-  land.rotation.x = -Math.PI / 2;
-  land.position.y = -0.1;
-  group.add(land);
   const stands = buildStands(group, spec, ctx);
   const roofs = buildRoofs(group, spec, ctx, stands);
   bakeStandShadows(group, spec, stands, sunDir, ctx.time, ctx.quality.level === 'low');
@@ -72,6 +65,22 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     else if (m instanceof THREE.MeshStandardMaterial) m.emissiveIntensity = 0.05 + 0.3 * lightsOn;
   }
   const boards = buildBoards(group, spec, stands, ctx.home.primary);
+  // the world outside, the ground's signature feature and its big screens
+  const maxBack = Math.max(...stands.runs.map((r) => r.backD), 6);
+  const radius = Math.max(Math.abs(stands.front.endR), Math.abs(stands.front.opp)) + maxBack + 8;
+  // the ground it stands on: a concourse round the stadium, then grass out to the horizon
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshStandardMaterial({ color: '#4b4f57', roughness: 0.95 }));
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.scale.set(radius + 18, radius * 0.8 + 18, 1);
+  plaza.position.y = -0.06;
+  group.add(plaza);
+  const land = new THREE.Mesh(new THREE.CircleGeometry(1400, 48), new THREE.MeshStandardMaterial({ color: spec.climate === 'highveld' ? '#5a6a3a' : '#3e5a30', roughness: 1 }));
+  land.rotation.x = -Math.PI / 2;
+  land.position.y = -0.1;
+  group.add(land);
+  buildSurroundings(group, spec, ctx, radius);
+  buildSignature(group, spec, ctx, stands, radius);
+  const drawScore = buildScreens(group, spec, stands);
   const side = buildPitchside(group, spec, ctx, stands);
   if (spec.track) {
     // athletics track: a ring on the ground between the pitch and the stands
@@ -91,7 +100,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     sunDir,
     time: ctx.time,
     event,
-    setScore: () => {},
+    setScore: drawScore,
     setWind: side.setWind,
     setTorches: crowd.setTorches,
     update(time, excite, camera) {

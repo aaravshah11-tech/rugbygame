@@ -245,6 +245,34 @@ export function buildStands(group: THREE.Group, spec: StadiumSpec, ctx: StadiumC
     void ri;
   });
 
+  // ---- grass banks on sides without a stand (fans sit on them; the crowd builder seats them)
+  if (spec.layout === 'stands') {
+    const bankM = new Mesher();
+    const grass = new THREE.Color('#3f6a2e');
+    const fz = 35 + SETBACK[spec.tier] + (spec.track ? 9 : 0);
+    const fx = 60 + SETBACK[spec.tier] + (spec.track ? 9 : 0);
+    const banks: [SideKey, Path][] = [
+      ['main', straight(-62, -fz, 62, -fz, 0, -1, 'main', step)],
+      ['opp', straight(62, fz, -62, fz, 0, 1, 'opp', step)],
+      ['endL', straight(-fx, 38, -fx, -38, -1, 0, 'endL', step)],
+      ['endR', straight(fx, -38, fx, 38, 1, 0, 'endR', step)],
+    ];
+    for (const [side, path] of banks) {
+      const st = spec.stands[side];
+      if (st.tiers || !st.bank) continue;
+      bankM.strip(path, 0, 0.1, 14, 4.2, () => grass);
+      for (let r = 0; r < 12; r++)
+        for (let i = 0; i < path.pts.length; i++) {
+          if (Math.random() > 0.45) continue;
+          const p = path.pts[i];
+          const d = 0.6 + r * 1.1 + Math.random() * 0.5;
+          const [x, z] = at(p, d);
+          seats.push({ x, y: 0.1 + (d / 14) * 4.1, z, side, u: p.s / path.length, standing: false });
+        }
+    }
+    if (!bankM.empty) group.add(new THREE.Mesh(bankM.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })));
+  }
+
   // ---- players' tunnel and dugouts in the stand that has them
   const tunnelRun = runs.find((r) => r.path.pts.some((p) => p.side === 'main' && r.specAt(p)?.tunnel));
   if (tunnelRun) addTunnel(group, tunnelRun);
