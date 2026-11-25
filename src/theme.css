@@ -1,0 +1,461 @@
+/* =====================================================================
+   TRY LINE — "Night match under the floodlights"
+   The design system: every colour, radius, spacing step, shadow, glow
+   and font lives here. Component styles below (and in styles.css) only
+   use these tokens.
+   ===================================================================== */
+:root {
+  /* surfaces */
+  --bg: #07090f;
+  --bg-2: #0b1020;
+  --bg-3: #121b33;
+  --bg-grad: radial-gradient(120% 90% at 85% -10%, rgba(40, 72, 160, 0.32) 0%, rgba(7, 9, 15, 0) 55%),
+    radial-gradient(90% 70% at -10% 110%, rgba(20, 40, 110, 0.28) 0%, rgba(7, 9, 15, 0) 60%), var(--bg);
+
+  /* accents */
+  --neon: #c6ff1a;
+  --neon-rgb: 198, 255, 26;
+  --neon-ink: #0a0e05;
+  --pink: #ff3d6e;
+  --pink-rgb: 255, 61, 110;
+  --cyan: #2ee6e0;
+  --cyan-rgb: 46, 230, 224;
+  --gold: #ffc83d;
+  --gold-rgb: 255, 200, 61;
+  --silver: #d5dbe7;
+  --bronze: #d58d4f;
+  --elite: #c07bff;
+  --elite-rgb: 192, 123, 255;
+
+  /* text (muted is 7:1 on --bg) */
+  --text: #f4f7ff;
+  --muted: #95a0b8;
+  --dim: #66708a;
+
+  /* glass */
+  --glass: rgba(16, 23, 41, 0.6);
+  --glass-strong: rgba(12, 17, 31, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-hi: rgba(255, 255, 255, 0.22);
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 28px rgba(110, 150, 255, 0.06);
+  --blur: blur(16px) saturate(150%);
+  /* older names, kept so every rule reads the same palette */
+  --panel: var(--glass-strong);
+  --panel-solid: #111a2d;
+  --line: var(--glass-border);
+
+  /* shape + space */
+  --r-xs: 8px;
+  --r-sm: 11px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+
+  /* depth + light */
+  --shadow-1: 0 6px 18px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 16px 44px rgba(0, 0, 0, 0.55);
+  --glow-neon: 0 0 22px rgba(var(--neon-rgb), 0.5), 0 0 2px rgba(var(--neon-rgb), 0.9);
+  --glow-pink: 0 0 22px rgba(var(--pink-rgb), 0.5);
+  --glow-cyan: 0 0 22px rgba(var(--cyan-rgb), 0.45);
+  --glow-gold: 0 0 22px rgba(var(--gold-rgb), 0.5);
+  --text-glow: 0 0 18px rgba(var(--neon-rgb), 0.55);
+
+  /* type */
+  --font-display: 'Barlow Condensed', 'Avenir Next Condensed', 'AvenirNextCondensed-Heavy', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  --font: var(--font-body);
+  --track-head: -0.01em;
+  --track-label: 0.16em;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.25);
+  --t-fast: 0.12s;
+  --t-med: 0.28s;
+
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  color-scheme: dark;
+}
+
+/* Low graphics: no blur, no glow, opaque panels (cheap on old phones). */
+html[data-gfx='low'] {
+  --glass: rgba(14, 20, 36, 0.94);
+  --glass-strong: #0e1424;
+  --blur: none;
+  --glow-neon: none;
+  --glow-pink: none;
+  --glow-cyan: none;
+  --glow-gold: none;
+  --text-glow: none;
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+html[data-gfx='low'] *,
+html[data-gfx='low'] *::before,
+html[data-gfx='low'] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Reduce motion: everything still fades, nothing flies, shakes or loops. */
+html[data-motion='reduce'] *,
+html[data-motion='reduce'] *::before,
+html[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ---------------------------------------------------------------- type */
+html,
+body,
+#root {
+  font-family: var(--font-body);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.italic,
+.btn,
+.tab,
+.seg button,
+.logo,
+.coins,
+.pill,
+.tile h3,
+.nation-btn b,
+.scorebug,
+.abtn,
+.result-score,
+.intro-title,
+.try-word,
+.pcard,
+.pack,
+.kick-chip,
+.phase-chip {
+  font-family: var(--font-display);
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: var(--track-head);
+  line-height: 0.95;
+}
+
+.italic {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+/* small uppercase labels: wide tracking */
+.label,
+.muted.italic {
+  font-family: var(--font-body);
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+p,
+small,
+.muted {
+  font-family: var(--font-body);
+}
+
+/* ---------------------------------------------------------------- screens */
+.screen {
+  background: var(--bg-grad);
+  gap: var(--s3);
+  animation: screenIn 0.34s var(--ease-out);
+}
+@keyframes screenIn {
+  0% {
+    opacity: 0;
+    transform: translateX(36px) scale(1.02);
+    filter: blur(6px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+html[data-gfx='low'] .screen {
+  animation-name: screenInLow;
+}
+@keyframes screenInLow {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.topbar {
+  gap: var(--s3);
+}
+.topbar h1 {
+  font-size: 30px;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+.topbar h1 span {
+  color: var(--neon);
+  text-shadow: var(--text-glow);
+}
+
+/* ---------------------------------------------------------------- buttons */
+.btn {
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02)), var(--panel-solid);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner), var(--shadow-1);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  transition: transform var(--t-fast) var(--ease-out), box-shadow 0.2s, background 0.2s, filter 0.2s;
+}
+.btn:active {
+  transform: scale(0.95);
+  filter: brightness(1.15);
+}
+.btn.primary {
+  background: linear-gradient(180deg, #e0ff6a 0%, var(--neon) 45%, #9fd60c 100%);
+  color: var(--neon-ink);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 0 rgba(0, 0, 0, 0.15), var(--glow-neon);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.btn.cyan {
+  background: linear-gradient(180deg, #8ff6f2, var(--cyan) 50%, #17b3ae);
+  color: #03201f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), var(--glow-cyan);
+}
+.btn.danger {
+  background: linear-gradient(180deg, #ff7598, var(--pink) 50%, #d81f52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), var(--glow-pink);
+}
+.btn.ghost {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+.back {
+  border-radius: var(--r-sm);
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+.coins {
+  height: 36px;
+  padding: 0 14px 0 10px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.2), rgba(var(--gold-rgb), 0.08));
+  border: 1px solid rgba(var(--gold-rgb), 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 16px rgba(var(--gold-rgb), 0.15);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.coin-dot {
+  box-shadow: 0 0 10px rgba(var(--gold-rgb), 0.7);
+}
+
+/* ---------------------------------------------------------------- glass */
+.card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01)), var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--glass-inner), var(--shadow-2);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+.card h3 {
+  font-size: 20px;
+}
+
+.tile {
+  border-radius: var(--r-lg);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.015) 60%), var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner), var(--shadow-1);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+}
+.tile::before {
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+}
+.tile .tag {
+  letter-spacing: 0.14em;
+  font-family: var(--font-body);
+  font-style: normal;
+  font-size: 10px;
+}
+
+/* ---------------------------------------------------------------- tabs + segmented */
+.tabs {
+  gap: var(--s1);
+  padding: var(--s1);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  align-self: flex-start;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  transition: background 0.2s, color 0.2s;
+}
+.tab.on {
+  background: linear-gradient(180deg, #e0ff6a, var(--neon));
+  color: var(--neon-ink);
+  box-shadow: var(--glow-neon);
+}
+.seg {
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+}
+.seg button {
+  border-radius: var(--r-sm);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  transition: background 0.2s, color 0.2s, transform var(--t-fast);
+}
+.seg button:active {
+  transform: scale(0.95);
+}
+.seg button.on {
+  background: linear-gradient(180deg, #e0ff6a, var(--neon));
+  color: var(--neon-ink);
+  box-shadow: var(--glow-neon);
+}
+
+/* ---------------------------------------------------------------- team buttons */
+.nation-btn {
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--glass-border);
+  transition: transform var(--t-fast) var(--ease-out), border-color 0.2s, box-shadow 0.2s;
+}
+.nation-btn:active {
+  transform: scale(0.97);
+}
+.nation-btn b {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.nation-btn small {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.nation-btn.sel {
+  border: 1px solid var(--neon);
+  background: linear-gradient(180deg, rgba(var(--neon-rgb), 0.16), rgba(var(--neon-rgb), 0.04));
+  box-shadow: inset 0 0 18px rgba(var(--neon-rgb), 0.12), 0 0 18px rgba(var(--neon-rgb), 0.2);
+}
+.nation-btn.sel2 {
+  border: 1px solid var(--pink);
+  background: linear-gradient(180deg, rgba(var(--pink-rgb), 0.16), rgba(var(--pink-rgb), 0.04));
+  box-shadow: inset 0 0 18px rgba(var(--pink-rgb), 0.12), 0 0 18px rgba(var(--pink-rgb), 0.2);
+}
+
+/* ---------------------------------------------------------------- sheets: glass sliding up, with a handle */
+.sheet {
+  background: rgba(2, 4, 9, 0.6);
+  align-items: flex-end;
+  padding-bottom: 0;
+  animation: fadeIn 0.22s;
+}
+.sheet > .card {
+  position: relative;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  border-bottom: 0;
+  padding: 22px var(--s4) calc(var(--sab) + var(--s4));
+  max-height: calc(100% - 4px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%), var(--glass-strong);
+  animation: sheetUp 0.34s var(--ease-out);
+}
+.sheet > .card::before {
+  content: '';
+  position: sticky;
+  display: block;
+  top: -14px;
+  margin: -14px auto 8px;
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.28);
+}
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------- tables + pills */
+table.t th {
+  font-family: var(--font-body);
+  font-size: 10px;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+table.t td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.pill {
+  border-radius: 999px;
+  padding: 2px 9px;
+  letter-spacing: 0.06em;
+}
+.pill.win {
+  box-shadow: 0 0 12px rgba(var(--neon-rgb), 0.25);
+}
+
+/* ---------------------------------------------------------------- tap feedback (pairs with ui/tap.ts) */
+.tapped {
+  animation: tapPulse 0.22s var(--ease-out);
+}
+@keyframes tapPulse {
+  0% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: none;
+  }
+}

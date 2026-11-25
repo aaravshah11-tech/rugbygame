@@ -245,20 +245,93 @@ class AudioEngine {
     o.stop(t + 0.12);
   }
 
+  private lastClick = 0;
+  /** Crisp UI tick. Taps are de-duplicated, so the global tap handler and a button's own onClick don't double up. */
   click() {
     if (!this.ctx) return;
+    const now = performance.now();
+    if (now - this.lastClick < 300) return;
+    this.lastClick = now;
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const o = ctx.createOscillator();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(1300, t);
-    o.frequency.exponentialRampToValueAtTime(700, t + 0.05);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(2400, t);
+    o.frequency.exponentialRampToValueAtTime(1100, t + 0.03);
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.18, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    g.gain.setValueAtTime(0.14, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
     o.connect(g).connect(this.sfx);
     o.start(t);
-    o.stop(t + 0.08);
+    o.stop(t + 0.05);
+    this.noiseHit(t, 0.02, 0.09, 5200);
+  }
+
+  /** A burst of filtered noise (ticks, thumps). */
+  private noiseHit(t: number, dur: number, vol: number, freq: number, type: BiquadFilterType = 'highpass') {
+    const ctx = this.ctx!;
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(f).connect(g).connect(this.sfx);
+    src.start(t);
+  }
+
+  /** Floodlight bank switching on: a heavy relay clunk with a hum tail. */
+  clunk(delay = 0) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + delay;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    o.connect(g).connect(this.sfx);
+    o.start(t);
+    o.stop(t + 0.3);
+    this.noiseHit(t, 0.06, 0.35, 900, 'lowpass');
+    const hum = ctx.createOscillator();
+    hum.type = 'sawtooth';
+    hum.frequency.value = 100;
+    const hg = ctx.createGain();
+    hg.gain.setValueAtTime(0.0001, t);
+    hg.gain.linearRampToValueAtTime(0.025, t + 0.05);
+    hg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 400;
+    hum.connect(lp).connect(hg).connect(this.sfx);
+    hum.start(t);
+    hum.stop(t + 0.75);
+  }
+
+  /** Logo slam: sub boom plus a bright crack. */
+  slam(delay = 0) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + delay;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(160, t);
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.35);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.7, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    o.connect(g).connect(this.sfx);
+    o.start(t);
+    o.stop(t + 0.55);
+    this.noiseHit(t, 0.12, 0.3, 2500);
   }
 
   coin() {

@@ -1,3 +1,4 @@
+import { resolveQuality } from '../game/view/quality';
 import { useSyncExternalStore } from 'react';
 import { makeRng, uid } from '../util/rng';
 import { randomCard, type Player } from '../data/players';
@@ -198,6 +199,15 @@ export function useProfile(): Profile {
 export function applySettings() {
   audio.setVolumes(profile.settings.music, profile.settings.sfx);
   setHapticsEnabled(profile.settings.haptics);
+  // the stylesheet reads these: data-motion="reduce" cuts big animations, data-gfx="low" the blur and glow
+  const root = document.documentElement;
+  root.dataset.motion = reduceMotion() ? 'reduce' : 'full';
+  root.dataset.gfx = resolveQuality(profile.settings.graphics);
+}
+
+/** The player's Reduce Motion setting, or the iOS/OS preference. */
+export function reduceMotion(): boolean {
+  return !!profile.settings.reduceMotion || (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
 // ---------- daily login + challenges ----------
@@ -254,6 +264,8 @@ export function recordMatch(r: MatchResult): number {
     else p.stats.losses++;
     p.stats.tries += r.user.tries;
     p.stats.tackles += r.user.tackles;
+    const side = r.userSide as 0 | 1;
+    p.recent = [{ home: r.home, away: r.away, homeScore: r.homeScore, awayScore: r.awayScore, tries: side === 0 ? r.homeTries : r.awayTries, userSide: side }, ...(p.recent ?? [])].slice(0, 6);
     for (const c of p.daily.challenges) {
       if (c.claimed) continue;
       const add: Record<ChallengeKind, number> = {

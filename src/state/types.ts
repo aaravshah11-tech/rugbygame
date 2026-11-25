@@ -52,6 +52,19 @@ export interface Settings {
   passButtons?: 'two' | 'one';
   /** moved/resized action buttons */
   controlLayout?: Record<string, { dx: number; dy: number; s: number }>;
+  /** cut camera drift, parallax and big animations (also follows the iOS setting) */
+  reduceMotion?: boolean;
+}
+
+/** A finished match as shown on the main menu ticker. */
+export interface RecentResult {
+  home: string;
+  away: string;
+  homeScore: number;
+  awayScore: number;
+  /** tries by the user's team */
+  tries: number;
+  userSide: 0 | 1;
 }
 
 export interface Fixture {
@@ -136,6 +149,10 @@ export interface Profile {
   kickLevels?: Record<string, { best: number; passed: boolean }>;
   /** daily challenge scenarios completed today */
   scenarios?: { date: string; done: string[] };
+  /** last few results, newest first (menu ticker) */
+  recent?: RecentResult[];
+  /** teams last picked in Quick Match (menu hero tile, menu player kit) */
+  lastQuick?: { home: string; away: string };
   updatedAt: number;
 }
 

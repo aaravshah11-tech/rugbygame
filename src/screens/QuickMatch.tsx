@@ -13,8 +13,8 @@ import { audio } from '../util/audio';
 
 export function QuickMatch({ go }: { go: Go }) {
   const p = useProfile();
-  const [home, setHome] = useState('ENG');
-  const [away, setAway] = useState('NZL');
+  const [home, setHome] = useState(p.lastQuick?.home ?? 'ENG');
+  const [away, setAway] = useState(p.lastQuick?.away ?? 'NZL');
   const [picking, setPicking] = useState<'home' | 'away'>('home');
 
   const pick = (id: string) => {
@@ -32,6 +32,7 @@ export function QuickMatch({ go }: { go: Go }) {
 
   const start = () => {
     audio.click();
+    update((x) => (x.lastQuick = { home, away }));
     const cfg = buildMatch(nationTeam(home), nationTeam(away), true, p);
     go({ name: 'match', cfg, back: { name: 'quick' }, onFinish: (r) => finishQuick(cfg, r) });
   };

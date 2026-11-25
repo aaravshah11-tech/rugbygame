@@ -65,6 +65,14 @@ export function Settings({ go }: { go: Go }) {
                 }}
               />
             </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Reduce motion</div>
+              <Seg<'on' | 'off'>
+                value={s.reduceMotion ? 'on' : 'off'}
+                options={[{ v: 'on', label: 'On' }, { v: 'off', label: 'Off' }]}
+                onChange={(v) => update((x) => (x.settings.reduceMotion = v === 'on'))}
+              />
+            </div>
           </div>
           <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <h3>Gameplay</h3>
