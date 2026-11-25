@@ -171,8 +171,8 @@ export class MenuScene {
       fragmentShader: `uniform float uOn; varying vec2 vUv;
         void main(){
           float along = vUv.y;                         // 1 at the lamp, 0 on the pitch
-          float across = 1.0 - abs(vUv.x - 0.5) * 2.0;
-          float a = pow(across, 1.6) * (0.2 + 0.8 * along) * 0.13 * uOn;
+          float across = clamp(1.0 - abs(vUv.x - 0.5) * 2.0, 0.0, 1.0); // clamp: pow() of a tiny negative is NaN on iOS GPUs
+          float a = clamp(pow(across, 1.6) * (0.2 + 0.8 * clamp(along, 0.0, 1.0)) * 0.13 * uOn, 0.0, 1.0);
           gl_FragColor = vec4(vec3(1.0, 0.96, 0.86) * a, a);
         }`,
     });
@@ -243,7 +243,7 @@ export class MenuScene {
         void main(){
           float r = length(gl_PointCoord - 0.5);
           float a = smoothstep(0.5, 0.0, r);
-          a = a * a * vA * uOn;
+          a = clamp(a * a * vA * uOn, 0.0, 1.0);
           gl_FragColor = vec4(vec3(1.0, 0.98, 0.92) * a, a);
         }`,
     });
