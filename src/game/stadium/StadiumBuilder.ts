@@ -47,7 +47,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     const crowd = [ctx.home.primary, ctx.home.primary, ctx.home.secondary, ctx.away.primary, ctx.away.secondary];
     const ground = buildSchoolGround(group, ctx.quality, crowd, spec, key);
     const side = buildPitchside(group, spec, ctx, null);
-    return { spec, group, key, sunDir, time: ctx.time, event, setScore: () => {}, setWind: side.setWind, setTorches: () => {}, update: (t, ex, cam) => (ground.update(t, ex, cam), side.update(t, cam), sky.update(t), snow?.update(t, cam)) };
+    return { spec, group, key, sunDir, time: ctx.time, bounds: { radius: 140, top: 14 }, event, setScore: () => {}, setWind: side.setWind, setTorches: () => {}, update: (t, ex, cam) => (ground.update(t, ex, cam), side.update(t, cam), sky.update(t), snow?.update(t, cam)) };
   }
 
   const stands = buildStands(group, spec, ctx);
@@ -99,6 +99,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     key,
     sunDir,
     time: ctx.time,
+    bounds: { radius, top: Math.max(roofs.maxY, ...stands.runs.map((r) => r.topY), 12) },
     event,
     setScore: drawScore,
     setWind: side.setWind,

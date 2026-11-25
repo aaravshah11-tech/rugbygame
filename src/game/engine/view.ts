@@ -456,13 +456,38 @@ export function updateCamera(eng: MatchEngine, dt: number, rf: ReplayFrame | nul
   let rate = 3.2;
   const fp = eng.camFocus;
   if (eng.camMode === 'intro') {
+    // Cinematic: aerial approach from outside the ground, a sweep over the roof, then down to pitch
+    // level by the tunnel as the teams walk out. 9 s, skippable.
     eng.introT += dt;
-    if (eng.introT > 5.5) eng.skipIntro();
-    const a = -1.2 + eng.introT * 0.32;
-    const r = 78 - eng.introT * 6;
-    pos = eng.cpos.set(Math.cos(a) * r, 34 - eng.introT * 3.5, Math.sin(a) * r * 0.8);
-    look = eng.clook.set(0, 2, 0);
-    rate = 3;
+    const T = eng.introT;
+    if (T > 9) eng.skipIntro();
+    const { radius: R, top } = eng.stadium.bounds;
+    const ease = (x: number) => x * x * (3 - 2 * x);
+    if (T < 3.2) {
+      // 1. high and wide, drifting in towards the ground
+      const k = ease(T / 3.2);
+      const a = -2.2 + k * 0.5;
+      const d = R * (2.6 - k * 0.9);
+      pos = eng.cpos.set(Math.cos(a) * d, top + 70 - k * 25, Math.sin(a) * d);
+      look = eng.clook.set(0, top * 0.3, 0);
+      rate = T < 0.1 ? 60 : 2.2;
+    } else if (T < 6) {
+      // 2. sweep low over the roof edge into the bowl
+      // stay above the roof until well inside the bowl, then drop towards the pitch
+      const k = ease((T - 3.2) / 2.8);
+      const a = -1.7 + k * 0.9;
+      const d = R * 1.7 + (48 - R * 1.7) * Math.min(1, k * 1.5);
+      const drop = ease(Math.max(0, (k - 0.6) / 0.4));
+      pos = eng.cpos.set(Math.cos(a) * d, top + 16 - drop * (top + 2), Math.sin(a) * d * 0.75);
+      look = eng.clook.set(0, 2, -6 * k);
+      rate = 2;
+    } else {
+      // 3. pitch level beside the tunnel, the teams walking out past the camera
+      const k = ease(Math.min(1, (T - 6) / 3));
+      pos = eng.cpos.set(9 - k * 3, 1.7 + (1 - k) * 2, -FIELD.halfW + 4 + k * 3);
+      look = eng.clook.set(-1, 1.4, -FIELD.halfW - 6 + k * 8);
+      rate = 2.4;
+    }
   } else if (eng.camMode === 'replay' && rf) {
     // low side-on tracking shot
     const side = rf.bz < 15 ? 1 : -1;
@@ -470,11 +495,20 @@ export function updateCamera(eng: MatchEngine, dt: number, rf: ReplayFrame | nul
     look = eng.clook.set(rf.bx + 1, 1.1, rf.bz);
     rate = 4;
   } else if (eng.camMode === 'try' && fp) {
-    // slow orbit around the try scorer
-    const a = 0.6 + eng.camModeT * 0.35;
-    pos = eng.cpos.set(fp.x + Math.cos(a) * 5.5, 1.9, fp.z + Math.sin(a) * 5.5);
-    look = eng.clook.set(fp.x, 1.0, fp.z);
-    rate = 2.5;
+    // first a slow orbit of the scorer, then a shot from the field of play with him in front of the
+    // celebrating crowd behind the try line
+    const d = fp.x >= 0 ? 1 : -1;
+    if (eng.camModeT < 1.6) {
+      const a = 0.6 + eng.camModeT * 0.35;
+      pos = eng.cpos.set(fp.x + Math.cos(a) * 5.5, 1.9, fp.z + Math.sin(a) * 5.5);
+      look = eng.clook.set(fp.x, 1.0, fp.z);
+      rate = 2.5;
+    } else {
+      const k = Math.min(1, (eng.camModeT - 1.6) / 3);
+      pos = eng.cpos.set(fp.x - d * (9 - k * 2.5), 1.6 + k * 0.6, fp.z * 0.85 - 2.5);
+      look = eng.clook.set(fp.x + d * 22, 4.5, fp.z * 0.6);
+      rate = 1.8;
+    }
   } else if (eng.camMode === 'kickoff' && fp) {
     const d = dirOf(fp.side);
     pos = eng.cpos.set(fp.x + d * 4.5, 1.7, fp.z + 3.2);
@@ -498,6 +532,13 @@ export function updateCamera(eng: MatchEngine, dt: number, rf: ReplayFrame | nul
   } else if (eng.camMode === 'setpiece' && eng.phase === 'scrum') {
     pos = eng.cpos.set(b.x - 9, 4.5, b.z + (b.z > 0 ? -5 : 5));
     look = eng.clook.set(b.x + 2, 0.8, b.z);
+  } else if (eng.phase === 'halftime' || eng.phase === 'fulltime') {
+    // establishing shot: a slow, high orbit of the whole ground
+    const { radius: R, top } = eng.stadium.bounds;
+    const a = eng.time * 0.05;
+    pos = eng.cpos.set(Math.cos(a) * R * 1.45, top + 48, Math.sin(a) * R * 1.2);
+    look = eng.clook.set(0, 0, 0);
+    rate = 1.5;
   } else {
     const mode = eng.cfg.camera;
     const tight = eng.phase === 'ruck' || eng.phase === 'maul' || eng.tackleZoomT > 0;

@@ -123,6 +123,8 @@ export interface StadiumView {
   /** direction that light travels (normalised, pointing down) */
   sunDir: THREE.Vector3;
   time: TimeOfDay;
+  /** footprint radius and highest structure (for the cinematic cameras) */
+  bounds: { radius: number; top: number };
   update(time: number, excite: number, camera: THREE.Camera): void;
   /** crowd and boards react */
   event(e: StadiumEvent): void;
