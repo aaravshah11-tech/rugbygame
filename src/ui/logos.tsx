@@ -274,7 +274,7 @@ export function TeamLogo({ id, size = 36 }: { id: string; size?: number }) {
           display: 'inline-grid', placeItems: 'center', boxShadow: '0 0 0 1.5px rgba(255,255,255,0.18)',
         }}
       >
-        <img src={`${import.meta.env.BASE_URL}logos/${id}.png`} alt="" draggable={false} style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
+        <img src={`${import.meta.env.BASE_URL}logos/${id}.png?v=2`} alt="" draggable={false} style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
       </span>
     );
   }
