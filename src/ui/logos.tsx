@@ -251,7 +251,7 @@ function contrast(bg: string): string {
 
 /** Teams with a real logo image in public/logos (nations are white artwork, clubs full colour). */
 const LOGO_NATIONS = new Set(['ENG', 'FRA', 'IRE', 'ITA', 'SCO', 'WAL', 'NZL', 'ARG', 'AUS', 'FIJ', 'JPN', 'RSA']);
-const LOGO_CLUBS = new Set(['BTH', 'BRS', 'EXE', 'GLO', 'LEI', 'LDN', 'LDW', 'NEW', 'NOR', 'SAL']);
+const LOGO_CLUBS = new Set(['BTH', 'BRS', 'EXE', 'GLO', 'LEI', 'LDN', 'LDW', 'NEW', 'NOR', 'SAL', 'BGS']);
 
 export function TeamLogo({ id, size = 36 }: { id: string; size?: number }) {
   const n = nationById(id);

@@ -16,13 +16,14 @@ export const BENCH_POS = [2, 1, 3, 4, 7, 9, 10, 13];
 
 export const REAL_SQUADS: Record<string, string> = {
   // BGS U16A v Clifton College, Sat 19 Sep 2026 (won). Coach: Mr Scott. Home: Failand Sports Fields.
+  // T Hargreaves added at 6; HJ Want (6 on the sheet) moves to the bench as back-row cover.
   BGS: `
 MA Wright|63|S
 GL Collinson|62|
 JD Millard|63|S
 B Bann|62|
 B Collier|62|
-HJ Want|63|T
+T Hargreaves|63|T
 AA Reavley|63|T
 HT Searle|66|S||C
 SE Davis|64|A||VC
@@ -34,7 +35,8 @@ LR Durrance|64|P
 OF Ketterer|64|K
 C Ellis|61|
 HA Vieten-Kay|61|
-A Shah|64|P|11`,
+A Shah|64|P|11
+HJ Want|63|T|6`,
   ENG: `
 Fin Baxter|81|
 Jamie George|83|
