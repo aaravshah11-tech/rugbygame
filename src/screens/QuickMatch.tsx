@@ -79,52 +79,55 @@ export function QuickMatch({ go }: { go: Go }) {
             </div>
           ))}
         </div>
-        <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 260 }}>
-          <div className="row" style={{ justifyContent: 'space-around' }}>
-            <button className="nation-btn sel" style={{ flexDirection: 'column', flex: 1 }} onClick={() => setPicking('home')}>
+        <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 260, minHeight: 0 }}>
+          <div className="row qm-teams" style={{ justifyContent: 'space-around' }}>
+            <button className="nation-btn sel" onClick={() => setPicking('home')}>
               <TeamLogo id={H.id} size={46} />
               <b>{H.short}</b>
             </button>
             <h2 style={{ color: 'var(--muted)' }}>VS</h2>
-            <button className="nation-btn sel2" style={{ flexDirection: 'column', flex: 1 }} onClick={() => setPicking('away')}>
+            <button className="nation-btn sel2" onClick={() => setPicking('away')}>
               <TeamLogo id={A.id} size={46} />
               <b>{A.short}</b>
             </button>
           </div>
-          <div>
-            <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Half length</div>
-            <Seg<HalfLength>
-              value={p.settings.halfLength}
-              options={[{ v: 3, label: '3 min' }, { v: 5, label: '5 min' }, { v: 8, label: '8 min' }]}
-              onChange={(v) => update((x) => (x.settings.halfLength = v))}
-            />
+          {/* options scroll on short screens; Kick off stays pinned below */}
+          <div className="scroll" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Half length</div>
+              <Seg<HalfLength>
+                value={p.settings.halfLength}
+                options={[{ v: 3, label: '3 min' }, { v: 5, label: '5 min' }, { v: 8, label: '8 min' }]}
+                onChange={(v) => update((x) => (x.settings.halfLength = v))}
+              />
+            </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Difficulty</div>
+              <Seg<Difficulty>
+                value={p.settings.difficulty}
+                options={[{ v: 'easy', label: 'Easy' }, { v: 'medium', label: 'Med' }, { v: 'hard', label: 'Hard' }, { v: 'elite', label: 'Elite' }]}
+                onChange={(v) => update((x) => (x.settings.difficulty = v))}
+              />
+            </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Weather</div>
+              <Seg<Weather>
+                value={p.settings.weather}
+                options={[{ v: 'dry', label: 'Dry' }, { v: 'rain', label: 'Rain' }]}
+                onChange={(v) => update((x) => (x.settings.weather = v))}
+              />
+            </div>
+            <details className="tactics-drawer">
+              <summary>Tactics</summary>
+              <TacticsPanel value={p.settings.tactics} onChange={(t) => update((x) => (x.settings.tactics = t))} />
+            </details>
+            {simMsg && <div className="muted" style={{ fontSize: 13, textAlign: 'center' }}>{simMsg}</div>}
           </div>
-          <div>
-            <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Difficulty</div>
-            <Seg<Difficulty>
-              value={p.settings.difficulty}
-              options={[{ v: 'easy', label: 'Easy' }, { v: 'medium', label: 'Med' }, { v: 'hard', label: 'Hard' }, { v: 'elite', label: 'Elite' }]}
-              onChange={(v) => update((x) => (x.settings.difficulty = v))}
-            />
-          </div>
-          <div>
-            <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Weather</div>
-            <Seg<Weather>
-              value={p.settings.weather}
-              options={[{ v: 'dry', label: 'Dry' }, { v: 'rain', label: 'Rain' }]}
-              onChange={(v) => update((x) => (x.settings.weather = v))}
-            />
-          </div>
-          <details className="tactics-drawer">
-            <summary>Tactics</summary>
-            <TacticsPanel value={p.settings.tactics} onChange={(t) => update((x) => (x.settings.tactics = t))} />
-          </details>
-          {simMsg && <div className="muted" style={{ fontSize: 13, textAlign: 'center' }}>{simMsg}</div>}
           <div className="row" style={{ marginTop: 'auto', gap: 8 }}>
-            <button className="btn ghost" style={{ minHeight: 54 }} onClick={simulate}>
+            <button className="btn ghost" style={{ minHeight: 54, whiteSpace: 'nowrap' }} onClick={simulate}>
               Simulate
             </button>
-            <button className="btn primary grow" style={{ minHeight: 54, fontSize: 20 }} onClick={start}>
+            <button className="btn primary grow" style={{ minHeight: 54, fontSize: 20, whiteSpace: 'nowrap' }} onClick={start}>
               Kick off
             </button>
           </div>

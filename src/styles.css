@@ -288,7 +288,7 @@ h3 {
 }
 
 .tab {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 10px;
   font-style: italic;
@@ -351,6 +351,28 @@ h3 {
 
 .nation-btn small {
   color: var(--muted);
+}
+
+/* quick match: the two picked teams */
+.qm-teams .nation-btn {
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+/* short landscape phones: badge beside the name so the options get the room */
+@media (max-height: 400px) {
+  .qm-teams .nation-btn {
+    flex-direction: row;
+    min-height: 48px;
+    padding: 4px 8px;
+  }
+  .qm-teams .nation-btn > span:first-child {
+    transform: scale(0.75);
+    margin: -6px;
+  }
+  .qm-teams h2 {
+    font-size: 16px;
+  }
 }
 
 /* ---------- table ---------- */
@@ -1193,7 +1215,8 @@ input[type='email'] {
 
 .seg button {
   flex: 1;
-  min-height: 40px;
+  min-height: 44px;
+  min-width: 44px;
   border-radius: 9px;
   font-style: italic;
   font-weight: 800;
@@ -2660,6 +2683,7 @@ input[type='email'] {
   text-align: center;
 }
 .moves-strip button {
+  position: relative;
   border: 0;
   border-radius: 10px;
   padding: 6px 10px;
@@ -2668,6 +2692,12 @@ input[type='email'] {
   background: rgba(11, 15, 23, 0.78);
   color: #c6ff1a;
   box-shadow: inset 0 0 0 1.5px rgba(198, 255, 26, 0.55);
+}
+/* the chips stay slim, but each one takes a full 44px-tall tap */
+.moves-strip button::after {
+  content: '';
+  position: absolute;
+  inset: -8px -2px;
 }
 .moves-strip button:active {
   background: #c6ff1a;
@@ -2959,7 +2989,8 @@ input[type='email'] {
 }
 .tile h3 {
   font-size: clamp(15px, 2.5vw, 22px);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 /* install tip: small banner at the top, out of the way of the tiles */
 .toast {
@@ -2976,4 +3007,11 @@ input[type='email'] {
   max-height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* tablets: the menu tiles get room for their titles */
+@media (min-width: 1000px) and (min-height: 600px) {
+  .menu-grid {
+    grid-template-columns: repeat(3, minmax(0, 240px));
+  }
 }
