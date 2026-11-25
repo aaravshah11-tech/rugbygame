@@ -34,6 +34,10 @@ export interface MatchConfig {
   quality: QualitySetting;
   drill?: Drill;
   weather: Weather;
+  /** kick-off time (stadium lighting); picked per fixture */
+  timeOfDay?: 'afternoon' | 'golden' | 'night';
+  /** 0.6 friendly .. 1 final: how full and loud the ground is */
+  importance?: number;
   tactics: Tactics;
   rules: RulesMode;
   autoSwitch: boolean;

@@ -4,7 +4,7 @@ import type { Go } from '../App';
 import { CHAMPIONSHIP_NATIONS, nationById } from '../data/nations';
 import { TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
-import { buildMatch, nationTeam } from '../state/teams';
+import { buildMatch, nationTeam, occasion } from '../state/teams';
 import { championshipUserFixture, computeTable, createChampionship, nationOvr } from '../state/tournaments';
 import { finishChampionship } from '../state/outcomes';
 import type { Fixture } from '../state/types';
@@ -110,6 +110,7 @@ export function Championship({ go }: { go: Go }) {
     audio.click();
     const userHome = next.home === c.user;
     const cfg = buildMatch(nationTeam(c.user), nationTeam(userHome ? next.away : next.home), userHome, p);
+    Object.assign(cfg, occasion(next.stage));
     const fid = next.id;
     go({ name: 'match', cfg, back: { name: 'championship' }, onFinish: (r) => finishChampionship(cfg, fid, r) });
   };

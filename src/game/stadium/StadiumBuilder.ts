@@ -7,6 +7,8 @@ import { buildCrowd } from './crowd';
 import { buildSchoolGround } from './fields';
 import { buildPitch } from './pitch';
 import { buildPitchside } from './pitchside';
+import { bakeStandShadows } from './shadows';
+import { buildSnow } from './weather';
 import type { StadiumContext, StadiumEvent, StadiumSpec, StadiumView } from './types';
 
 /**
@@ -21,7 +23,10 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   const group = new THREE.Group();
   group.name = `stadium:${spec.id}`;
   scene.add(group);
-  const key = buildSkyAndLights(scene, renderer, ctx.quality);
+  const sky = buildSkyAndLights(scene, renderer, ctx.quality, spec, ctx.time, ctx.weather);
+  const key = sky.key;
+  const sunDir = sky.sunDir;
+  const snow = ctx.weather === 'snow' ? buildSnow(group, ctx.quality) : null;
   // posts padded in the home side's colours; the pitch mown the ground's own way
   void postPads;
   buildPitch(group, renderer, pitchPx, [ctx.home.primary, ctx.home.primary], { mow: spec.pitch.mow, inGoal: spec.pitch.inGoal, artificial: spec.pitch.artificial, wet: ctx.weather === 'rain' ? 1 : 0 }, ctx.home.secondary);
@@ -40,7 +45,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     const crowd = [ctx.home.primary, ctx.home.primary, ctx.home.secondary, ctx.away.primary, ctx.away.secondary];
     const ground = buildSchoolGround(group, ctx.quality, crowd, spec, key);
     const side = buildPitchside(group, spec, ctx, null);
-    return { spec, group, key, event, setScore: () => {}, setWind: side.setWind, setTorches: () => {}, update: (t, ex, cam) => (ground.update(t, ex, cam), side.update(t, cam)) };
+    return { spec, group, key, sunDir, time: ctx.time, event, setScore: () => {}, setWind: side.setWind, setTorches: () => {}, update: (t, ex, cam) => (ground.update(t, ex, cam), side.update(t, cam), sky.update(t), snow?.update(t, cam)) };
   }
 
   // the ground the stadium stands on: a plaza ring, then grass out to the horizon
@@ -53,7 +58,19 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   land.position.y = -0.1;
   group.add(land);
   const stands = buildStands(group, spec, ctx);
-  buildRoofs(group, spec, ctx, stands);
+  const roofs = buildRoofs(group, spec, ctx, stands);
+  bakeStandShadows(group, spec, stands, sunDir, ctx.time, ctx.quality.level === 'low');
+  // floodlights, roof strips and box windows only matter after dark (just coming on at golden hour)
+  const lightsOn = ctx.time === 'night' ? 1 : ctx.time === 'golden' ? 0.45 : 0;
+  for (const s of roofs.glowSprites) {
+    s.visible = lightsOn > 0;
+    s.scale.multiplyScalar(0.6 + 0.4 * lightsOn);
+  }
+  for (const m of [...roofs.nightGlow, ...stands.nightGlow]) {
+    if (m instanceof THREE.SpriteMaterial) m.opacity = 0.9 * lightsOn;
+    else if (m instanceof THREE.MeshBasicMaterial) m.color.multiplyScalar(0.25 + 0.75 * lightsOn);
+    else if (m instanceof THREE.MeshStandardMaterial) m.emissiveIntensity = 0.05 + 0.3 * lightsOn;
+  }
   const boards = buildBoards(group, spec, stands, ctx.home.primary);
   const side = buildPitchside(group, spec, ctx, stands);
   if (spec.track) {
@@ -71,6 +88,8 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     spec,
     group,
     key,
+    sunDir,
+    time: ctx.time,
     event,
     setScore: () => {},
     setWind: side.setWind,
@@ -93,6 +112,8 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
       right.set(-right.z, 0, right.x).normalize();
       cu.uRight.value.copy(right);
       crowd.update(time, dt);
+      sky.update(time);
+      snow?.update(time, camera);
       boards.update(time, mood.flash);
       side.update(time, camera);
     },

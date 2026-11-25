@@ -84,6 +84,23 @@ function changeKit(k: Kit): Kit {
   return { ...k, primary: k.secondary, secondary: k.primary, shorts: k.primary, socks: k.secondary };
 }
 
+/**
+ * Kick-off time and how big the occasion is, from the fixture's stage: finals under the lights in
+ * a full house, league rounds at any time of day, friendlies a little quieter.
+ */
+export function occasion(stage: string): { timeOfDay: 'afternoon' | 'golden' | 'night'; importance: number } {
+  const pick = (w: [number, number, number]) => {
+    const r = Math.random() * (w[0] + w[1] + w[2]);
+    return r < w[0] ? 'afternoon' : r < w[0] + w[1] ? 'golden' : 'night';
+  };
+  if (stage === 'drill') return { timeOfDay: 'afternoon', importance: 0.6 };
+  if (/final/i.test(stage) && !/semi|quarter/i.test(stage)) return { timeOfDay: 'night', importance: 1 };
+  if (/SF|semi/i.test(stage)) return { timeOfDay: pick([1, 2, 3]), importance: 0.93 };
+  if (/QF|quarter/i.test(stage)) return { timeOfDay: pick([1, 2, 2]), importance: 0.88 };
+  if (stage === 'friendly') return { timeOfDay: pick([4, 2.5, 3.5]), importance: 0.68 };
+  return { timeOfDay: pick([4, 2.5, 3.5]), importance: 0.8 };
+}
+
 export function buildMatch(user: TeamSetup, cpu: TeamSetup, userIsHome: boolean, p: Profile, drill?: Drill): MatchConfig {
   let u = user;
   let c = cpu;
@@ -102,6 +119,7 @@ export function buildMatch(user: TeamSetup, cpu: TeamSetup, userIsHome: boolean,
     quality: p.settings.graphics ?? 'auto',
     drill,
     weather: p.settings.weather ?? 'dry',
+    ...occasion(drill ? 'drill' : 'friendly'),
     tactics: p.settings.tactics ?? { attack: 'balanced', defence: 'balanced', kicking: 'balanced' },
     rules: p.settings.rules ?? 'standard',
     autoSwitch: p.settings.autoSwitch ?? true,

@@ -41,6 +41,7 @@ export class MatchEngine {
   scene = new THREE.Scene();
   camera: THREE.PerspectiveCamera;
   stadium: StadiumView;
+  shadowBasis: { dir: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3 } | null = null;
   post: PostFX;
   particles: Particles;
   ballFx: BallFx;
@@ -236,11 +237,16 @@ export class MatchEngine {
     const home = cfg.userIsHome ? cfg.user.kit : cfg.cpu.kit;
     const away = cfg.userIsHome ? cfg.cpu.kit : cfg.user.kit;
     // The user's team defends the -x end, so those posts wear the user's colours.
+    const spec = stadiumFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id);
+    const time = cfg.timeOfDay ?? 'night';
+    // light snow, sometimes, for a dry winter fixture at a temperate ground (looks only)
+    const devWx = import.meta.env.DEV ? new URLSearchParams(location.search).get('wx') : null;
+    const snow = devWx === 'snow' || (!devWx && !cfg.drill && cfg.weather === 'dry' && (spec.climate ?? 'temperate') === 'temperate' && spec.layout !== 'fields' && Math.random() < 0.08);
     this.stadium = buildStadium(
       this.scene,
       this.renderer,
-      stadiumFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id),
-      { quality: this.quality, home, away, time: 'night', weather: cfg.weather, importance: 0.8, homeName: cfg.userIsHome ? cfg.user.short : cfg.cpu.short, awayName: cfg.userIsHome ? cfg.cpu.short : cfg.user.short },
+      spec,
+      { quality: this.quality, home, away, time, weather: snow ? 'snow' : cfg.weather, importance: cfg.importance ?? 0.75, homeName: cfg.userIsHome ? cfg.user.short : cfg.cpu.short, awayName: cfg.userIsHome ? cfg.cpu.short : cfg.user.short },
       this.quality.pitchPxPerMetre,
       [cfg.user.kit.primary, cfg.cpu.kit.primary],
     );
@@ -334,8 +340,28 @@ export class MatchEngine {
     grad.addColorStop(0.6, 'rgba(0,0,0,0.25)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     sg.fillStyle = grad;
-    sg.fillRect(0, 0, 64, 64);
-    const shGeo = new THREE.PlaneGeometry(1.4, 1.4);
+    let shSize = 1.4;
+    if (this.stadium.time === 'night') {
+      // four floodlight banks: four soft shadows fanning out from each player
+      sg.globalAlpha = 0.55;
+      for (const a of [0.6, 2.2, 3.7, 5.4]) {
+        sg.save();
+        sg.translate(32, 32);
+        sg.rotate(a);
+        sg.scale(1, 0.38);
+        sg.translate(18, 0);
+        sg.beginPath();
+        sg.arc(0, 0, 16, 0, Math.PI * 2);
+        sg.fill();
+        sg.restore();
+      }
+      sg.globalAlpha = 1;
+      shSize = 2.6;
+    }
+    sg.beginPath();
+    sg.arc(32, 32, shSize > 2 ? 14 : 32, 0, Math.PI * 2);
+    sg.fill();
+    const shGeo = new THREE.PlaneGeometry(shSize, shSize);
     shGeo.rotateX(-Math.PI / 2);
     this.shadows = new THREE.InstancedMesh(
       shGeo,

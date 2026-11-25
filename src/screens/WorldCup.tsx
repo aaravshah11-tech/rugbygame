@@ -4,7 +4,7 @@ import type { Go } from '../App';
 import { NATIONS, nationById } from '../data/nations';
 import { TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
-import { buildMatch, nationTeam } from '../state/teams';
+import { buildMatch, nationTeam, occasion } from '../state/teams';
 import { createWorldCup, finishWorldCup, nationOvr, worldCupUserFixture } from '../state/tournaments';
 import { finishWorldCup as finishWcMatch } from '../state/outcomes';
 import { FixtureRow, StandingsTable } from './Championship';
@@ -50,6 +50,7 @@ export function WorldCup({ go }: { go: Go }) {
     audio.click();
     const userHome = next.home === w.user;
     const cfg = buildMatch(nationTeam(w.user), nationTeam(userHome ? next.away : next.home), userHome, p);
+    Object.assign(cfg, occasion(next.stage));
     const fid = next.id;
     go({ name: 'match', cfg, back: { name: 'worldcup' }, onFinish: (r) => finishWcMatch(cfg, fid, r) });
   };

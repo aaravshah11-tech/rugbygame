@@ -120,6 +120,9 @@ export interface StadiumView {
   group: THREE.Group;
   /** the light that casts player shadows (sun or main floodlight bank) */
   key: THREE.DirectionalLight;
+  /** direction that light travels (normalised, pointing down) */
+  sunDir: THREE.Vector3;
+  time: TimeOfDay;
   update(time: number, excite: number, camera: THREE.Camera): void;
   /** crowd and boards react */
   event(e: StadiumEvent): void;

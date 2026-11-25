@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { clamp } from '../../util/rng';
 import { FIELD } from '../field';
 import type { AnimName } from '../view/assets';
-import { ANIMS, G, GRUB_FRICTION, GRUB_KEEP, GRUB_REST, REPLAY_SPEED, SHADOW_BASIS, dirOf, dist } from './shared';
+import { ANIMS, G, GRUB_FRICTION, GRUB_KEEP, GRUB_REST, REPLAY_SPEED, dirOf, dist } from './shared';
 import type { P, ReplayFrame } from './shared';
 
 // ---------------------------------------------------------------- rendering
@@ -144,15 +144,15 @@ export function render(eng: MatchEngine, dt: number) {
     const key = eng.stadium.key;
     const sc = key.shadow.camera as THREE.OrthographicCamera;
     const texel = (sc.right - sc.left) / key.shadow.mapSize.x || 0.05;
-    // Snap in the light's own right/up axes (the light direction never changes).
-    const L = SHADOW_BASIS;
+    // Snap in the light's own right/up axes (the light direction is fixed for the match).
+    const L = eng.shadowBasis ?? (eng.shadowBasis = basisFor(eng.stadium.sunDir));
     const f3 = eng.tmpV2.set(fx, 0, fz);
     const r = Math.round(f3.dot(L.right) / texel) * texel;
     const u = Math.round(f3.dot(L.up) / texel) * texel;
     const fwd = f3.dot(L.dir);
     f3.copy(L.right).multiplyScalar(r).addScaledVector(L.up, u).addScaledVector(L.dir, fwd);
     key.target.position.copy(f3);
-    key.position.set(f3.x - 35, f3.y + 70, f3.z + 45);
+    key.position.copy(f3).addScaledVector(eng.stadium.sunDir, -95);
   }
 
   // support runner in space calls for the ball (small bubble above the head)
@@ -531,4 +531,12 @@ export function updateCamera(eng: MatchEngine, dt: number, rf: ReplayFrame | nul
   eng.camLook.lerp(look, k);
   eng.camera.position.copy(eng.camPos);
   eng.camera.lookAt(eng.camLook);
+}
+
+/** Right/up axes of the shadow light, for snapping the shadow map to whole texels. */
+function basisFor(dir: THREE.Vector3) {
+  const d = dir.clone().normalize();
+  const right = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, d).normalize();
+  return { dir: d, right, up };
 }

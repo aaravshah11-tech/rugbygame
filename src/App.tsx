@@ -48,7 +48,13 @@ function devRoute(): Route {
   const id = import.meta.env.DEV ? new URLSearchParams(location.search).get('devmatch') : null;
   if (!id) return { name: 'menu' };
   const opp = id === 'NZL' ? 'ENG' : 'NZL';
-  return { name: 'match', cfg: buildMatch(nationTeam(id), nationTeam(opp), true, getProfile()), back: { name: 'menu' } };
+  const q = new URLSearchParams(location.search);
+  const cfg = buildMatch(nationTeam(id), nationTeam(opp), true, getProfile());
+  const tod = q.get('tod');
+  if (tod === 'afternoon' || tod === 'golden' || tod === 'night') cfg.timeOfDay = tod;
+  if (q.get('wx') === 'rain') cfg.weather = 'rain';
+  if (q.get('imp')) cfg.importance = Number(q.get('imp'));
+  return { name: 'match', cfg, back: { name: 'menu' } };
 }
 
 export function App() {

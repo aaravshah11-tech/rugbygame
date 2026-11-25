@@ -130,12 +130,6 @@ export function moveStats(p: P): { acc: number; agi: number } {
   return { acc, agi };
 }
 /** Orthonormal basis of the key light (it always shines along (35, -70, -45)). */
-export const SHADOW_BASIS = (() => {
-  const dir = new THREE.Vector3(35, -70, -45).normalize();
-  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
-  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
-  return { dir, right, up };
-})();
 export type KickType = 'punt' | 'grubber' | 'box' | 'drop' | 'chip' | 'high' | 'touch' | 'cross';
 export const GRUB_VY = CFG.grubber.vy;
 export const GRUB_REST = CFG.grubber.restitution;
