@@ -11,6 +11,7 @@ import { ControlsEditor } from './screens/ControlsEditor';
 import { Training } from './screens/Training';
 import { Settings } from './screens/Settings';
 import { SquadViewer } from './screens/SquadViewer';
+import { Stadiums } from './screens/Stadiums';
 import { Competition } from './screens/Competition';
 import type { CompKind } from './state/comps';
 import { loadPlayerAsset } from './game/view/assets';
@@ -32,6 +33,7 @@ export type Route =
   | { name: 'controls' }
   | { name: 'settings' }
   | { name: 'viewer' }
+  | { name: 'stadiums'; start?: string; back: Route }
   | { name: 'comp'; kind: CompKind }
   | {
       name: 'match';
@@ -107,6 +109,9 @@ export function App() {
       break;
     case 'settings':
       screen = <Settings go={go} />;
+      break;
+    case 'stadiums':
+      screen = <Stadiums go={go} start={route.start} back={route.back} />;
       break;
     case 'viewer':
       screen = <SquadViewer go={go} />;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { KitPreviewScene } from '../game/view/kitPreview';
+import { stadiumFor } from '../game/stadium/index';
 import { nationSquad } from '../data/players';
 import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
@@ -108,6 +109,9 @@ export function QuickMatch({ go }: { go: Go }) {
               <b>{A.short}</b>
             </button>
           </div>
+          <button className="venue-chip" onClick={() => go({ name: 'stadiums', start: home, back: { name: 'quick' } })}>
+            <span>🏟</span> {stadiumFor(home).name} <em>View stadium ›</em>
+          </button>
           {/* options scroll on short screens; Kick off stays pinned below */}
           <div className="scroll" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
