@@ -240,7 +240,7 @@ export class MatchEngine {
       this.scene,
       this.renderer,
       stadiumFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id),
-      { quality: this.quality, home, away, time: 'night', weather: cfg.weather, importance: 0.8 },
+      { quality: this.quality, home, away, time: 'night', weather: cfg.weather, importance: 0.8, homeName: cfg.userIsHome ? cfg.user.short : cfg.cpu.short, awayName: cfg.userIsHome ? cfg.cpu.short : cfg.user.short },
       this.quality.pitchPxPerMetre,
       [cfg.user.kit.primary, cfg.cpu.kit.primary],
     );
@@ -474,6 +474,7 @@ export class MatchEngine {
     this.timers = [];
     this.introT = 0;
     this.camMode = 'intro';
+    this.stadium.setTorches(true);
     // the teams walk out side by side from the tunnel to their kick-off spots
     this.teams.forEach((team, side) =>
       team.forEach((p, i) => {
@@ -504,6 +505,7 @@ export class MatchEngine {
     if (this.introT < 0) return;
     this.introT = -1;
     this.emit({ type: 'intro', on: false, title: '', sub: '' });
+    this.stadium.setTorches(false);
     this.setupKickoff(this.firstKicker, 0);
   }
 

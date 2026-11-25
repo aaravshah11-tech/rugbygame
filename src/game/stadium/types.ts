@@ -107,9 +107,13 @@ export interface StadiumContext {
   weather: StadiumWeather;
   /** 0.6 friendly .. 1 final: how full the ground is */
   importance: number;
+  /** short team names for banners */
+  homeName?: string;
+  awayName?: string;
 }
 
-export type StadiumEvent = 'try' | 'tryAgainst' | 'missKick' | 'attack22' | 'kickoff' | 'halftime' | 'fulltime';
+/** 'Home' / 'Away' = which side's fans the moment belongs to (who scored, who missed). */
+export type StadiumEvent = 'tryHome' | 'tryAway' | 'missHome' | 'missAway' | 'kickoff' | 'halftime' | 'fulltime';
 
 export interface StadiumView {
   spec: StadiumSpec;
@@ -123,4 +127,6 @@ export interface StadiumView {
   setScore(text: string): void;
   /** the match wind (m/s), for flags */
   setWind(x: number, z: number): void;
+  /** phone torches in the crowd (night, before kick-off) */
+  setTorches(on: boolean): void;
 }
