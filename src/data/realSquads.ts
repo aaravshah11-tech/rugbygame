@@ -7,6 +7,7 @@
  * Each line: "Name|OVR|traits|pos". 23 lines per team: shirts 1-15, then the bench in the
  * order 2, 1, 3, 4, 7, 9, 10, 13 (see BENCH_POS).
  * Traits bump one rating: P pace, S strength, K kicking, A passing, H handling, T tackling.
+ * An exact value can follow, e.g. "K pace=87" (set after tuning).
  * pos (optional) is the player's natural position when it differs from the shirt slot.
  * role (optional, 5th field): C = captain, VC = vice-captain.
  * A squad may have fewer than 23 (school sides): 15 starters, then whoever is on the bench.
@@ -18,6 +19,7 @@ export const REAL_SQUADS: Record<string, string> = {
   // BGS U16A v Clifton College, Sat 19 Sep 2026 (won). Coach: Mr Scott. Home: Failand Sports Fields.
   // T Hargreaves added at 6; HJ Want (6 on the sheet) moves to the bench as back-row cover.
   // A Shah starts at 14 (fastest, highest rated); LR Durrance (14 on the sheet) is wing cover on the bench.
+  // LJ Vanstone at 9, SE Davis at 10 (very quick, second only to Shah); B Webber in for I White at 13.
   BGS: `
 MA Wright|69|S
 GL Collinson|68|
@@ -27,11 +29,11 @@ B Collier|68|
 T Hargreaves|70|T
 AA Reavley|70|T
 HT Searle|72|S||C
-SE Davis|71|A||VC
-LJ Vanstone|71|K
+LJ Vanstone|71|A
+SE Davis|70|K pace=87||VC
 F Barnes|71|P||VC
 AO Griffiths|69|
-I White|69|
+B Webber|69|
 A Shah|80|PP
 OF Ketterer|71|K
 C Ellis|67|

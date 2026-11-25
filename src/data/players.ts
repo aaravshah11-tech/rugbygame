@@ -128,11 +128,13 @@ function realPlayer(nation: Nation, line: RealLine, position: number, id: string
   p.last = line.last;
   p.id = id;
   if (line.role) p.role = line.role;
-  for (const ch of line.traits) {
+  for (const ch of line.traits.replace(/[a-z]+=\d+/g, '')) {
     const k = ({ P: 'pace', S: 'strength', K: 'kicking', A: 'passing', H: 'handling', T: 'tackling' } as Record<string, Rating>)[ch];
     if (k) p.ratings[k] = clamp(p.ratings[k] + 9, 20, 99);
   }
   tuneToOvr(p, line.ovr);
+  // exact overrides after tuning, e.g. "pace=87"
+  for (const m of line.traits.matchAll(/(pace|strength|passing|kicking|tackling|handling)=(\d+)/g)) p.ratings[m[1] as Rating] = clamp(Number(m[2]), 15, 99);
   return p;
 }
 
