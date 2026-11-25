@@ -53,7 +53,7 @@ interface ModeTile {
   sub: string;
   hint: string;
   accent: string;
-  icon: (p: { className?: string }) => JSX.Element;
+  icon: (p: { className?: string }) => React.ReactElement;
   route: Route;
 }
 
