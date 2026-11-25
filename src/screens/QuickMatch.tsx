@@ -3,7 +3,7 @@ import { KitPreviewScene } from '../game/view/kitPreview';
 import { nationSquad } from '../data/players';
 import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
-import { CLUBS, NATIONS, nationById } from '../data/nations';
+import { CLUBS, NATIONS, SCHOOLS, nationById } from '../data/nations';
 import { Seg, TopBar } from '../ui/common';
 import { update, useProfile } from '../state/store';
 import { buildMatch, nationTeam } from '../state/teams';
@@ -33,7 +33,7 @@ export function QuickMatch({ go }: { go: Go }) {
   };
 
   // swipe on the showcase: next / previous team for the side being picked
-  const order = [...NATIONS, ...CLUBS].map((n) => n.id);
+  const order = [...NATIONS, ...CLUBS, ...SCHOOLS].map((n) => n.id);
   const swipeTeam = (dir: 1 | -1) => {
     const cur = picking === 'home' ? home : away;
     const other = picking === 'home' ? away : home;
@@ -77,6 +77,7 @@ export function QuickMatch({ go }: { go: Go }) {
           {[
             { label: 'Nations', list: NATIONS },
             { label: 'Clubs', list: CLUBS },
+            { label: 'Schools', list: SCHOOLS },
           ].map((group) => (
             <div key={group.label} style={{ marginBottom: 10 }}>
               <div className="muted italic" style={{ fontSize: 12, margin: '2px 0 6px' }}>{group.label.toUpperCase()}</div>

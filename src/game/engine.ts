@@ -1,6 +1,6 @@
 import { disposeScene } from './view/dispose';
 import * as THREE from 'three';
-import { effectiveRatings, playerOvr } from '../data/players';
+import { displayName, effectiveRatings, playerOvr } from '../data/players';
 import type { Ratings } from '../data/players';
 import { venueFor } from '../data/venues';
 import type { Venue } from '../data/venues';
@@ -402,7 +402,7 @@ export class MatchEngine {
         av.root.rotation.order = 'YXZ'; // heading first, then the body lean in the player's own frame
         this.scene.add(av.root);
         const p: P = {
-          side, num: i + 1, data: pl, r, name: `${pl.first[0]}. ${pl.last}`,
+          side, num: i + 1, data: pl, r, name: displayName(pl),
           x: 0, z: 0, vx: 0, vz: 0, heading: side === 0 ? 0 : Math.PI, tx: 0, tz: 0, gx: 0, gz: 0, urgency: 0,
           state: 'free', timer: 0, tackleCD: 0, catchCD: 0, sidestepT: 0, sidestepCD: 0, sideDir: 1, handoffT: 0, diveT: 0, kickT: 0,
           stamina: 1, slotSide: 1, slotK: 0, av, fx: null, celebrateT: 0, wasDown: false, face: side === 0 ? 0 : Math.PI, loco: 'idle',
@@ -559,7 +559,7 @@ export class MatchEngine {
     return {
       field: this.teams[0].map((p) => ({ num: p.num, name: p.name, stamina: p.stamina, ovr: Math.round((p.r.pace + p.r.strength + p.r.passing + p.r.tackling + p.r.handling) / 5), off: p.state === 'off' })),
       bench: (this.cfg.user.bench ?? [])
-        .map((pl, idx) => ({ idx, name: `${pl.first[0]}. ${pl.last}`, pos: pl.position, ovr: Math.round(playerOvr(pl)) }))
+        .map((pl, idx) => ({ idx, name: displayName(pl), pos: pl.position, ovr: Math.round(playerOvr(pl)) }))
         .filter((b) => !used.has(b.idx)),
     };
   }
@@ -573,7 +573,7 @@ export class MatchEngine {
     this.subsUsed.add(benchIdx);
     p.data = pl;
     p.r = effectiveRatings(pl, this.cfg.user.boost ?? {});
-    p.name = `${pl.first[0]}. ${pl.last}`;
+    p.name = displayName(pl);
     p.stamina = 1;
     if (this.nameFor === p) this.nameFor = null;
     this.say('Substitution', 'info', `${p.name} on at ${num}`);

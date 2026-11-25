@@ -81,6 +81,13 @@ export const CLUBS: Nation[] = [
 ];
 
 export const PREM_CLUBS = CLUBS.map((c) => c.id);
+
+/** School sides (private build): Quick Match only, not in the club or nation competitions. */
+export const SCHOOLS: Nation[] = [
+  // Bristol Grammar School U16A: claret shirt, navy shorts and socks
+  { id: 'BGS', name: 'BGS U16', short: 'BGS', strength: 62, region: 'anglo',
+    kit: { primary: '#6d1830', secondary: '#1c2452', accent: '#ffffff', pattern: 'plain', shorts: '#1c2452', socks: '#1c2452', collar: '#ffffff' } },
+];
 export const LEAGUE_NORTH = ['ENG', 'FRA', 'IRE', 'ITA', 'SCO', 'WAL'];
 export const LEAGUE_SOUTH = ['NZL', 'RSA', 'AUS', 'ARG', 'FIJ', 'JPN'];
 
@@ -97,7 +104,7 @@ export const CLUB_NATION: Nation = {
 
 export function nationById(id: string): Nation {
   if (id === CLUB_ID) return CLUB_NATION;
-  return NATIONS.find((n) => n.id === id) ?? CLUBS.find((n) => n.id === id) ?? NATIONS[0];
+  return NATIONS.find((n) => n.id === id) ?? CLUBS.find((n) => n.id === id) ?? SCHOOLS.find((n) => n.id === id) ?? NATIONS[0];
 }
 
 export const CHAMPIONSHIP_NATIONS = ['ENG', 'FRA', 'IRE', 'ITA', 'SCO', 'WAL'];

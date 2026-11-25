@@ -8,11 +8,33 @@
  * order 2, 1, 3, 4, 7, 9, 10, 13 (see BENCH_POS).
  * Traits bump one rating: P pace, S strength, K kicking, A passing, H handling, T tackling.
  * pos (optional) is the player's natural position when it differs from the shirt slot.
+ * role (optional, 5th field): C = captain, VC = vice-captain.
+ * A squad may have fewer than 23 (school sides): 15 starters, then whoever is on the bench.
  * To change a player, just edit the line.
  */
 export const BENCH_POS = [2, 1, 3, 4, 7, 9, 10, 13];
 
 export const REAL_SQUADS: Record<string, string> = {
+  // BGS U16A v Clifton College, Sat 19 Sep 2026 (won). Coach: Mr Scott. Home: Failand Sports Fields.
+  BGS: `
+MA Wright|63|S
+GL Collinson|62|
+JD Millard|63|S
+B Bann|62|
+B Collier|62|
+HJ Want|63|T
+AA Reavley|63|T
+HT Searle|66|S||C
+SE Davis|64|A||VC
+LJ Vanstone|64|K
+F Barnes|65|P||VC
+AO Griffiths|63|
+I White|63|
+LR Durrance|64|P
+OF Ketterer|64|K
+C Ellis|61|
+HA Vieten-Kay|61|
+A Shah|64|P|11`,
   ENG: `
 Fin Baxter|81|
 Jamie George|83|
@@ -600,6 +622,8 @@ export interface RealLine {
   traits: string;
   /** natural position when it differs from the shirt slot (e.g. a centre on the scrum-half bench spot) */
   pos?: number;
+  /** captain / vice-captain */
+  role?: 'C' | 'VC';
 }
 
 export function parseSquad(id: string): RealLine[] | null {
@@ -609,8 +633,9 @@ export function parseSquad(id: string): RealLine[] | null {
     .trim()
     .split('\n')
     .map((l) => {
-      const [name, ovr, traits = '', pos = ''] = l.split('|');
+      const [name, ovr, traits = '', pos = '', role = ''] = l.split('|');
       const parts = name.trim().split(' ');
-      return { first: parts[0], last: parts.slice(1).join(' ') || parts[0], ovr: Number(ovr), traits: traits.trim(), pos: pos ? Number(pos) : undefined };
+      const r = role.trim();
+      return { first: parts[0], last: parts.slice(1).join(' ') || parts[0], ovr: Number(ovr), traits: traits.trim(), pos: pos ? Number(pos) : undefined, role: r === 'C' || r === 'VC' ? r : undefined };
     });
 }

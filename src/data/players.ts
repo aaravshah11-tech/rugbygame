@@ -22,6 +22,8 @@ export interface Player {
   xp: number;
   /** extra points bought via training upgrades */
   training: Partial<Ratings>;
+  /** captain / vice-captain (real squads) */
+  role?: 'C' | 'VC';
 }
 
 export const POSITIONS: { num: number; name: string; short: string; group: 'front' | 'lock' | 'back-row' | 'half' | 'centre' | 'back3' }[] = [
@@ -125,6 +127,7 @@ function realPlayer(nation: Nation, line: RealLine, position: number, id: string
   p.first = line.first;
   p.last = line.last;
   p.id = id;
+  if (line.role) p.role = line.role;
   for (const ch of line.traits) {
     const k = ({ P: 'pace', S: 'strength', K: 'kicking', A: 'passing', H: 'handling', T: 'tackling' } as Record<string, Rating>)[ch];
     if (k) p.ratings[k] = clamp(p.ratings[k] + 9, 20, 99);
@@ -139,7 +142,8 @@ export function nationSquad(nationId: string): NationSquad {
   if (cached) return cached;
   const nation = nationById(nationId);
   const real = parseSquad(nationId);
-  if (real && real.length >= 23) {
+  // a full XV is enough: school sides list only the players actually on the bench
+  if (real && real.length >= 15) {
     const squad = {
       starters: real.slice(0, 15).map((l, i) => realPlayer(nation, l, l.pos ?? i + 1, `${nationId}-${i + 1}`)),
       bench: real.slice(15, 23).map((l, i) => realPlayer(nation, l, l.pos ?? BENCH_POS[i], `${nationId}-b${i}`)),
@@ -212,4 +216,7 @@ export function randomCard(rarity: Rarity, rng: Rng, real = false): Player {
 }
 
 export const fullName = (p: Player) => `${p.first} ${p.last}`;
-export const shortName = (p: Player) => `${p.first[0]}. ${p.last}`;
+/** "F. Smith"; team-sheet initials ("MA Wright") are kept as written. */
+export const shortName = (p: Player) => (/^[A-Z]{1,3}$/.test(p.first) ? `${p.first} ${p.last}` : `${p.first[0]}. ${p.last}`);
+/** shortName plus (C) / (VC) for captains */
+export const displayName = (p: Player) => shortName(p) + (p.role ? ` (${p.role})` : '');
