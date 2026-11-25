@@ -35,6 +35,29 @@ export function ledTexture(extra: string[] = []) {
   return t;
 }
 
+/** LED board text for a try: big flashing words in the scoring side's colour. */
+export function tryLedTexture(color: string) {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#04060b';
+  g.fillRect(0, 0, 1024, 64);
+  g.font = 'italic 900 46px Arial Black, Arial, sans-serif';
+  g.textBaseline = 'middle';
+  for (let x = 10, i = 0; x < 1024; i++) {
+    g.fillStyle = i % 2 ? '#ffffff' : color;
+    g.fillText('TRY!', x, 34);
+    x += g.measureText('TRY!').width + 40;
+  }
+  g.fillStyle = 'rgba(0,0,0,0.28)';
+  for (let y = 0; y < 64; y += 3) g.fillRect(0, y, 1024, 1);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
 export function fanAtlas() {
   // 4 cells: 2 body variants x (arms down, arms up). R = shirt, G = skin, B = hair.
   const c = document.createElement('canvas');

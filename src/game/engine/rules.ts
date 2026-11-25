@@ -99,6 +99,7 @@ export function scoreTry(eng: MatchEngine, c: P) {
   eng.score[side] += 5;
   eng.tries[side]++;
   eng.ps(c).tries++;
+  eng.stadium.event(side === 0 ? 'try' : 'tryAgainst');
   c.fx = 'dive';
   if (side === 0) eng.stats.tries++;
   eng.phase = 'dead';
@@ -154,6 +155,7 @@ export function scoreTry(eng: MatchEngine, c: P) {
 }
 
 export function goalResult(eng: MatchEngine, side: Side, kind: 'drop' | 'conversion' | 'penalty' | 'drill', good: boolean) {
+  if (!good && kind !== 'drill') eng.stadium.event('missKick');
   if (kind === 'drop') {
     if (!good) return;
     eng.score[side] += 3;

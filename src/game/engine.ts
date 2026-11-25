@@ -348,6 +348,7 @@ export class MatchEngine {
     const ws = rand.range(0, 22) / 3.6;
     const wa = rand.range(0, Math.PI * 2);
     this.wind = { x: Math.cos(wa) * ws, z: Math.sin(wa) * ws };
+    this.stadium.setWind(this.wind.x, this.wind.z);
     this.warmShaders();
   }
 

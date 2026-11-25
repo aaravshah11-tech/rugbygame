@@ -1,8 +1,16 @@
 import * as THREE from 'three';
 import { FIELD } from '../field';
 
-/** Grass with mowing stripes, crisp painted lines and in-goal shading, drawn once to a canvas. */
-function pitchCanvas(pxPerM: number) {
+export interface PitchStyle {
+  mow: 'stripes' | 'checker' | 'diagonal' | 'circles' | 'wide';
+  inGoal: string;
+  artificial?: boolean;
+  /** 0 dry .. 1 soaked: wear patches show up more */
+  wet: number;
+}
+
+/** Grass with a mowing pattern, crisp painted lines and in-goal shading, drawn once to a canvas. */
+function pitchCanvas(pxPerM: number, style: PitchStyle) {
   const W = 150;
   const H = 96;
   const c = document.createElement('canvas');
@@ -12,10 +20,38 @@ function pitchCanvas(pxPerM: number) {
   const X = (x: number) => (x + W / 2) * pxPerM;
   const Z = (z: number) => (z + H / 2) * pxPerM;
 
-  // Base grass, mown in 5m stripes along the length.
-  for (let i = 0; i < W / 5; i++) {
-    g.fillStyle = i % 2 ? '#356f2a' : '#3f8132';
-    g.fillRect(i * 5 * pxPerM, 0, 5 * pxPerM + 1, H * pxPerM);
+  // Base grass and the ground's mowing pattern (artificial pitches: flat, brighter, faint bands)
+  const [dark, light] = style.artificial ? ['#3b8a39', '#409240'] : ['#356f2a', '#3f8132'];
+  g.fillStyle = dark;
+  g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = light;
+  const P = pxPerM;
+  if (style.mow === 'stripes' || style.mow === 'wide') {
+    const w = style.mow === 'wide' ? 10 : 5;
+    for (let i = 0; i < W / w; i += 2) g.fillRect(i * w * P, 0, w * P + 1, H * P);
+  } else if (style.mow === 'checker') {
+    for (let i = 0; i < W / 6; i++) for (let j = 0; j < H / 6; j++) if ((i + j) % 2) g.fillRect(i * 6 * P, j * 6 * P, 6 * P + 1, 6 * P + 1);
+  } else if (style.mow === 'diagonal') {
+    g.save();
+    g.beginPath();
+    g.rect(0, 0, c.width, c.height);
+    g.clip();
+    g.translate(c.width / 2, c.height / 2);
+    g.rotate(Math.PI / 4);
+    for (let i = -30; i < 30; i += 2) g.fillRect(i * 5 * P, -c.width, 5 * P, c.width * 2);
+    g.restore();
+  } else {
+    // circles: rings mown out from the centre spot, over faint length stripes
+    for (let i = 0; i < W / 5; i += 2) {
+      g.fillStyle = 'rgba(70,140,55,0.35)';
+      g.fillRect(i * 5 * P, 0, 5 * P + 1, H * P);
+    }
+    for (let r = 70; r > 0; r -= 6) {
+      g.fillStyle = (r / 6) % 2 < 1 ? light : dark;
+      g.beginPath();
+      g.arc(X(0), Z(0), r * P, 0, Math.PI * 2);
+      g.fill();
+    }
   }
   // Fine colour variation (speckle) so it doesn't look flat up close.
   const n = Math.round(W * H * 2.2);
@@ -24,14 +60,17 @@ function pitchCanvas(pxPerM: number) {
     g.fillStyle = l < 0.5 ? `rgba(20,50,15,${0.08 + l * 0.12})` : `rgba(150,200,90,${0.04 + (l - 0.5) * 0.1})`;
     g.fillRect(Math.random() * c.width, Math.random() * c.height, pxPerM * 0.35, pxPerM * 0.35);
   }
-  // In-goal areas: a slightly cooler, darker shade.
-  g.fillStyle = 'rgba(10,40,40,0.22)';
+  // In-goal areas tinted in the home side's colour
+  const ig = new THREE.Color(style.inGoal);
+  g.fillStyle = `rgba(${Math.round(ig.r * 255)},${Math.round(ig.g * 255)},${Math.round(ig.b * 255)},0.2)`;
   g.fillRect(X(-60), Z(-35), 10 * pxPerM, 70 * pxPerM);
   g.fillRect(X(50), Z(-35), 10 * pxPerM, 70 * pxPerM);
   // Worn patches in front of the posts and at the centre.
-  for (const [x, z, r] of [[0, 0, 4], [-40, 0, 5], [40, 0, 5], [-50, 0, 3], [50, 0, 3]] as const) {
+  // (worse in the wet: scrums and lineouts churn the mud)
+  const wear = style.artificial ? 0 : 0.2 + style.wet * 0.35;
+  for (const [x, z, r] of [[0, 0, 4], [-40, 0, 5], [40, 0, 5], [-50, 0, 3], [50, 0, 3], [-22, -8, 3], [22, 8, 3], [0, -30, 3], [0, 30, 3]] as const) {
     const rg = g.createRadialGradient(X(x), Z(z), 0, X(x), Z(z), r * pxPerM);
-    rg.addColorStop(0, 'rgba(120,110,60,0.22)');
+    rg.addColorStop(0, `rgba(${style.wet > 0.5 ? '95,78,50' : '120,110,60'},${wear})`);
     rg.addColorStop(1, 'rgba(120,110,60,0)');
     g.fillStyle = rg;
     g.fillRect(X(x - r), Z(z - r), 2 * r * pxPerM, 2 * r * pxPerM);
@@ -104,14 +143,14 @@ function grassNormalMap(size = 256) {
   return t;
 }
 
-function padTexture(color: string) {
+function padTexture(color: string, band = 'rgba(255,255,255,0.9)') {
   const c = document.createElement('canvas');
   c.width = 64;
   c.height = 128;
   const g = c.getContext('2d')!;
   g.fillStyle = color;
   g.fillRect(0, 0, 64, 128);
-  g.fillStyle = 'rgba(255,255,255,0.9)';
+  g.fillStyle = band;
   g.fillRect(0, 18, 64, 10);
   g.fillRect(0, 100, 64, 10);
   const t = new THREE.CanvasTexture(c);
@@ -119,19 +158,20 @@ function padTexture(color: string) {
   return t;
 }
 
-export function buildPitch(parent: THREE.Object3D, renderer: THREE.WebGLRenderer, pxPerM: number, endColors: [string, string]) {
+export function buildPitch(parent: THREE.Object3D, renderer: THREE.WebGLRenderer, pxPerM: number, endColors: [string, string], style: PitchStyle = { mow: 'stripes', inGoal: '#2c6a33', wet: 0 }, padBand?: string) {
   const group = new THREE.Group();
-  const map = new THREE.CanvasTexture(pitchCanvas(pxPerM));
+  const map = new THREE.CanvasTexture(pitchCanvas(pxPerM, style));
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   map.generateMipmaps = true;
   map.minFilter = THREE.LinearMipmapLinearFilter;
-  const mat = new THREE.MeshStandardMaterial({ map, normalMap: grassNormalMap(), normalScale: new THREE.Vector2(0.55, 0.55), roughness: 0.95, metalness: 0 });
+  // wet grass picks up a sheen from the floodlights
+  const mat = new THREE.MeshStandardMaterial({ map, normalMap: grassNormalMap(), normalScale: new THREE.Vector2(style.artificial ? 0.25 : 0.55, style.artificial ? 0.25 : 0.55), roughness: 0.95 - style.wet * 0.42, metalness: 0, envMapIntensity: 1 + style.wet * 0.8 });
   const pitch = new THREE.Mesh(new THREE.PlaneGeometry(150, 96), mat);
   pitch.rotation.x = -Math.PI / 2;
   pitch.receiveShadow = true;
   group.add(pitch);
-  const surround = new THREE.Mesh(new THREE.PlaneGeometry(260, 200), new THREE.MeshStandardMaterial({ color: '#1d3a1c', roughness: 1 }));
+  const surround = new THREE.Mesh(new THREE.PlaneGeometry(260, 200), new THREE.MeshStandardMaterial({ color: style.artificial ? '#2c6b2c' : '#264a22', roughness: 1 }));
   surround.rotation.x = -Math.PI / 2;
   surround.position.y = -0.03;
   group.add(surround);
@@ -142,7 +182,7 @@ export function buildPitch(parent: THREE.Object3D, renderer: THREE.WebGLRenderer
   const bar = new THREE.CylinderGeometry(0.075, 0.075, FIELD.postHalfW * 2, 10);
   const padGeo = new THREE.CylinderGeometry(0.34, 0.34, 2.2, 14);
   ([-1, 1] as const).forEach((sx, i) => {
-    const padMat = new THREE.MeshStandardMaterial({ map: padTexture(endColors[i]), roughness: 0.8 });
+    const padMat = new THREE.MeshStandardMaterial({ map: padTexture(endColors[i], padBand), roughness: 0.8 });
     for (const sz of [-1, 1]) {
       const u = new THREE.Mesh(upright, postMat);
       u.position.set(sx * FIELD.tryX, 8, sz * FIELD.postHalfW);

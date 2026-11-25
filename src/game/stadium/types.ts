@@ -121,4 +121,6 @@ export interface StadiumView {
   event(e: StadiumEvent): void;
   /** text for the big screens */
   setScore(text: string): void;
+  /** the match wind (m/s), for flags */
+  setWind(x: number, z: number): void;
 }

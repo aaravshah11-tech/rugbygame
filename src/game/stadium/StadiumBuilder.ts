@@ -6,6 +6,7 @@ import { buildBoards } from './boards';
 import { buildCrowd } from './crowd';
 import { buildSchoolGround } from './fields';
 import { buildPitch } from './pitch';
+import { buildPitchside } from './pitchside';
 import type { StadiumContext, StadiumEvent, StadiumSpec, StadiumView } from './types';
 
 /**
@@ -21,18 +22,25 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   group.name = `stadium:${spec.id}`;
   scene.add(group);
   const key = buildSkyAndLights(scene, renderer, ctx.quality);
-  buildPitch(group, renderer, pitchPx, postPads);
+  // posts padded in the home side's colours; the pitch mown the ground's own way
+  void postPads;
+  buildPitch(group, renderer, pitchPx, [ctx.home.primary, ctx.home.primary], { mow: spec.pitch.mow, inGoal: spec.pitch.inGoal, artificial: spec.pitch.artificial, wet: ctx.weather === 'rain' ? 1 : 0 }, ctx.home.secondary);
 
   const right = new THREE.Vector3();
   let excited = 0;
+  let flash = 0;
   const event = (e: StadiumEvent) => {
-    if (e === 'try' || e === 'tryAgainst') excited = 1;
+    if (e === 'try' || e === 'tryAgainst') {
+      excited = 1;
+      flash = 4;
+    }
   };
 
   if (spec.layout === 'fields') {
     const crowd = [ctx.home.primary, ctx.home.primary, ctx.home.secondary, ctx.away.primary, ctx.away.secondary];
     const ground = buildSchoolGround(group, ctx.quality, crowd, spec, key);
-    return { spec, group, key, event, setScore: () => {}, update: (t, ex, cam) => ground.update(t, ex, cam) };
+    const side = buildPitchside(group, spec, ctx, null);
+    return { spec, group, key, event, setScore: () => {}, setWind: side.setWind, update: (t, ex, cam) => (ground.update(t, ex, cam), side.update(t, cam)) };
   }
 
   // the ground the stadium stands on: a plaza ring, then grass out to the horizon
@@ -46,7 +54,8 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   group.add(land);
   const stands = buildStands(group, spec, ctx);
   buildRoofs(group, spec, ctx, stands);
-  const { led, boards } = buildBoards(group, spec, stands);
+  const boards = buildBoards(group, spec, stands, ctx.home.primary);
+  const side = buildPitchside(group, spec, ctx, stands);
   if (spec.track) {
     // athletics track: a ring on the ground between the pitch and the stands
     const t = new THREE.Mesh(new THREE.RingGeometry(1, 1.12, 64, 1), new THREE.MeshStandardMaterial({ color: spec.track, roughness: 0.95 }));
@@ -62,6 +71,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     key,
     event,
     setScore: () => {},
+    setWind: side.setWind,
     update(time, excite, camera) {
       excited = Math.max(0, excited - 0.004);
       crowdUniforms.uTime.value = time;
@@ -69,9 +79,9 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
       camera.getWorldDirection(right);
       right.set(-right.z, 0, right.x).normalize();
       crowdUniforms.uRight.value.copy(right);
-      const off = (time * 0.025) % 1;
-      led.offset.x = off;
-      for (const b of boards) b.offset.x = off;
+      flash = Math.max(0, flash - 1 / 60);
+      boards.update(time, flash);
+      side.update(time, camera);
     },
   };
 }
