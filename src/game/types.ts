@@ -38,6 +38,10 @@ export interface MatchConfig {
   timeOfDay?: 'afternoon' | 'golden' | 'night';
   /** 0.6 friendly .. 1 final: how full and loud the ground is */
   importance?: number;
+  /** which competition / mode (picks the title sponsor) */
+  competition?: import('../sponsors/manager').Competition;
+  /** real-world sponsors on (default) or the made-up ones */
+  realSponsors?: boolean;
   tactics: Tactics;
   rules: RulesMode;
   autoSwitch: boolean;

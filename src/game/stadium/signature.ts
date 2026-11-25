@@ -3,6 +3,9 @@ import { at } from './path';
 import { tierBack, tierTop, type StandsResult } from './stands';
 import { rng, seedOf } from './surroundings';
 import type { StadiumContext, StadiumSpec } from './types';
+import type { Sponsor } from '../../data/sponsors';
+import type { MatchSponsors } from '../../sponsors/manager';
+import { drawPanel } from '../../sponsors/logo';
 
 /**
  * Each ground's signature feature - all original designs, only inspired by the real places: a
@@ -267,8 +270,16 @@ export function buildSignature(group: THREE.Group, spec: StadiumSpec, ctx: Stadi
  * Big screens (ends, corners or hung from the roof) that show the score. Returns a function to
  * redraw them when the score changes.
  */
-export function buildScreens(group: THREE.Group, spec: StadiumSpec, stands: StandsResult) {
-  if (!spec.screens.count) return () => {};
+export interface Screens {
+  setScore(text: string): void;
+  /** a sponsor ident for a few seconds (replay sting, kick-off) */
+  ident(s: Sponsor, caption: string, seconds: number): void;
+  update(time: number): void;
+}
+
+export function buildScreens(group: THREE.Group, spec: StadiumSpec, stands: StandsResult, sp: MatchSponsors | null = null): Screens {
+  const noop: Screens = { setScore: () => {}, ident: () => {}, update: () => {} };
+  if (!spec.screens.count) return noop;
   const c = document.createElement('canvas');
   c.width = 512;
   c.height = 256;
@@ -292,6 +303,54 @@ export function buildScreens(group: THREE.Group, spec: StadiumSpec, stands: Stan
     tex.needsUpdate = true;
   };
   draw('0 - 0');
+  // sponsor ident: the brand's panel with a caption bar
+  const drawIdent = (s: Sponsor, caption: string) => {
+    drawPanel(g, s, 0, 0, 512, 256);
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillRect(0, 214, 512, 42);
+    g.font = '800 22px Arial, sans-serif';
+    g.textAlign = 'center';
+    g.fillStyle = '#ffffff';
+    g.fillText(caption.toUpperCase(), 256, 242);
+    g.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let y = 0; y < 256; y += 3) g.fillRect(0, y, 512, 1);
+    tex.needsUpdate = true;
+  };
+  let score = '0 - 0';
+  let showing: 'score' | 'ident' = 'score';
+  let until = -1;
+  let forced: { s: Sponsor; caption: string; seconds: number } | null = null;
+  let now = 0;
+  let k = 0;
+  const screens: Screens = {
+    setScore(text) {
+      score = text;
+      if (showing === 'score') draw(text);
+    },
+    ident(s, caption, seconds) {
+      forced = { s, caption, seconds };
+    },
+    update(time) {
+      now = time;
+      if (forced) {
+        drawIdent(forced.s, forced.caption);
+        showing = 'ident';
+        until = now + forced.seconds;
+        forced = null;
+        return;
+      }
+      if (showing === 'ident' && now > until) {
+        showing = 'score';
+        draw(score);
+      } else if (sp && showing === 'score' && now % 18 > 13 && now - until > 6) {
+        // every 18 s a partner ident for 5 s
+        const s = sp.featured[k++ % sp.featured.length];
+        drawIdent(s, s === sp.title ? 'Title partner' : 'Official partner');
+        showing = 'ident';
+        until = now + 5;
+      }
+    },
+  };
   const mat = new THREE.MeshBasicMaterial({ map: tex });
   mat.color.setScalar(1.25);
   const frame = new THREE.MeshStandardMaterial({ color: '#1b1f26', roughness: 0.6, metalness: 0.5 });
@@ -318,5 +377,5 @@ export function buildScreens(group: THREE.Group, spec: StadiumSpec, stands: Stan
     s.lookAt(0, y, 0);
     group.add(s);
   });
-  return draw;
+  return screens;
 }

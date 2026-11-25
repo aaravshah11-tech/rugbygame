@@ -56,6 +56,7 @@ export function Competition({ go, kind }: { go: Go; kind: CompKind }) {
     audio.click();
     const userHome = next.home === c.user;
     const cfg = buildMatch(nationTeam(c.user), nationTeam(userHome ? next.away : next.home), userHome, p);
+    cfg.competition = kind;
     Object.assign(cfg, occasion(next.stage));
     const fid = next.id;
     go({ name: 'match', cfg, back: { name: 'comp', kind }, onFinish: (r) => finishCompMatch(cfg, kind, fid, r) });

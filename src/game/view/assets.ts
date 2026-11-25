@@ -80,6 +80,11 @@ export interface PlayerAsset {
   /** model-space anchor points measured in the idle pose (metres, unscaled) */
   backZ: number;
   backY: number;
+  /** front of the chest at backY (for the shirt sponsor) */
+  frontZ: number;
+  /** outside of one sleeve and the front of the same-side thigh (kit logos) */
+  sleeve: THREE.Vector3;
+  shorts: THREE.Vector3;
   headCenter: THREE.Vector3;
   headRadius: number;
   eyes: THREE.Vector3[];
@@ -312,8 +317,38 @@ function prepare(gltfScene: THREE.Object3D, animations: THREE.AnimationClip[]): 
     const lo = Math.min(...ys);
     const hi = Math.max(...ys);
     backY = lo + (hi - lo) * 0.6;
-    const band = spine.filter((p) => Math.abs(p.y - backY) < height * 0.05);
+    // look a little wider than the centre line (the low-poly shirt has few vertices on it)
+    const band = shirt.filter((p) => Math.abs(p.x) < height * 0.1 && Math.abs(p.y - backY) < height * 0.06);
     if (band.length) backZ = Math.min(...band.map((p) => p.z));
+  }
+  let frontZ = height * 0.07;
+  {
+    // the low-poly shirt has few vertices on the centre line: look a little wider for the chest
+    const band = shirt.filter((p) => Math.abs(p.x) < height * 0.1 && Math.abs(p.y - backY) < height * 0.06);
+    if (band.length) frontZ = Math.max(...band.map((p) => p.z));
+  }
+  // sleeve: the outermost shirt points on the +x side
+  let sleeve = new THREE.Vector3(height * 0.15, backY + height * 0.08, 0);
+  {
+    const side = shirt.filter((p) => p.x > 0);
+    if (side.length) {
+      const maxX = Math.max(...side.map((p) => p.x));
+      const outer = side.filter((p) => p.x > maxX * 0.86);
+      const y = outer.reduce((a, p) => a + p.y, 0) / outer.length;
+      const z = outer.reduce((a, p) => a + p.z, 0) / outer.length;
+      sleeve = new THREE.Vector3(maxX, y, z);
+    }
+  }
+  // shorts: front of the +x thigh, a little below the waistband
+  let shorts = new THREE.Vector3(height * 0.08, height * 0.45, height * 0.06);
+  {
+    const pants = byMat.get('Pants') ?? [];
+    if (pants.length) {
+      const top = Math.max(...pants.map((p) => p.y));
+      const y = top - height * 0.09;
+      const leg = pants.filter((p) => p.x > height * 0.03 && p.x < height * 0.13 && Math.abs(p.y - y) < height * 0.03);
+      if (leg.length) shorts = new THREE.Vector3(leg.reduce((a, p) => a + p.x, 0) / leg.length, y, Math.max(...leg.map((p) => p.z)));
+    }
   }
   const hair = [...(byMat.get('Hair') ?? []), ...(byMat.get('Hair2') ?? [])];
   const neckY = findBone(scene, 'Head')?.getWorldPosition(new THREE.Vector3()).y ?? height * 0.85;
@@ -380,7 +415,7 @@ function prepare(gltfScene: THREE.Object3D, animations: THREE.AnimationClip[]): 
   mixer.update(0);
   mixer.uncacheRoot(scene);
   scene.updateMatrixWorld(true);
-  return { scene, clips, height, backZ, backY, headCenter, headRadius, eyes, gaitSpeed };
+  return { scene, clips, height, backZ, backY, frontZ, sleeve, shorts, headCenter, headRadius, eyes, gaitSpeed };
 }
 
 // ------------------------------------------------------------------ procedural clips

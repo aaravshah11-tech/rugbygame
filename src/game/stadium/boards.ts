@@ -2,34 +2,106 @@ import * as THREE from 'three';
 import { at } from './path';
 import type { StandsResult } from './stands';
 import { ledTexture, tryLedTexture } from './textures';
-import type { StadiumSpec } from './types';
+import { boardStrip, takeoverTexture, tryBoardTexture } from '../../sponsors/textures';
+import type { StadiumContext, StadiumSpec } from './types';
 
 /**
  * LED advertising: perimeter boards round the pitch and ribbons along the upper-tier fronts.
  * One scrolling texture shared by all (original made-up sponsors plus the ground's name).
  */
-export function buildBoards(group: THREE.Group, spec: StadiumSpec, stands: StandsResult, tryColor = '#c6ff1a') {
-  const led = ledTexture([spec.name.toUpperCase(), spec.city.toUpperCase()]);
-  const boardMat = new THREE.MeshBasicMaterial({ map: led });
-  boardMat.color.setScalar(1.35);
+export function buildBoards(group: THREE.Group, spec: StadiumSpec, stands: StandsResult, tryColor = '#c6ff1a', ctx?: StadiumContext) {
+  const sp = ctx?.sponsors ?? null;
+  const low = ctx?.quality.level === 'low';
+  // the running order: real sponsors, or the made-up ones with the ground's name
+  const strip = sp ? boardStrip(sp.boards, low) : null;
+  const led = strip ? strip.texture : ledTexture([spec.name.toUpperCase(), spec.city.toUpperCase()]);
+  const panels = strip ? strip.panels : 0;
+  const take = sp && !low ? takeoverTexture(low, panels) : null;
+  const tryTex = sp ? tryBoardTexture(sp.title, low) : tryLedTexture(tryColor);
+  const glow = ctx?.time === 'night' ? 1.45 : ctx?.time === 'golden' ? 1.25 : 1.1;
+  const U = {
+    uStrip: { value: led },
+    uTake: { value: (take?.texture ?? led) as THREE.Texture },
+    uTry: { value: tryTex },
+    uOff: { value: 0 },
+    uWipe: { value: 0 },
+    uShine: { value: -1 },
+    uFlash: { value: 0 },
+    uTime: { value: 0 },
+    uGlow: { value: glow },
+  };
   const boards: THREE.Texture[] = [];
-  const faces: { mat: THREE.MeshBasicMaterial; normal: THREE.Texture; flash: THREE.Texture }[] = [];
-  const tryTex = tryLedTexture(tryColor);
+  const faces: { mat: THREE.ShaderMaterial }[] = [];
   const dark = new THREE.MeshStandardMaterial({ color: '#111' });
+  /** panel width in metres on the perimeter boards (0.9 m high, 4:1 panels) */
+  const PANEL_M = 3.6;
+  const faceMat = (len: number) =>
+    new THREE.ShaderMaterial({
+      uniforms: { ...U, uRep: { value: sp ? len / PANEL_M / panels : len / 60 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `
+        uniform sampler2D uStrip; uniform sampler2D uTake; uniform sampler2D uTry;
+        uniform float uRep; uniform float uOff; uniform float uWipe; uniform float uShine; uniform float uFlash; uniform float uTime; uniform float uGlow;
+        varying vec2 vUv;
+        void main() {
+          vec2 su = vec2(vUv.x * uRep + uOff, vUv.y);
+          vec3 c = texture2D(uStrip, su).rgb;
+          // full-width takeover wipes in from the left
+          vec3 t = texture2D(uTake, vec2(vUv.x * uRep, vUv.y)).rgb;
+          float w = smoothstep(uWipe - 0.015, uWipe, vUv.x);
+          c = mix(t, c, w);
+          // the wipe edge itself glows
+          c += vec3(1.0) * (1.0 - smoothstep(0.0, 0.02, abs(vUv.x - uWipe))) * step(0.001, uWipe) * step(uWipe, 0.999) * 0.8;
+          // shine sweep across a takeover
+          float sh = 1.0 - smoothstep(0.0, 0.06, abs(vUv.x - uShine + (vUv.y - 0.5) * 0.04));
+          c += sh * 0.55;
+          // try celebration: scrolling TRY! panels, strobing
+          if (uFlash > 0.0) {
+            vec3 f = texture2D(uTry, vec2(vUv.x * uRep * 2.0 - uTime * 0.5, vUv.y)).rgb;
+            c = f * (1.0 + 0.6 * max(0.0, sin(uTime * 18.0)));
+          }
+          gl_FragColor = vec4(c * uGlow, 1.0);
+          #include <colorspace_fragment>
+        }`,
+    });
+  const wet = ctx?.weather === 'rain' && !low;
+  const reflMat = (len: number) =>
+    new THREE.ShaderMaterial({
+      uniforms: { ...U, uRep: { value: sp ? len / PANEL_M / panels : len / 60 } },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `
+        uniform sampler2D uStrip; uniform float uRep; uniform float uOff; uniform float uGlow; uniform float uFlash; uniform sampler2D uTry; uniform float uTime;
+        varying vec2 vUv;
+        void main() {
+          // the board mirrored in the wet grass, rippled and fading away from the board
+          float ripple = sin(vUv.x * 300.0 + vUv.y * 40.0) * 0.004;
+          vec2 su = vec2(vUv.x * uRep + uOff + ripple, 1.0 - min(vUv.y * 2.4, 1.0));
+          vec3 c = uFlash > 0.0 ? texture2D(uTry, vec2(vUv.x * uRep * 2.0 - uTime * 0.5, su.y)).rgb : texture2D(uStrip, su).rgb;
+          float a = pow(1.0 - vUv.y, 2.2) * 0.32;
+          gl_FragColor = vec4(c * uGlow * a, a);
+          #include <colorspace_fragment>
+        }`,
+    });
   const mkBoard = (len: number, x: number, z: number, ry: number) => {
-    const tex = led.clone();
-    tex.needsUpdate = true;
-    tex.repeat.set(len / 60, 1);
-    boards.push(tex);
-    const face = Object.assign(boardMat.clone(), { map: tex });
-    const flash = tryTex.clone();
-    flash.needsUpdate = true;
-    flash.repeat.set(len / 30, 1);
-    faces.push({ mat: face, normal: tex, flash });
+    const face = faceMat(len);
+    faces.push({ mat: face });
     const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.9, 0.12), [dark, dark, dark, dark, face, dark]);
     m.position.set(x, 0.45, z);
     m.rotation.y = ry;
     group.add(m);
+    if (wet) {
+      const r = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.4), reflMat(len));
+      r.rotation.set(-Math.PI / 2, 0, 0);
+      const g = new THREE.Group();
+      r.position.set(0, 0.025, 1.3);
+      g.add(r);
+      g.position.set(x, 0, z);
+      g.rotation.y = ry;
+      group.add(g);
+    }
   };
   // the boards sit between the pitch surround and the stands
   const bz = Math.min(40.5, Math.abs(stands.front.opp) - 1.5);
@@ -70,21 +142,26 @@ export function buildBoards(group: THREE.Group, spec: StadiumSpec, stands: Stand
     m.color.setScalar(1.5);
     group.add(new THREE.Mesh(g, m));
   }
-  /** scroll the adverts; while `flash` > 0 the boards shout TRY! and strobe */
+  /** scroll the strip; every ~20 s a brand takes over the whole board (wipe in, shine, wipe out);
+   *  while `flash` > 0 the boards celebrate a try */
+  let cycleBrand = 0;
+  let lastCycle = -1;
   const update = (time: number, flash: number) => {
-    const off = (time * 0.025) % 1;
-    led.offset.x = off;
-    for (const b of boards) b.offset.x = off;
-    for (const f of faces) {
-      const want = flash > 0 ? f.flash : f.normal;
-      if (f.mat.map !== want) {
-        f.mat.map = want;
-        f.mat.needsUpdate = true;
+    U.uTime.value = time;
+    U.uOff.value = (time * (sp ? 0.012 : 0.025)) % 1;
+    U.uFlash.value = flash;
+    led.offset.x = U.uOff.value; // the stand ribbons scroll with the boards
+    if (take && sp) {
+      const T = 22;
+      const k = time % T;
+      const cyc = Math.floor(time / T);
+      if (cyc !== lastCycle) {
+        lastCycle = cyc;
+        take.show(sp.featured[cycleBrand++ % sp.featured.length]);
       }
-      if (flash > 0) {
-        f.flash.offset.x = (time * 0.4) % 1;
-        f.mat.color.setScalar(1 + Math.max(0, Math.sin(time * 18)) * 0.9);
-      } else f.mat.color.setScalar(1.35);
+      // 0-14 s scroll, 14-15 wipe in, 15-20 hold with a shine, 20-21 wipe out
+      U.uWipe.value = k < 14 ? 0 : k < 15 ? k - 14 : k < 20 ? 1 : k < 21 ? 1 - (k - 20) : 0;
+      U.uShine.value = k > 15.3 && k < 17.3 ? (k - 15.3) / 1.6 - 0.1 : -1;
     }
   };
   return { led, boards, update };

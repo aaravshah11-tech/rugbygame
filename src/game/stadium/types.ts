@@ -110,10 +110,12 @@ export interface StadiumContext {
   /** short team names for banners */
   homeName?: string;
   awayName?: string;
+  /** real sponsors for this match (null = the made-up ones) */
+  sponsors?: import('../../sponsors/manager').MatchSponsors | null;
 }
 
 /** 'Home' / 'Away' = which side's fans the moment belongs to (who scored, who missed). */
-export type StadiumEvent = 'tryHome' | 'tryAway' | 'missHome' | 'missAway' | 'kickoff' | 'halftime' | 'fulltime';
+export type StadiumEvent = 'tryHome' | 'tryAway' | 'missHome' | 'missAway' | 'kickoff' | 'halftime' | 'fulltime' | 'replay';
 
 export interface StadiumView {
   spec: StadiumSpec;

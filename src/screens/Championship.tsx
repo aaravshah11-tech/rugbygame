@@ -110,6 +110,7 @@ export function Championship({ go }: { go: Go }) {
     audio.click();
     const userHome = next.home === c.user;
     const cfg = buildMatch(nationTeam(c.user), nationTeam(userHome ? next.away : next.home), userHome, p);
+    cfg.competition = 'six';
     Object.assign(cfg, occasion(next.stage));
     const fid = next.id;
     go({ name: 'match', cfg, back: { name: 'championship' }, onFinish: (r) => finishChampionship(cfg, fid, r) });

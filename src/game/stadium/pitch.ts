@@ -158,7 +158,7 @@ function padTexture(color: string, band = 'rgba(255,255,255,0.9)') {
   return t;
 }
 
-export function buildPitch(parent: THREE.Object3D, renderer: THREE.WebGLRenderer, pxPerM: number, endColors: [string, string], style: PitchStyle = { mow: 'stripes', inGoal: '#2c6a33', wet: 0 }, padBand?: string) {
+export function buildPitch(parent: THREE.Object3D, renderer: THREE.WebGLRenderer, pxPerM: number, endColors: [string, string], style: PitchStyle = { mow: 'stripes', inGoal: '#2c6a33', wet: 0 }, padBand?: string, padMap?: (color: string) => THREE.Texture) {
   const group = new THREE.Group();
   const map = new THREE.CanvasTexture(pitchCanvas(pxPerM, style));
   map.colorSpace = THREE.SRGBColorSpace;
@@ -182,7 +182,7 @@ export function buildPitch(parent: THREE.Object3D, renderer: THREE.WebGLRenderer
   const bar = new THREE.CylinderGeometry(0.075, 0.075, FIELD.postHalfW * 2, 10);
   const padGeo = new THREE.CylinderGeometry(0.34, 0.34, 2.2, 14);
   ([-1, 1] as const).forEach((sx, i) => {
-    const padMat = new THREE.MeshStandardMaterial({ map: padTexture(endColors[i], padBand), roughness: 0.8 });
+    const padMat = new THREE.MeshStandardMaterial({ map: padMap ? padMap(endColors[i]) : padTexture(endColors[i], padBand), roughness: 0.8 });
     for (const sz of [-1, 1]) {
       const u = new THREE.Mesh(upright, postMat);
       u.position.set(sx * FIELD.tryX, 8, sz * FIELD.postHalfW);

@@ -54,6 +54,8 @@ export interface Settings {
   controlLayout?: Record<string, { dx: number; dy: number; s: number }>;
   /** cut camera drift, parallax and big animations (also follows the iOS setting) */
   reduceMotion?: boolean;
+  /** real-world brands on boards, kits and broadcast graphics (off = the made-up sponsors) */
+  realSponsors?: boolean;
 }
 
 /** A finished match as shown on the main menu ticker. */

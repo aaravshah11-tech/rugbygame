@@ -73,6 +73,14 @@ export function Settings({ go }: { go: Go }) {
                 onChange={(v) => update((x) => (x.settings.reduceMotion = v === 'on'))}
               />
             </div>
+            <div>
+              <div className="muted italic" style={{ fontSize: 12, marginBottom: 4 }}>Real sponsors</div>
+              <Seg<'on' | 'off'>
+                value={s.realSponsors === false ? 'off' : 'on'}
+                options={[{ v: 'on', label: 'On' }, { v: 'off', label: 'Off' }]}
+                onChange={(v) => update((x) => (x.settings.realSponsors = v === 'on'))}
+              />
+            </div>
           </div>
           <div className="card" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <h3>Gameplay</h3>

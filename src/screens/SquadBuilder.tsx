@@ -220,6 +220,7 @@ export function SquadBuilder({ go, initialTab }: { go: Go; initialTab?: string }
     }
     const f = s.fixtures[s.index];
     const cfg = buildMatch(team, nationTeam(f.away), true, p);
+    cfg.competition = 'club';
     const fid = f.id;
     audio.click();
     go({ name: 'match', cfg, back: { name: 'squad', tab: 'season' }, onFinish: (r) => finishSeason(cfg, fid, r) });

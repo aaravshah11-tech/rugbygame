@@ -19,6 +19,7 @@ import { FpsGovernor, preset, resolveQuality } from './view/quality';
 import type { QualityPreset } from './view/quality';
 import { buildStadium, stadiumFor } from './stadium/index';
 import type { StadiumView } from './stadium/index';
+import { pickMatchSponsors, type MatchSponsors } from '../sponsors/manager';
 import { LegacyVisual } from './view/visual';
 import type { Visual } from './view/visual';
 import * as Inp from './engine/input';
@@ -43,6 +44,8 @@ export class MatchEngine {
   stadium: StadiumView;
   shadowBasis: { dir: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3 } | null = null;
   stadiumBuildMs = 0;
+  /** this match's real sponsors (null when the setting is off) */
+  sponsors: MatchSponsors | null = null;
   post: PostFX;
   particles: Particles;
   ballFx: BallFx;
@@ -239,6 +242,9 @@ export class MatchEngine {
     const away = cfg.userIsHome ? cfg.cpu.kit : cfg.user.kit;
     // The user's team defends the -x end, so those posts wear the user's colours.
     const spec = stadiumFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id);
+    const homeId = cfg.userIsHome ? cfg.user.id : cfg.cpu.id;
+    const awayId = cfg.userIsHome ? cfg.cpu.id : cfg.user.id;
+    this.sponsors = cfg.realSponsors !== false ? pickMatchSponsors(cfg.competition ?? 'quick', homeId, awayId) : null;
     const time = cfg.timeOfDay ?? 'night';
     // light snow, sometimes, for a dry winter fixture at a temperate ground (looks only)
     const devWx = import.meta.env.DEV ? new URLSearchParams(location.search).get('wx') : null;
@@ -248,7 +254,7 @@ export class MatchEngine {
       this.scene,
       this.renderer,
       spec,
-      { quality: this.quality, home, away, time, weather: snow ? 'snow' : cfg.weather, importance: cfg.importance ?? 0.75, homeName: cfg.userIsHome ? cfg.user.short : cfg.cpu.short, awayName: cfg.userIsHome ? cfg.cpu.short : cfg.user.short },
+      { quality: this.quality, home, away, time, weather: snow ? 'snow' : cfg.weather, importance: cfg.importance ?? 0.75, homeName: cfg.userIsHome ? cfg.user.short : cfg.cpu.short, awayName: cfg.userIsHome ? cfg.cpu.short : cfg.user.short, sponsors: this.sponsors },
       this.quality.pitchPxPerMetre,
       [cfg.user.kit.primary, cfg.cpu.kit.primary],
     );
@@ -433,7 +439,9 @@ export class MatchEngine {
         const h = Math.abs(hashCode(pl.id + 'h'));
         // Some forwards wear scrum caps (hooker, locks, flankers more often than not).
         const scrumCap = [2, 4, 5, 6, 7].includes(i + 1) && h % 3 !== 0;
-        const av: Visual = asset && kit ? new Avatar(asset, kit, { num: i + 1, forward: i < 8, skin, hair: h % 6, scrumCap, size: pl.size }) : new LegacyVisual(team.kit, skin, i < 8);
+        const d = this.sponsors ? ((side === 0) === this.cfg.userIsHome ? this.sponsors.home : this.sponsors.away) : null;
+        const logos = d ? { front: d.shirt, kit: d.kit, sleeve: d.sleeve, back: d.back, detail: this.quality.level } : undefined;
+        const av: Visual = asset && kit ? new Avatar(asset, kit, { num: i + 1, forward: i < 8, skin, hair: h % 6, scrumCap, size: pl.size, logos }) : new LegacyVisual(team.kit, skin, i < 8);
         av.root.rotation.order = 'YXZ'; // heading first, then the body lean in the player's own frame
         this.scene.add(av.root);
         const p: P = {
@@ -509,6 +517,7 @@ export class MatchEngine {
     this.introT = 0;
     this.camMode = 'intro';
     this.stadium.setTorches(true);
+    this.stadium.event('kickoff');
     if (this.stadium.spec.layout !== 'fields') audio.paChime();
     // the teams walk out side by side from the tunnel to their kick-off spots
     this.teams.forEach((team, side) =>
@@ -1293,6 +1302,7 @@ export class MatchEngine {
 
   // ---------------------------------------------------------------- replay
   startReplay(frames: ReplayFrame[], done: () => void) {
+    this.stadium.event('replay');
     return View.startReplay(this, frames, done);
   }
 

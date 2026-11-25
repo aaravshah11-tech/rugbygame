@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { Kit } from '../../data/nations';
 import { findBone, type AnimName, type PlayerAsset } from './assets';
+import type { Sponsor } from '../../data/sponsors';
+import { drawLogo, luminance as lumHex } from '../../sponsors/logo';
 
 const SKIN_TONES = ['#f2c8a0', '#deae84', '#b97f55', '#8a5a3a', '#5c3a25'];
 const HAIR = ['#1d1612', '#3a2618', '#6b4423', '#a8752f', '#d9b25c', '#2b2b2b'];
@@ -168,7 +170,30 @@ export interface AvatarOptions {
   scrumCap: boolean;
   /** body size multiplier (taller and broader) */
   size?: number;
+  /** kit sponsors: front of shirt, kit maker (chest + shorts), sleeve, back. detail: how many to show */
+  logos?: { front?: Sponsor; kit?: Sponsor; sleeve?: Sponsor; back?: Sponsor; detail: 'low' | 'medium' | 'high' };
 }
+
+// ---------------------------------------------------------------- kit logo decals
+const kitTexCache = new Map<string, THREE.CanvasTexture>();
+function kitTex(key: string, w: number, h: number, paint: (g: CanvasRenderingContext2D) => void) {
+  const hit = kitTexCache.get(key);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  paint(c.getContext('2d')!);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  kitTexCache.set(key, t);
+  return t;
+}
+const decalMat = (map: THREE.Texture) =>
+  new THREE.MeshStandardMaterial({ map, transparent: true, alphaTest: 0.3, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -4, depthWrite: false });
+/** logos on a shirt read best in the light version on dark kits and the dark one on light kits */
+const kitVariant = (shirt: string) => (lumHex(shirt) < 0.45 ? 'onDark' : 'onLight');
 
 export class Avatar {
   readonly root = new THREE.Group();
@@ -227,8 +252,49 @@ export class Avatar {
         new THREE.PlaneGeometry(size, size),
         new THREE.MeshStandardMaterial({ map: numberTexture(o.num, team.kit), transparent: true, alphaTest: 0.35, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -4 }),
       );
-      attachKeepWorld(chest, decal, new THREE.Vector3(0, asset.backY, asset.backZ - H * 0.012), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+      attachKeepWorld(chest, decal, new THREE.Vector3(0, asset.backY, asset.backZ - H * 0.05), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
       this.meshes.push(decal);
+    }
+
+    // Kit sponsors: one chest decal (shirt sponsor + kit maker), back sponsor, sleeve, shorts.
+    const L = o.logos;
+    if (L && chest) {
+      const v = kitVariant(team.kit.primary);
+      const add = (bone: THREE.Object3D | null, map: THREE.Texture, w: number, h: number, pos: THREE.Vector3, yaw: number) => {
+        if (!bone) return;
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), decalMat(map));
+        attachKeepWorld(bone, m, pos, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
+        this.meshes.push(m);
+      };
+      if (L.front || L.kit) {
+        const key = `chest|${L.front?.id}|${L.kit?.id}|${v}`;
+        const map = kitTex(key, 512, 320, (g) => {
+          // kit maker small on the wearer's right chest (viewer's left), sponsor big across the middle
+          if (L.kit) drawLogo(g, L.kit, v, 40, 10, 150, 70, 0.08);
+          if (L.front) drawLogo(g, L.front, v, 20, 110, 472, 180, 0.06);
+        });
+        add(chest, map, H * 0.2, H * 0.125, new THREE.Vector3(0, asset.backY + H * 0.005, asset.frontZ + H * 0.02), 0);
+      }
+      if (L.back && L.detail !== 'low') {
+        const map = kitTex(`back|${L.back.id}|${v}`, 512, 128, (g) => drawLogo(g, L.back!, v, 0, 0, 512, 128, 0.08));
+        add(chest, map, H * 0.17, H * 0.042, new THREE.Vector3(0, asset.backY + H * 0.1, asset.backZ - H * 0.05), Math.PI);
+      }
+      if (L.detail === 'high') {
+        const armKey = asset.sleeve.x > 0 ? 'LArm' : 'RArm';
+        const arm = findBone(this.inner, armKey) ?? findBone(this.inner, armKey === 'LArm' ? 'RArm' : 'LArm');
+        const sl = L.sleeve ?? L.kit;
+        if (sl && arm) {
+          const map = kitTex(`sleeve|${sl.id}|${v}`, 256, 160, (g) => drawLogo(g, sl, v, 0, 0, 256, 160, 0.06));
+          add(arm, map, H * 0.07, H * 0.044, new THREE.Vector3(asset.sleeve.x + H * 0.006, asset.sleeve.y, asset.sleeve.z), Math.PI / 2);
+        }
+        const shortsV = kitVariant(team.kit.shorts);
+        const legKey = asset.shorts.x > 0 ? 'LUpLeg' : 'RUpLeg';
+        const leg = findBone(this.inner, legKey);
+        if (L.kit && leg) {
+          const map = kitTex(`shorts|${L.kit.id}|${shortsV}`, 256, 128, (g) => drawLogo(g, L.kit!, shortsV, 0, 0, 256, 128, 0.06));
+          add(leg, map, H * 0.05, H * 0.025, new THREE.Vector3(asset.shorts.x, asset.shorts.y, asset.shorts.z + H * 0.008), 0);
+        }
+      }
     }
 
     if (head) {

@@ -50,6 +50,7 @@ export function WorldCup({ go }: { go: Go }) {
     audio.click();
     const userHome = next.home === w.user;
     const cfg = buildMatch(nationTeam(w.user), nationTeam(userHome ? next.away : next.home), userHome, p);
+    cfg.competition = 'wc';
     Object.assign(cfg, occasion(next.stage));
     const fid = next.id;
     go({ name: 'match', cfg, back: { name: 'worldcup' }, onFinish: (r) => finishWcMatch(cfg, fid, r) });

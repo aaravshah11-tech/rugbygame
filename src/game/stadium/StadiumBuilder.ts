@@ -7,6 +7,8 @@ import { buildCrowd } from './crowd';
 import { buildSchoolGround } from './fields';
 import { buildPitch } from './pitch';
 import { buildPitchside } from './pitchside';
+import { buildSponsorDressing } from './sponsorDressing';
+import { padTextureWithLogo } from '../../sponsors/textures';
 import { bakeStandShadows } from './shadows';
 import { buildSnow } from './weather';
 import { buildSurroundings } from './surroundings';
@@ -31,9 +33,10 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   const snow = ctx.weather === 'snow' ? buildSnow(group, ctx.quality) : null;
   // posts padded in the home side's colours; the pitch mown the ground's own way
   void postPads;
-  buildPitch(group, renderer, pitchPx, [ctx.home.primary, ctx.home.primary], { mow: spec.pitch.mow, inGoal: spec.pitch.inGoal, artificial: spec.pitch.artificial, wet: ctx.weather === 'rain' ? 1 : 0 }, ctx.home.secondary);
+  buildPitch(group, renderer, pitchPx, [ctx.home.primary, ctx.home.primary], { mow: spec.pitch.mow, inGoal: spec.pitch.inGoal, artificial: spec.pitch.artificial, wet: ctx.weather === 'rain' ? 1 : 0 }, ctx.home.secondary, ctx.sponsors ? (c) => padTextureWithLogo(c, ctx.home.secondary, ctx.sponsors!.posts) : undefined);
 
   const right = new THREE.Vector3();
+  let screensRef: { ident: (s: import('../../data/sponsors').Sponsor, c: string, t: number) => void } | null = null;
   // crowd mood, driven by match events
   const mood = { cheerH: 0, cheerA: 0, sadH: 0, sadA: 0, flash: 0 };
   const event = (e: StadiumEvent) => {
@@ -41,12 +44,15 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     else if (e === 'tryAway') Object.assign(mood, { cheerA: 1, sadH: 1, flash: 4 });
     else if (e === 'missHome') mood.sadH = 1;
     else if (e === 'missAway') mood.sadA = 1;
+    else if (e === 'replay' && ctx.sponsors) screensRef?.ident(ctx.sponsors.replay, 'Replay brought to you by', 4);
+    else if (e === 'kickoff' && ctx.sponsors) screensRef?.ident(ctx.sponsors.title, 'In association with', 9);
   };
 
   if (spec.layout === 'fields') {
     const crowd = [ctx.home.primary, ctx.home.primary, ctx.home.secondary, ctx.away.primary, ctx.away.secondary];
     const ground = buildSchoolGround(group, ctx.quality, crowd, spec, key);
     const side = buildPitchside(group, spec, ctx, null);
+    if (ctx.sponsors) buildSponsorDressing(group, ctx.sponsors, ctx, null);
     return { spec, group, key, sunDir, time: ctx.time, bounds: { radius: 140, top: 14 }, event, setScore: () => {}, setWind: side.setWind, setTorches: () => {}, update: (t, ex, cam) => (ground.update(t, ex, cam), side.update(t, cam), sky.update(t), snow?.update(t, cam)) };
   }
 
@@ -61,7 +67,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     else if (m instanceof THREE.MeshBasicMaterial) m.color.multiplyScalar(0.25 + 0.75 * lightsOn);
     else if (m instanceof THREE.MeshStandardMaterial) m.emissiveIntensity = 0.05 + 0.3 * lightsOn;
   }
-  const boards = buildBoards(group, spec, stands, ctx.home.primary);
+  const boards = buildBoards(group, spec, stands, ctx.home.primary, ctx);
   // the world outside, the ground's signature feature and its big screens
   const maxBack = Math.max(...stands.runs.map((r) => r.backD), 6);
   const radius = Math.max(Math.abs(stands.front.endR), Math.abs(stands.front.opp)) + maxBack + 8;
@@ -77,8 +83,10 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
   group.add(land);
   buildSurroundings(group, spec, ctx, radius);
   buildSignature(group, spec, ctx, stands, radius);
-  const drawScore = buildScreens(group, spec, stands);
+  const screens = buildScreens(group, spec, stands, ctx.sponsors ?? null);
+  screensRef = screens;
   const side = buildPitchside(group, spec, ctx, stands);
+  if (ctx.sponsors) buildSponsorDressing(group, ctx.sponsors, ctx, stands);
   if (spec.track) {
     // athletics track: a ring on the ground between the pitch and the stands
     const t = new THREE.Mesh(new THREE.RingGeometry(1, 1.12, 64, 1), new THREE.MeshStandardMaterial({ color: spec.track, roughness: 0.95 }));
@@ -98,7 +106,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     time: ctx.time,
     bounds: { radius, top: Math.max(roofs.maxY, ...stands.runs.map((r) => r.topY), 12) },
     event,
-    setScore: drawScore,
+    setScore: screens.setScore,
     setWind: side.setWind,
     setTorches: crowd.setTorches,
     update(time, excite, camera) {
@@ -123,6 +131,7 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
       snow?.update(time, camera);
       boards.update(time, mood.flash);
       side.update(time, camera);
+      screens.update(time);
     },
   };
 }

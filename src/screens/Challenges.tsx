@@ -61,6 +61,7 @@ export function Challenges({ go }: { go: Go }) {
   const play = (sc: Scenario) => {
     audio.click();
     const base = buildMatch(nationTeam(sc.user), nationTeam(sc.cpu), true, getProfile());
+    base.competition = 'challenge';
     const cfg: MatchConfig = { ...base, challenge: sc };
     go({ name: 'match', cfg, back: { name: 'challenges' }, onFinish: (r) => finishChallenge(cfg, sc, r) });
   };

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { makeCrowd } from './crowd';
 import type { StandsResult } from './stands';
 import type { StadiumContext, StadiumSpec } from './types';
+import { flagTexture } from '../../sponsors/textures';
 
 export interface PitchsideResult {
   /** wind for the flags (m/s, x and z) */
@@ -18,14 +19,15 @@ export function buildPitchside(group: THREE.Group, spec: StadiumSpec, ctx: Stadi
   const low = ctx.quality.level === 'low';
 
   // ---------------------------------------------------------------- flags
-  const flagU = { uTime: { value: 0 }, uWind: { value: new THREE.Vector2(2, 0) }, uColor: { value: new THREE.Color(ctx.home.primary) } };
+  const flagU = { uTime: { value: 0 }, uWind: { value: new THREE.Vector2(2, 0) }, uColor: { value: new THREE.Color(ctx.home.primary) }, uMap: { value: (ctx.sponsors ? flagTexture(ctx.sponsors.flags) : null) as THREE.Texture | null }, uUseMap: { value: ctx.sponsors ? 1 : 0 } };
   const flagMat = new THREE.ShaderMaterial({
     uniforms: flagU,
     side: THREE.DoubleSide,
     vertexShader: `
       uniform float uTime; uniform vec2 uWind;
-      varying float vShade;
+      varying float vShade; varying vec2 vUv;
       void main() {
+        vUv = uv;
         vec3 p = position;
         // cloth hangs from the pole (x = 0) and streams downwind; ripples run along it
         float along = clamp(p.x / 0.55, 0.0, 1.0);
@@ -40,9 +42,10 @@ export function buildPitchside(group: THREE.Group, spec: StadiumSpec, ctx: Stadi
         gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
       }`,
     fragmentShader: `
-      uniform vec3 uColor; varying float vShade;
+      uniform vec3 uColor; uniform sampler2D uMap; uniform float uUseMap; varying float vShade; varying vec2 vUv;
       void main() {
-        gl_FragColor = vec4(uColor * vShade, 1.0);
+        vec3 c = uUseMap > 0.5 ? texture2D(uMap, vUv).rgb : uColor;
+        gl_FragColor = vec4(c * vShade, 1.0);
         #include <colorspace_fragment>
       }`,
   });
