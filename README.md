@@ -43,8 +43,9 @@ Production builds ignore both.
 
 | Area | Where |
 | --- | --- |
-| Match engine: phases, AI, rules, ball physics, set pieces, camera | `src/game/engine.ts` and `src/game/engine/` |
-| Tuning numbers (speeds, reach, stamina, timings) | `src/game/gameConfig.ts` |
+| Match engine: state, loop, HUD, scene setup | `src/game/engine.ts` |
+| Engine logic: `input`, `ai`, `contact` (tackles/offloads), `ball` (passing/kicking/physics), `rules`, `setpieces`, `drills`, `view` (render/replay/camera) | `src/game/engine/` |
+| Tuning numbers (speeds, stamina, tackle reach, kick lengths, difficulty tables, prompt timeouts) | `src/game/gameConfig.ts` |
 | Players, animation, kits, stadiums, effects, quality | `src/game/view/` |
 | Touch controls (joystick, buttons, kick aim, layout editor support) | `src/ui/controls.tsx` |
 | Mini-games, goal-kick swipe, score bug, scrum push | `src/ui/overlays.tsx` |
