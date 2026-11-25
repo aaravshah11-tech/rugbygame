@@ -166,6 +166,8 @@ export interface AvatarOptions {
   skin: number;
   hair: number;
   scrumCap: boolean;
+  /** body size multiplier (taller and broader) */
+  size?: number;
 }
 
 export class Avatar {
@@ -271,9 +273,10 @@ export class Avatar {
       b.position.copy(b.parent.worldToLocal(wp));
     }
 
-    const targetH = o.forward ? (o.num === 4 || o.num === 5 ? 1.98 : o.num <= 3 ? 1.84 : 1.9) : o.num === 9 ? 1.75 : 1.83;
+    const size = o.size ?? 1;
+    const targetH = (o.forward ? (o.num === 4 || o.num === 5 ? 1.98 : o.num <= 3 ? 1.84 : 1.9) : o.num === 9 ? 1.75 : 1.83) * size;
     const s = targetH / (H * 1.02);
-    const bulk = (o.forward ? 1.15 : 1) * 1.08;
+    const bulk = (o.forward ? 1.15 : 1) * 1.08 * (1 + (size - 1) * 1.6); // big men are broader, not just taller
     this.height = targetH;
     this.inner.scale.set(s * bulk, s, s * bulk);
     this.inner.rotation.y = Math.PI / 2; // model faces +Z; the game's local forward is +X

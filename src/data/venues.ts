@@ -28,8 +28,10 @@ export interface Venue {
   towers: boolean;
   /** what's on the ends with no stand */
   bank?: string;
-  /** share of seats filled */
+  /** share of seats filled (fields: how busy the touchline is) */
   fill: number;
+  /** 'fields' = a school ground: open fields, pavilion, no stands */
+  kind?: 'stadium' | 'fields';
 }
 
 const V = (v: Venue) => v;
@@ -61,7 +63,7 @@ export const VENUES: Record<string, Venue> = {
   NEW: V({ name: 'Kingston Park', city: 'Newcastle', tiers: { main: 1, opp: 1, endL: 1, endR: 1, corners: 0 }, lowerRows: 10, roof: 'stands', roofColor: '#c9ced4', seats: ['#0d1b3e', '#d4002a'], towers: true, fill: 0.85 }),
   NOR: V({ name: "cinch Stadium at Franklin's Gardens", city: 'Northampton', tiers: { main: 1, opp: 1, endL: 1, endR: 1, corners: 1 }, lowerRows: 14, roof: 'stands', roofColor: '#ccd1d7', seats: ['#0a5c36', '#c9a227'], towers: false, fill: 0.97 }),
   // ---- schools
-  BGS: V({ name: 'Failand Sports Fields', city: 'Bristol', tiers: { main: 1, opp: 0, endL: 0, endR: 0, corners: 0 }, lowerRows: 4, roof: 'stands', roofSides: { main: true }, roofColor: '#cfd4da', seats: ['#6d1830', '#1c2452'], towers: false, bank: '#3b6b2b', fill: 0.35 }),
+  BGS: V({ name: 'Failand Sports Fields', city: 'Bristol', kind: 'fields', tiers: { main: 0, opp: 0, endL: 0, endR: 0, corners: 0 }, lowerRows: 0, roof: 'none', roofColor: '#cfd4da', seats: ['#6d1830', '#1c2452'], towers: false, fill: 0.5 }),
   SAL: V({ name: 'Salford Community Stadium', city: 'Salford', tiers: { main: 1, opp: 1, endL: 1, endR: 1, corners: 0 }, lowerRows: 12, roof: 'stands', roofColor: '#ccd1d7', seats: ['#0b2a5b', '#4aa3df'], towers: true, fill: 0.88 }),
 };
 

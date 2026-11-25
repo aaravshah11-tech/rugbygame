@@ -16,30 +16,30 @@
 export const BENCH_POS = [2, 1, 3, 4, 7, 9, 10, 13];
 
 export const REAL_SQUADS: Record<string, string> = {
-  // BGS U16A v Clifton College, Sat 19 Sep 2026 (won). Coach: Mr Scott. Home: Failand Sports Fields.
-  // T Hargreaves added at 6; HJ Want (6 on the sheet) moves to the bench as back-row cover.
-  // A Shah starts at 14 (fastest, highest rated); LR Durrance (14 on the sheet) is wing cover on the bench.
-  // LJ Vanstone at 9, SE Davis at 10 (very quick, second only to Shah); B Webber in for I White at 13.
+  // BGS U16A, latest team sheet. Standbys go on the bench; HT Searle (standby) plays 8.
+  // A Shah starts at 14: the biggest, strongest and fastest player in the game.
+  // OF Ketterer (14 on the sheet) and AA Reavley (8) are on the bench.
+  // LJ Vanstone is a liability (drops it, misses tackles, wild passes); SE Davis is very quick (second to Shah).
   BGS: `
-MA Wright|69|S
-GL Collinson|68|
-JD Millard|69|S
-B Bann|68|
-B Collier|68|
-T Hargreaves|70|T
-AA Reavley|70|T
-HT Searle|72|S||C
-LJ Vanstone|71|A
-SE Davis|70|K pace=87||VC
-F Barnes|71|P||VC
-AO Griffiths|69|
-B Webber|69|
-A Shah|80|PP
-OF Ketterer|71|K
-C Ellis|67|
-HA Vieten-Kay|67|
-LR Durrance|69|P|14
-HJ Want|69|T|6`,
+MA Wright|71|S
+GL Collinson|70|||VC
+JD Millard|71|S
+B Collier|70|
+TJ Hargreaves|72|T||VC
+T Garner|71|T
+HJ Want|71|T
+HT Searle|74|S
+LJ Vanstone|38|pace=34 strength=30 passing=24 kicking=22 tackling=20 handling=22||VC
+SE Davis|72|K pace=87||VC
+AO Griffiths|73||11
+B Webber|71|||C
+LR Durrance|71|P
+A Shah|94|PS pace=99 strength=99 tackling=90 handling=92 size=1.14
+HA Vieten-Kay|71|K
+MP Medwell|68|
+AA Reavley|72|T|8|VC
+OF Ketterer|73|K|15
+C Ellis|67||4`,
   ENG: `
 Fin Baxter|81|
 Jamie George|83|

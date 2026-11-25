@@ -398,7 +398,7 @@ export class MatchEngine {
         const h = Math.abs(hashCode(pl.id + 'h'));
         // Some forwards wear scrum caps (hooker, locks, flankers more often than not).
         const scrumCap = [2, 4, 5, 6, 7].includes(i + 1) && h % 3 !== 0;
-        const av: Visual = asset && kit ? new Avatar(asset, kit, { num: i + 1, forward: i < 8, skin, hair: h % 6, scrumCap }) : new LegacyVisual(team.kit, skin, i < 8);
+        const av: Visual = asset && kit ? new Avatar(asset, kit, { num: i + 1, forward: i < 8, skin, hair: h % 6, scrumCap, size: pl.size }) : new LegacyVisual(team.kit, skin, i < 8);
         av.root.rotation.order = 'YXZ'; // heading first, then the body lean in the player's own frame
         this.scene.add(av.root);
         const p: P = {
