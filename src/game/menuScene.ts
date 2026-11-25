@@ -82,8 +82,9 @@ export class MenuScene {
     this.ball.scale.setScalar(1.3);
     this.scene.add(this.ball);
 
-    this.buildFloodlights(level !== 'low');
-    if (level !== 'low') this.buildTorches();
+    // Light beams and phone torches (custom shaders) are off: on iPad they showed as black blocks
+    // through the bloom pass. The floodlight flares are plain sprites and stay.
+    this.buildFloodlights(false);
     this.lightsT = opts.intro ? 0 : 99;
 
     void loadPlayerAsset(this.renderer).then((asset) => {
@@ -203,55 +204,6 @@ export class MenuScene {
     });
   }
 
-  /** Phone torches: small flickering lights scattered through the stands. */
-  private buildTorches() {
-    const N = 420;
-    const pos = new Float32Array(N * 3);
-    const seed = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      // round the stadium bowl: a rounded rectangle just outside the boards, rising with distance
-      const d = 3 + Math.random() * 26;
-      const a = Math.random() * Math.PI * 2;
-      const hx = 66 + d;
-      const hz = 42 + d;
-      const c = Math.cos(a);
-      const s = Math.sin(a);
-      const k = 1 / Math.max(Math.abs(c) / hx, Math.abs(s) / hz);
-      pos[i * 3] = c * k;
-      pos[i * 3 + 1] = 1.8 + d * 0.62;
-      pos[i * 3 + 2] = s * k;
-      seed[i] = Math.random() * 100;
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
-    this.torchMat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      uniforms: { uTime: { value: 0 }, uOn: { value: 1 }, uScale: { value: 1 } },
-      vertexShader: `attribute float aSeed; uniform float uTime; uniform float uScale; varying float vA;
-        void main(){
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          // each torch fades in and out on its own slow cycle, with a little shimmer
-          float cyc = 0.5 + 0.5 * sin(uTime * (0.35 + fract(aSeed) * 0.5) + aSeed);
-          vA = smoothstep(0.35, 1.0, cyc) * (0.75 + 0.25 * sin(uTime * 9.0 + aSeed * 3.0));
-          gl_PointSize = uScale * 180.0 / -mv.z;
-          gl_Position = projectionMatrix * mv;
-        }`,
-      fragmentShader: `uniform float uOn; varying float vA;
-        void main(){
-          float r = length(gl_PointCoord - 0.5);
-          float a = smoothstep(0.5, 0.0, r);
-          a = clamp(a * a * vA * uOn, 0.0, 1.0);
-          gl_FragColor = vec4(vec3(1.0, 0.98, 0.92) * a, a);
-        }`,
-    });
-    const pts = new THREE.Points(g, this.torchMat);
-    pts.frustumCulled = false;
-    this.scene.add(pts);
-  }
-
   // ---------------------------------------------------------------- per frame
   private tick(dt: number) {
     const rm = !!this.opts.reduceMotion;
@@ -268,7 +220,7 @@ export class MenuScene {
       for (const s of b.sprites) {
         const m = s.material as THREE.SpriteMaterial;
         // gentle shimmer once on
-        m.opacity = k * (0.9 + 0.1 * Math.sin(t * 7 + s.position.x));
+        m.opacity = Math.min(1, k) * (0.9 + 0.1 * Math.sin(t * 7 + s.position.x));
       }
       (b.shaft.material as THREE.ShaderMaterial).uniforms.uOn.value = Math.min(1, k);
     });
