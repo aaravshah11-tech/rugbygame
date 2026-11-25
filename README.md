@@ -35,7 +35,7 @@ Production builds ignore both.
   - Generated as skeletal clips from the Idle pose: pass, catch, kick, tackle, dive, sidestep and ruck-bind.
   - Clips are retargeted by bone name. Anything that fails to match falls back to Idle, so players never T-pose. Crossfades are 0.2 s; walk/run keep their stride phase when switching and play back at the measured stride speed.
 - **Squad Viewer:** Settings → Squad Viewer shows all 15 players of any team on turntables, with buttons for every animation.
-- **Stadiums:** each home side has its own ground (`src/data/venues.ts`), built by `src/game/view/stadium.ts` from a description: tiers per stand, open corners, grass banks, roof type (stands / closed / translucent), track, masts, seat colours and floodlights. Instanced billboard crowd in home colours that reacts to the play, scrolling LED boards with the ground's name, evening sky and PBR image lighting. Grass with mowing stripes and crisp lines; 16 m posts with team-coloured pads.
+- **Stadiums:** every home side has its own ground, described by a `StadiumSpec` in `src/game/stadium/stadiumSpecs.ts` (capacity tier, stands and tiers per side, roof types, seat patterns, cladding, floodlights, big screens, surroundings, signature feature, mowing pattern) and built procedurally by `src/game/stadium/` (stands with aisles, vomitories, boxes, terraces and tunnel; cantilever / translucent / closing roofs; pitch and pitchside; reactive instanced crowd with flags, banners and phone torches; sky, time of day and weather; surroundings; signature structures; big screens). Kick-off is afternoon, golden hour or night per fixture. A Stadiums gallery opens from the venue chip in Quick Match.
 - **Effects:** ACES tone mapping and bloom, a real shadow on the six players nearest the ball plus blob shadows for everyone, a ball glow and trail, dust on tackles, confetti on tries, a TRY! banner and a slow-motion replay.
 - **Quality:** Auto/Low/Medium/High in Settings. Auto chooses from the screen resolution, then steps down (and finally caps to 30 fps) if the frame rate drops. Low turns off shadows and bloom and thins the crowd.
 
@@ -46,7 +46,8 @@ Production builds ignore both.
 | Match engine: state, loop, HUD, scene setup | `src/game/engine.ts` |
 | Engine logic: `input`, `ai`, `contact` (tackles/offloads), `ball` (passing/kicking/physics), `rules`, `setpieces`, `drills`, `view` (render/replay/camera) | `src/game/engine/` |
 | Tuning numbers (speeds, stamina, tackle reach, kick lengths, difficulty tables, prompt timeouts) | `src/game/gameConfig.ts` |
-| Players, animation, kits, stadiums, effects, quality | `src/game/view/` |
+| Players, animation, kits, effects, quality, viewers | `src/game/view/` |
+| Stadiums: specs and the builder (stands, roofs, pitch, crowd, lights, weather, surroundings, signatures) | `src/game/stadium/` |
 | Touch controls (joystick, buttons, kick aim, layout editor support) | `src/ui/controls.tsx` |
 | Mini-games, goal-kick swipe, score bug, scrum push | `src/ui/overlays.tsx` |
 | Teams, squads, logos, venues | `src/data/`, `public/logos/` |
