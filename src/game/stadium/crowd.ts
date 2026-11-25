@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { fanAtlas } from './textures';
+import type { SeatSpot } from './stands';
+import type { StadiumContext, StadiumSpec } from './types';
 
 /** Camera-facing crowd billboards: one instance per spectator (offset, shirt colour, params). */
 export function makeCrowd(offsets: number[], colors: number[], params: number[]) {
@@ -52,4 +54,43 @@ export function makeCrowd(offsets: number[], colors: number[], params: number[])
   const crowd = new THREE.Mesh(cg, crowdMat);
   crowd.frustumCulled = false;
   return { mesh: crowd, uniforms: crowdUniforms };
+}
+
+
+const BUDGET = { low: 3500, medium: 9000, high: 18000 } as const;
+
+/**
+ * Seat the crowd: fill from the spec and the match's importance, home colours in the majority,
+ * the away fans grouped together behind one end. Only as many fans as the graphics setting allows
+ * (each one stands for a few real seats).
+ */
+export function buildCrowd(group: THREE.Group, seats: SeatSpot[], spec: StadiumSpec, ctx: StadiumContext) {
+  const fill = Math.min(1, spec.fill * (0.55 + 0.45 * ctx.importance) + 0.04);
+  const budget = BUDGET[ctx.quality.level];
+  const stride = Math.max(1, (seats.length * fill) / budget);
+  const home = [ctx.home.primary, ctx.home.primary, ctx.home.secondary, ctx.home.primary].map((c) => new THREE.Color(c));
+  const away = [ctx.away.primary, ctx.away.primary, ctx.away.secondary].map((c) => new THREE.Color(c));
+  const neutrals = ['#2b3346', '#4a5366', '#6b7280', '#1f2937', '#8a8f9c', '#b33a3a', '#e8e4da'].map((c) => new THREE.Color(c));
+  // away end: the left end if it has seats, else one corner of the main stand
+  const awaySide = seats.some((s) => s.side === 'endL') ? 'endL' : null;
+  const isAway = (s: SeatSpot) => (awaySide ? s.side === awaySide : s.side === 'main' && s.u < 0.12);
+  const offsets: number[] = [];
+  const colors: number[] = [];
+  const params: number[] = [];
+  let acc = Math.random() * stride;
+  for (const s of seats) {
+    acc += 1;
+    if (acc < stride) continue;
+    acc -= stride;
+    if (Math.random() > fill) continue;
+    offsets.push(s.x, s.y + (s.standing ? 0.05 : -0.12), s.z);
+    const pal = isAway(s) ? away : home;
+    const c = (Math.random() < 0.8 ? pal[Math.floor(Math.random() * pal.length)] : neutrals[Math.floor(Math.random() * neutrals.length)]).clone();
+    c.multiplyScalar(0.75 + Math.random() * 0.3);
+    colors.push(c.r, c.g, c.b);
+    params.push(Math.random(), Math.random() < 0.5 ? 0 : 1, Math.random());
+  }
+  const crowd = makeCrowd(offsets, colors, params);
+  group.add(crowd.mesh);
+  return crowd;
 }

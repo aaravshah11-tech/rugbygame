@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { buildSkyAndLights } from './lights';
-import { buildRingStadium } from './stands';
+import { buildStands } from './stands';
+import { buildRoofs } from './roof';
+import { buildBoards } from './boards';
+import { buildCrowd } from './crowd';
 import { buildSchoolGround } from './fields';
 import { buildPitch } from './pitch';
 import type { StadiumContext, StadiumEvent, StadiumSpec, StadiumView } from './types';
@@ -32,7 +35,27 @@ export function buildStadium(scene: THREE.Scene, renderer: THREE.WebGLRenderer, 
     return { spec, group, key, event, setScore: () => {}, update: (t, ex, cam) => ground.update(t, ex, cam) };
   }
 
-  const { crowdUniforms, led, boards } = buildRingStadium(group, spec, ctx);
+  // the ground the stadium stands on: a plaza ring, then grass out to the horizon
+  const plaza = new THREE.Mesh(new THREE.CircleGeometry(190, 48), new THREE.MeshStandardMaterial({ color: '#4b4f57', roughness: 0.95 }));
+  plaza.rotation.x = -Math.PI / 2;
+  plaza.position.y = -0.06;
+  group.add(plaza);
+  const land = new THREE.Mesh(new THREE.CircleGeometry(1400, 48), new THREE.MeshStandardMaterial({ color: '#2f4a28', roughness: 1 }));
+  land.rotation.x = -Math.PI / 2;
+  land.position.y = -0.1;
+  group.add(land);
+  const stands = buildStands(group, spec, ctx);
+  buildRoofs(group, spec, ctx, stands);
+  const { led, boards } = buildBoards(group, spec, stands);
+  if (spec.track) {
+    // athletics track: a ring on the ground between the pitch and the stands
+    const t = new THREE.Mesh(new THREE.RingGeometry(1, 1.12, 64, 1), new THREE.MeshStandardMaterial({ color: spec.track, roughness: 0.95 }));
+    t.rotation.x = -Math.PI / 2;
+    t.scale.set(74, 52, 1);
+    t.position.y = 0.012;
+    group.add(t);
+  }
+  const { uniforms: crowdUniforms } = buildCrowd(group, stands.seats, spec, ctx);
   return {
     spec,
     group,
