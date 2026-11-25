@@ -482,13 +482,19 @@ export function SquadBuilder({ go, initialTab }: { go: Go; initialTab?: string }
       {detail && <PlayerDetail player={byId.get(detail.id) ?? detail} owned={byId.has(detail.id)} onClose={() => setDetail(null)} />}
 
       {reveal && (
-        <div className="sheet" onClick={() => setReveal(null)}>
+        <div className="sheet packs-reveal-sheet" onClick={() => setReveal(null)}>
           <div className="card" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
             <h2>Pack opened!</h2>
             <div className="reveal" style={{ margin: '14px 0' }}>
-              {reveal.map((c, i) => (
-                <PlayerCard key={c.id} player={c} style={{ animationDelay: `${i * 0.25}s` }} />
-              ))}
+              {reveal.map((c, i) => {
+                const o = playerOvr(c);
+                return (
+                  <div key={c.id} className={`reveal-slot ${o >= 88 ? 'elite' : rarityOf(o)}`} style={{ '--d': `${0.2 + i * 0.35}s` } as React.CSSProperties}>
+                    <span className="burst" />
+                    <PlayerCard player={c} className="big" />
+                  </div>
+                );
+              })}
             </div>
             <button className="btn primary" onClick={() => setReveal(null)}>
               Add to club

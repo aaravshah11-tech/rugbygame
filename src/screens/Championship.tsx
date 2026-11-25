@@ -21,13 +21,13 @@ export function FixtureRow({ f, user }: { f: Fixture; user: string }) {
     pill = <span className={`pill ${us > them ? 'win' : us < them ? 'loss' : ''}`}>{us > them ? 'W' : us < them ? 'L' : 'D'}</span>;
   }
   return (
-    <div className="row" style={{ padding: '6px 0', borderTop: '1px solid var(--line)', fontWeight: 800, fontStyle: 'italic', color: mine ? 'var(--text)' : 'var(--muted)' }}>
-      <TeamLogo id={H.id} size={22} />
-      <span className="grow">{H.short}</span>
-      <span style={{ minWidth: 64, textAlign: 'center' }}>{f.played ? `${f.homeScore} – ${f.awayScore}` : 'vs'}</span>
-      <span className="grow" style={{ textAlign: 'right' }}>{A.short}</span>
-      <TeamLogo id={A.id} size={22} />
-      <span style={{ width: 24 }}>{pill}</span>
+    <div className={`fx ${mine ? 'mine' : ''}`} style={{ '--h': H.kit.primary, '--a': A.kit.primary } as React.CSSProperties}>
+      <TeamLogo id={H.id} size={24} />
+      <span className="grow fx-name">{H.short}</span>
+      <span className={`fx-score ${f.played ? 'ft' : ''}`}>{f.played ? `${f.homeScore} – ${f.awayScore}` : 'v'}</span>
+      <span className="grow fx-name" style={{ textAlign: 'right' }}>{A.short}</span>
+      <TeamLogo id={A.id} size={24} />
+      <span className="fx-pill">{pill}</span>
     </div>
   );
 }

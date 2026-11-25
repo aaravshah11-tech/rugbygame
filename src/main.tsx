@@ -11,9 +11,13 @@ import '@fontsource/inter/700.css';
 import './styles.css';
 import './theme.css';
 import './menu.css';
+import './screens.css';
+import './hud.css';
 import { installTapFeedback } from './ui/tap';
+import { installTilt } from './ui/tilt';
 
 installTapFeedback();
+installTilt();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

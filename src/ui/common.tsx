@@ -68,8 +68,15 @@ export function PlayerCard({
     );
   const pos = slot ?? player.position;
   const ovr = playerOvr(player, pos, boost);
+  const base = playerOvr(player);
+  // the shine follows a finger dragged over the card (and the phone's tilt, via CSS)
+  const shine = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--hx', ((e.clientX - r.left) / r.width).toFixed(3));
+    e.currentTarget.style.setProperty('--hy', ((e.clientY - r.top) / r.height).toFixed(3));
+  };
   return (
-    <div className={`pcard ${rarityOf(playerOvr(player))} ${className}`} style={style} onPointerDown={onPointerDown} onClick={onClick}>
+    <div className={`pcard ${rarityOf(base)} ${base >= 88 ? 'elite' : ''} ${className}`} style={style} onPointerDown={onPointerDown} onPointerMove={shine} onClick={onClick}>
       <span className="ovr">{ovr}</span>
       <span className="pos">{posInfo(player.position).short}</span>
       <span className="flag" style={{ backgroundImage: `url(${flag})` }} />

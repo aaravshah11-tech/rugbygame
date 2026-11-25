@@ -20,6 +20,7 @@ export function ScoreBug({
   return (
     <div className="scorebug">
       <div className="team">
+        <i className="strip" style={{ background: left.color }} />
         <TeamLogo id={left.id} size={22} />
         {left.short}
       </div>
@@ -29,6 +30,7 @@ export function ScoreBug({
       <div className="team">
         {right.short}
         <TeamLogo id={right.id} size={22} />
+        <i className="strip" style={{ background: right.color }} />
       </div>
       <div className={`clock ${hud.timeUp ? 'up' : ''}`}>
         <small>{hud.half === 1 ? '1H' : '2H'}</small>

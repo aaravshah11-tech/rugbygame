@@ -6,6 +6,7 @@ import { createInput, type KickKind, type EngineEvent, type EngineResult, type H
 import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker, KickTypeChooser } from '../ui/controls';
 import { MiniGame, PlaceKickUI, PROMPT_TIMEOUT, ScoreBug, ScrumBattle, usePromptTimeout, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
+import { TeamLogo } from '../ui/logos';
 import { TacticsPanel } from '../ui/tactics';
 import { CustomPlaysEditor } from '../ui/setplays';
 import { update, useProfile } from '../state/store';
@@ -210,8 +211,30 @@ export function MatchScreen({
       )}
       {intro && !howTo && (
         <div className="intro-card" onPointerDown={() => engine.current?.skipIntro()}>
-          <div className="intro-title">{intro.title}</div>
-          <div className="intro-sub">{intro.sub}</div>
+          {cfg.drill || cfg.challenge ? (
+            <>
+              <div className="intro-title">{intro.title}</div>
+              <div className="intro-sub">{intro.sub}</div>
+            </>
+          ) : (
+            // broadcast-style versus card: badges slam in from each side
+            <div className="vs">
+              {[userIsHome ? cfg.user : cfg.cpu, userIsHome ? cfg.cpu : cfg.user].map((t, i) => (
+                <div key={t.id} className={`vs-team ${i ? 'r' : 'l'}`} style={{ '--kit': t.kit.primary } as React.CSSProperties}>
+                  <TeamLogo id={t.id} size={64} />
+                  <b>{t.name}</b>
+                </div>
+              ))}
+              <div className="vs-v">V</div>
+              <div className="vs-venue">
+                <span className="vs-wx" aria-label={cfg.weather === 'rain' ? 'Rain' : 'Dry'}>{cfg.weather === 'rain' ? '🌧' : '☾'}</span>
+                {intro.sub}
+              </div>
+              <button className="btn primary vs-go" onPointerDown={(e) => (e.stopPropagation(), engine.current?.skipIntro())}>
+                Kick off
+              </button>
+            </div>
+          )}
           <div className="intro-skip">Tap to skip</div>
         </div>
       )}
@@ -276,6 +299,7 @@ export function MatchScreen({
             ))}
           </div>
         )}
+        {tryBanner && <div className={`try-flash ${tryBanner.user ? '' : 'them'}`} key={'f' + tryBanner.id} />}
         {tryBanner && (
           <div className={`try-banner ${tryBanner.user ? '' : 'them'}`} key={tryBanner.id}>
             <div className="try-word">TRY!</div>
@@ -329,7 +353,7 @@ export function MatchScreen({
             </div>
           </div>
         )}
-        {showControls && hud.canDiveTry && (
+        {showControls && !paused && hud.canDiveTry && (
           <button className="dive-try-btn" onPointerDown={() => input.current.actions.push({ type: 'diveTry' })}>
             DIVE!
             <small>for the line</small>
@@ -652,7 +676,7 @@ export function MatchScreen({
       )}
 
       {outcome && (
-        <div className="sheet">
+        <div className="sheet fulltime">
           <div className="card" style={{ textAlign: 'center' }}>
             <h2>{outcome.title}</h2>
             {!cfg.drill && (
@@ -752,10 +776,10 @@ function StatsTable({ st, user, cpu, potm = false }: { st: import('../game/types
         <span />
         <b>{cpu}</b>
       </div>
-      {rows.map(([label, [a, b], unit]) => {
+      {rows.map(([label, [a, b], unit], i) => {
         const t = a + b || 1;
         return (
-          <div key={label} className="stats-row">
+          <div key={label} className="stats-row" style={{ '--i': i } as React.CSSProperties}>
             <b>{a}{unit}</b>
             <div>
               <small>{label}</small>

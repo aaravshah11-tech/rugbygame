@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { KitPreviewScene } from '../game/view/kitPreview';
+import { nationSquad } from '../data/players';
 import { TeamLogo } from '../ui/logos';
 import type { Go } from '../App';
 import { CLUBS, NATIONS, nationById } from '../data/nations';
@@ -28,6 +30,18 @@ export function QuickMatch({ go }: { go: Go }) {
       setAway(id);
       setPicking('home');
     }
+  };
+
+  // swipe on the showcase: next / previous team for the side being picked
+  const order = [...NATIONS, ...CLUBS].map((n) => n.id);
+  const swipeTeam = (dir: 1 | -1) => {
+    const cur = picking === 'home' ? home : away;
+    const other = picking === 'home' ? away : home;
+    let i = order.indexOf(cur);
+    do i = (i + dir + order.length) % order.length;
+    while (order[i] === other);
+    if (picking === 'home') setHome(order[i]);
+    else setAway(order[i]);
   };
 
   const start = () => {
@@ -80,6 +94,7 @@ export function QuickMatch({ go }: { go: Go }) {
             </div>
           ))}
         </div>
+        <TeamShowcase id={picking === 'home' ? home : away} side={picking} onSwipe={(dir) => swipeTeam(dir)} />
         <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 260, minHeight: 0 }}>
           <div className="row qm-teams" style={{ justifyContent: 'space-around' }}>
             <button className="nation-btn sel" onClick={() => setPicking('home')}>
@@ -133,6 +148,74 @@ export function QuickMatch({ go }: { go: Go }) {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const BARS: { label: string; of: (r: Record<string, number>) => number }[] = [
+  { label: 'Attack', of: (r) => (r.passing + r.handling) / 2 },
+  { label: 'Defence', of: (r) => r.tackling },
+  { label: 'Power', of: (r) => r.strength },
+  { label: 'Pace', of: (r) => r.pace },
+  { label: 'Kicking', of: (r) => r.kicking },
+];
+
+/** The team being picked: 3D player in the kit, badge, rating bars. Swipe to change team. */
+function TeamShowcase({ id, side, onSwipe }: { id: string; side: 'home' | 'away'; onSwipe: (dir: 1 | -1) => void }) {
+  const host = useRef<HTMLDivElement>(null);
+  const scene = useRef<KitPreviewScene | null>(null);
+  const n = nationById(id);
+  const accent = side === 'home' ? '#c6ff1a' : '#ff3d6e';
+  useEffect(() => {
+    const s = new KitPreviewScene(host.current!);
+    scene.current = s;
+    return () => s.dispose();
+  }, []);
+  useEffect(() => {
+    void scene.current?.showKit(n.kit, accent);
+  }, [id, accent]); // eslint-disable-line react-hooks/exhaustive-deps
+  const starters = nationSquad(id).starters;
+  const avg = (f: (r: Record<string, number>) => number) => Math.round(starters.reduce((a, p) => a + f(p.ratings), 0) / starters.length);
+  const down = useRef<number | null>(null);
+  return (
+    <div
+      className={`showcase ${side}`}
+      onPointerDown={(e) => (down.current = e.clientX)}
+      onPointerUp={(e) => {
+        if (down.current === null) return;
+        const dx = e.clientX - down.current;
+        down.current = null;
+        if (Math.abs(dx) > 40) onSwipe(dx < 0 ? 1 : -1);
+      }}
+    >
+      <div ref={host} className="showcase-3d" />
+      <div className="showcase-head" key={id}>
+        <TeamLogo id={id} size={44} />
+        <div>
+          <small>{side === 'home' ? 'Your team' : 'Opponent'}</small>
+          <b>{n.name}</b>
+        </div>
+        <span className="showcase-ovr">{nationOvr(id)}</span>
+      </div>
+      <div className="showcase-bars" key={id + '-bars'}>
+        {BARS.map((b, i) => {
+          const v = avg(b.of);
+          return (
+            <div key={b.label} className="sbar">
+              <span>{b.label}</span>
+              <i>
+                <em style={{ width: `${Math.max(4, ((v - 40) / 55) * 100)}%`, animationDelay: `${i * 0.06}s` }} />
+              </i>
+              <b>{v}</b>
+            </div>
+          );
+        })}
+      </div>
+      <div className="showcase-swipe">
+        <button aria-label="Previous team" onClick={() => onSwipe(-1)}>‹</button>
+        <span>swipe</span>
+        <button aria-label="Next team" onClick={() => onSwipe(1)}>›</button>
       </div>
     </div>
   );
