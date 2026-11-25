@@ -2,7 +2,7 @@
 import type { MatchEngine } from '../engine';
 import { clamp, rand } from '../../util/rng';
 import { CFG } from '../gameConfig';
-import { FIELD } from '../stadium';
+import { FIELD } from '../field';
 import { dirOf, dist, moveStats, other } from './shared';
 import type { P, Side } from './shared';
 

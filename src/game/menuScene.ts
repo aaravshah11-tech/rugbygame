@@ -2,8 +2,7 @@ import { disposeScene } from './view/dispose';
 import * as THREE from 'three';
 import { createBall } from './model';
 import type { Kit } from '../data/nations';
-import { buildStadium, GLOW_TEX } from './view/stadium';
-import { buildPitch } from './view/pitch';
+import { buildStadium, DEFAULT_SPEC, GLOW_TEX } from './stadium/index';
 import { PostFX } from './view/effects';
 import { preset, resolveQuality } from './view/quality';
 import { loadPlayerAsset, type AnimName } from './view/assets';
@@ -67,8 +66,14 @@ export class MenuScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(this.renderer.domElement);
     this.post = new PostFX(this.renderer, this.scene, this.camera, q);
-    const stadium = buildStadium(this.scene, this.renderer, q, [kit.primary, kit.secondary, '#21e6c1', '#c6ff1a']);
-    buildPitch(this.scene, this.renderer, 9, [kit.primary, kit.secondary]);
+    const stadium = buildStadium(
+      this.scene,
+      this.renderer,
+      DEFAULT_SPEC,
+      { quality: q, home: { primary: kit.primary, secondary: '#21e6c1' }, away: { primary: kit.secondary, secondary: '#c6ff1a' }, time: 'night', weather: 'dry', importance: 0.6 },
+      9,
+      [kit.primary, kit.secondary],
+    );
     // night haze: distance fog in the sky colour softens the far stands
     this.scene.fog = new THREE.FogExp2('#0b1024', 0.0042);
     const key = stadium.key;

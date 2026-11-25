@@ -10,16 +10,15 @@ import { dirOf, dist, hashCode, indicatorColor } from './engine/shared';
 import type { Ball, KickType, P, Phase, ReplayFrame, Side } from './engine/shared';
 import { CFG } from './gameConfig';
 import { createBall } from './model';
-import { FIELD } from './stadium';
+import { FIELD } from './field';
 import type { CommentaryTone, EngineEvent, EngineResult, HudState, InputAction, InputState, KickKind, MatchConfig, MiniGameKind, SetPlayId, TeamSetup } from './types';
 import type { AnimName, PlayerAsset } from './view/assets';
 import { Avatar, makeTeamKit } from './view/avatar';
 import { BallFx, Particles, PostFX, Selector } from './view/effects';
-import { buildPitch } from './view/pitch';
 import { FpsGovernor, preset, resolveQuality } from './view/quality';
 import type { QualityPreset } from './view/quality';
-import { buildStadium } from './view/stadium';
-import type { StadiumView } from './view/stadium';
+import { buildStadium, stadiumFor } from './stadium/index';
+import type { StadiumView } from './stadium/index';
 import { LegacyVisual } from './view/visual';
 import type { Visual } from './view/visual';
 import * as Inp from './engine/input';
@@ -236,9 +235,15 @@ export class MatchEngine {
     this.venue = venueFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id);
     const home = cfg.userIsHome ? cfg.user.kit : cfg.cpu.kit;
     const away = cfg.userIsHome ? cfg.cpu.kit : cfg.user.kit;
-    this.stadium = buildStadium(this.scene, this.renderer, this.quality, [home.primary, home.primary, home.secondary, home.primary, away.primary, away.secondary], this.venue);
     // The user's team defends the -x end, so those posts wear the user's colours.
-    buildPitch(this.scene, this.renderer, this.quality.pitchPxPerMetre, [cfg.user.kit.primary, cfg.cpu.kit.primary]);
+    this.stadium = buildStadium(
+      this.scene,
+      this.renderer,
+      stadiumFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id),
+      { quality: this.quality, home, away, time: 'night', weather: cfg.weather, importance: 0.8 },
+      this.quality.pitchPxPerMetre,
+      [cfg.user.kit.primary, cfg.cpu.kit.primary],
+    );
     this.buildTeams(asset);
 
     this.ballMesh = createBall();

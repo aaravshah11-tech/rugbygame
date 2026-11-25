@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FIELD } from '../stadium';
+import { FIELD } from '../field';
 
 /** Grass with mowing stripes, crisp painted lines and in-goal shading, drawn once to a canvas. */
 function pitchCanvas(pxPerM: number) {
@@ -119,7 +119,7 @@ function padTexture(color: string) {
   return t;
 }
 
-export function buildPitch(scene: THREE.Scene, renderer: THREE.WebGLRenderer, pxPerM: number, endColors: [string, string]) {
+export function buildPitch(parent: THREE.Object3D, renderer: THREE.WebGLRenderer, pxPerM: number, endColors: [string, string]) {
   const group = new THREE.Group();
   const map = new THREE.CanvasTexture(pitchCanvas(pxPerM));
   map.colorSpace = THREE.SRGBColorSpace;
@@ -159,6 +159,6 @@ export function buildPitch(scene: THREE.Scene, renderer: THREE.WebGLRenderer, px
     b.castShadow = true;
     group.add(b);
   });
-  scene.add(group);
+  parent.add(group);
   return group;
 }

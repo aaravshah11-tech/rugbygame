@@ -4,7 +4,7 @@ import { audio } from '../../util/audio';
 import { haptic } from '../../util/haptics';
 import { clamp, rand } from '../../util/rng';
 import { CFG } from '../gameConfig';
-import { FIELD } from '../stadium';
+import { FIELD } from '../field';
 import { dirOf, dist, line, other } from './shared';
 import type { P } from './shared';
 

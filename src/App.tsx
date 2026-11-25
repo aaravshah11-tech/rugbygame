@@ -16,7 +16,8 @@ import type { CompKind } from './state/comps';
 import { loadPlayerAsset } from './game/view/assets';
 import { MatchScreen, type MatchOutcome } from './screens/MatchScreen';
 import type { EngineResult, MatchConfig } from './game/types';
-import { applySettings, restoreFromIdb, runDailyCheck } from './state/store';
+import { applySettings, getProfile, restoreFromIdb, runDailyCheck } from './state/store';
+import { buildMatch, nationTeam } from './state/teams';
 import { unlockAudio } from './util/audio';
 
 export type Route =
@@ -42,8 +43,16 @@ export type Route =
 
 export type Go = (r: Route) => void;
 
+/** Dev builds: ?devmatch=ENG starts a match at that team's ground straight away (stadium checks). */
+function devRoute(): Route {
+  const id = import.meta.env.DEV ? new URLSearchParams(location.search).get('devmatch') : null;
+  if (!id) return { name: 'menu' };
+  const opp = id === 'NZL' ? 'ENG' : 'NZL';
+  return { name: 'match', cfg: buildMatch(nationTeam(id), nationTeam(opp), true, getProfile()), back: { name: 'menu' } };
+}
+
 export function App() {
-  const [route, setRoute] = useState<Route>({ name: 'menu' });
+  const [route, setRoute] = useState<Route>(devRoute);
 
   useEffect(() => {
     applySettings();

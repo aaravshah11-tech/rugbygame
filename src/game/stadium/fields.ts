@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import type { QualityPreset } from './quality';
-import type { Venue } from '../../data/venues';
-import { makeCrowd, type StadiumView } from './stadium';
+import type { QualityPreset } from '../view/quality';
+import { makeCrowd } from './crowd';
+import type { StadiumSpec } from './types';
 
 /**
  * A school sports ground instead of a stadium: open mown fields, the pavilion behind one
@@ -11,7 +11,7 @@ import { makeCrowd, type StadiumView } from './stadium';
  *
  * Game axes: the pitch runs along x (try lines at x = +-50), touchlines at z = +-35.
  */
-export function buildSchoolGround(group: THREE.Group, q: QualityPreset, crowdColors: string[], V: Venue, key: THREE.DirectionalLight): StadiumView {
+export function buildSchoolGround(group: THREE.Group, q: QualityPreset, crowdColors: string[], V: StadiumSpec, key: THREE.DirectionalLight) {
   const rnd = mulberry(0xb65);
 
   // ---------- the mown fields round the pitch (stripes like the photos)
@@ -112,8 +112,7 @@ export function buildSchoolGround(group: THREE.Group, q: QualityPreset, crowdCol
 
   const right = new THREE.Vector3();
   return {
-    key,
-    update(time, excite, camera) {
+    update(time: number, excite: number, camera: THREE.Camera) {
       uniforms.uTime.value = time;
       uniforms.uExcite.value = excite * 0.6;
       camera.getWorldDirection(right);

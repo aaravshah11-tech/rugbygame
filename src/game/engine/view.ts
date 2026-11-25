@@ -2,7 +2,7 @@
 import type { MatchEngine } from '../engine';
 import * as THREE from 'three';
 import { clamp } from '../../util/rng';
-import { FIELD } from '../stadium';
+import { FIELD } from '../field';
 import type { AnimName } from '../view/assets';
 import { ANIMS, G, GRUB_FRICTION, GRUB_KEEP, GRUB_REST, REPLAY_SPEED, SHADOW_BASIS, dirOf, dist } from './shared';
 import type { P, ReplayFrame } from './shared';

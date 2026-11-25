@@ -4,7 +4,7 @@ import { disposeScene } from './dispose';
 import { loadPlayerAsset } from './assets';
 import { Avatar, makeTeamKit } from './avatar';
 import { LegacyVisual, type Visual } from './visual';
-import { GLOW_TEX } from './stadium';
+import { GLOW_TEX } from '../stadium/textures';
 
 /**
  * One player on a slow turntable, showing a team's kit. Transparent, so the page's glass and

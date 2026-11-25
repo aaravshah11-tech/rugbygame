@@ -4,7 +4,7 @@ import type { Kit } from '../../data/nations';
 import { loadPlayerAsset, type AnimName } from './assets';
 import { Avatar, makeTeamKit } from './avatar';
 import { LegacyVisual, type Visual } from './visual';
-import { GLOW_TEX } from './stadium';
+import { GLOW_TEX } from '../stadium/textures';
 
 /** Debug turntable: all 15 players of a team, slowly rotating. */
 export class SquadViewerScene {

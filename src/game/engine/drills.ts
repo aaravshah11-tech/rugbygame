@@ -1,7 +1,7 @@
 /** Training drills and the kicking challenge. */
 import type { MatchEngine } from '../engine';
 import { clamp, rand } from '../../util/rng';
-import { FIELD } from '../stadium';
+import { FIELD } from '../field';
 import { dirOf } from './shared';
 
 /** Daily challenge scenarios: set the score, the clock and where play starts. */

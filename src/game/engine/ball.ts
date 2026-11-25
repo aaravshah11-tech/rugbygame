@@ -4,7 +4,7 @@ import { audio } from '../../util/audio';
 import { haptic } from '../../util/haptics';
 import { clamp, rand } from '../../util/rng';
 import { CFG } from '../gameConfig';
-import { FIELD } from '../stadium';
+import { FIELD } from '../field';
 import type { InputAction } from '../types';
 import { G, GRUB_FRICTION, GRUB_KEEP, GRUB_REST, GRUB_VY, KICK_MAX, dirOf, dist, line, other, simulateGrubber } from './shared';
 import type { KickType, P, Side } from './shared';
