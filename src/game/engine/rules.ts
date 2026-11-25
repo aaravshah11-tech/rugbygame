@@ -100,6 +100,7 @@ export function scoreTry(eng: MatchEngine, c: P) {
   eng.tries[side]++;
   eng.ps(c).tries++;
   eng.stadium.event((side === 0) === eng.cfg.userIsHome ? 'tryHome' : 'tryAway');
+  if (eng.stadium.spec.layout !== 'fields') audio.paHorn();
   c.fx = 'dive';
   if (side === 0) eng.stats.tries++;
   eng.phase = 'dead';

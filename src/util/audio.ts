@@ -72,6 +72,12 @@ class AudioEngine {
     this.crowdGain = ctx.createGain();
     this.crowdGain.gain.value = 0;
     src.connect(this.crowdFilter).connect(this.crowdGain).connect(this.sfx);
+    // the ground's echo: crowd -> convolver -> wet gain (set by setVenue)
+    this.venueVerb = ctx.createConvolver();
+    this.venueVerb.buffer = this.impulse(1.2, 2.5);
+    this.venueWet = ctx.createGain();
+    this.venueWet.gain.value = 0.2;
+    this.crowdGain.connect(this.venueVerb).connect(this.venueWet).connect(this.sfx);
     src.start();
     // A second, brighter layer gives the "murmur" texture.
     const src2 = ctx.createBufferSource();
@@ -88,12 +94,100 @@ class AudioEngine {
     this.crowdStarted = true;
   }
 
+  private venueVerb: ConvolverNode | null = null;
+  private venueWet: GainNode | null = null;
+  /** crowd loudness from the ground: 0.35 school field .. 1 full national arena */
+  private venueSize = 1;
+  private venueBright = 0;
+
+  /** Decaying stereo noise: a cheap room impulse. */
+  private impulse(seconds: number, decay: number) {
+    const ctx = this.ctx!;
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+  }
+
+  /**
+   * Shape the crowd for the ground: how many people (capacity x fill) sets the loudness; a roof
+   * makes it boomier (longer, wetter echo); a small ground is more intimate (short slap-back, you
+   * hear individual voices - brighter, thinner).
+   */
+  setVenue(capacity: number, fill: number, roofed: boolean) {
+    if (!this.ctx) return;
+    const people = capacity * fill;
+    // 800 people ~0.35, a full 80,000 arena 1.0
+    this.venueSize = Math.max(0.3, Math.min(1, 0.35 + ((Math.log10(Math.max(500, people)) - 2.9) / 2) * 0.65));
+    this.venueBright = people < 20000 ? 500 : 0;
+    if (!this.venueVerb || !this.venueWet) return;
+    const big = people > 40000;
+    this.venueVerb.buffer = roofed ? this.impulse(big ? 2.6 : 1.6, 2.2) : this.impulse(big ? 1.4 : 0.6, 3.2);
+    this.venueWet.gain.value = roofed ? (big ? 0.55 : 0.35) : big ? 0.22 : 0.12;
+  }
+
   /** intensity 0..1, raised as the ball nears a try line. */
   setCrowd(intensity: number) {
     if (!this.ctx || !this.crowdStarted) return;
     const t = this.ctx.currentTime;
-    this.crowdGain.gain.setTargetAtTime(0.12 + intensity * 0.55, t, 0.4);
-    this.crowdFilter.frequency.setTargetAtTime(600 + intensity * 700, t, 0.4);
+    this.crowdGain.gain.setTargetAtTime((0.12 + intensity * 0.55) * this.venueSize, t, 0.4);
+    this.crowdFilter.frequency.setTargetAtTime(600 + this.venueBright + intensity * 700, t, 0.4);
+  }
+
+  /** Stadium PA: a short two-tone air horn for a try (original sound). */
+  paHorn() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    for (const [f, d] of [[233, 0], [233, 0.32], [311, 0.62]] as const) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = f;
+      const o2 = ctx.createOscillator();
+      o2.type = 'sawtooth';
+      o2.frequency.value = f * 1.006;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1400;
+      const g = ctx.createGain();
+      const len = d > 0.5 ? 0.9 : 0.24;
+      g.gain.setValueAtTime(0, t + d);
+      g.gain.linearRampToValueAtTime(0.16, t + d + 0.03);
+      g.gain.setValueAtTime(0.16, t + d + len - 0.06);
+      g.gain.linearRampToValueAtTime(0, t + d + len);
+      o.connect(lp);
+      o2.connect(lp);
+      lp.connect(g).connect(this.sfx);
+      if (this.venueVerb) g.connect(this.venueVerb);
+      o.start(t + d);
+      o2.start(t + d);
+      o.stop(t + d + len + 0.05);
+      o2.stop(t + d + len + 0.05);
+    }
+  }
+
+  /** Stadium PA: a three-note announcer chime before kick-off (original). */
+  paChime() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    [659, 523, 784].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      const s0 = t + i * 0.38;
+      g.gain.setValueAtTime(0, s0);
+      g.gain.linearRampToValueAtTime(0.2, s0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, s0 + 1.1);
+      o.connect(g).connect(this.sfx);
+      if (this.venueVerb) g.connect(this.venueVerb);
+      o.start(s0);
+      o.stop(s0 + 1.2);
+    });
   }
 
   stopCrowd() {

@@ -460,6 +460,11 @@ export class MatchEngine {
   /** @param holdIntro the How to Play card is up: line the teams up but keep the intro until beginIntro() */
   start(holdIntro = false) {
     audio.startCrowd();
+    {
+      const sp = this.stadium.spec;
+      const roofed = Object.values(sp.stands).some((s) => s.roof !== 'none' && s.tiers > 0) && sp.layout !== 'fields';
+      audio.setVenue(sp.capacity, Math.min(1, sp.fill * (0.55 + 0.45 * (this.cfg.importance ?? 0.75))), roofed);
+    }
     audio.setCrowd(0.2);
     this.last = performance.now();
     const loop = (now: number) => {
@@ -501,6 +506,7 @@ export class MatchEngine {
     this.introT = 0;
     this.camMode = 'intro';
     this.stadium.setTorches(true);
+    if (this.stadium.spec.layout !== 'fields') audio.paChime();
     // the teams walk out side by side from the tunnel to their kick-off spots
     this.teams.forEach((team, side) =>
       team.forEach((p, i) => {
