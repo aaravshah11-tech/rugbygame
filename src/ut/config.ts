@@ -87,13 +87,14 @@ export const QUICK_SELL = { share: 0.1, min: 30 };
 
 // ------------------------------------------------------------------ chemistry
 /**
- * Each player in the XV earns 0-3 chem (FC style), only when playing in position.
- * Points come from how many of the XV share the player's team (nation or club) and league;
+ * Each player in the XV earns 0-3 chem (FC style), only when playing in position: up to +3 from
+ * team-mates (same nation or club) in the XV and +1 from league-mates;
  * an Icon counts double for their nation and always gets full league chem.
  */
 export const CHEM = {
   team: [2, 4, 7] as number[], // teammates (incl. self) for +1 / +2 / +3
-  league: [3, 6, 10] as number[],
+  /** league links add at most +1 (there are only three leagues, so they'd otherwise max everyone out) */
+  league: [8] as number[],
   /** every chem point adds this to each rating in matches */
   statPerPoint: 1,
   /** OVR penalty out of position: same position group / anything else */

@@ -3,7 +3,8 @@ import { audio } from '../../util/audio';
 import { PACKS, WALKOUT, type PackDef } from '../config';
 import { currentPromo, openPack, packDef, type PackResult } from '../packs';
 import { packName, recordEvent, addXp } from '../progress';
-import { spend, updateUT, useUT } from '../store';
+import { newCard, spend, updateUT, useUT } from '../store';
+import type { OwnedCard } from '../pool';
 import { SEASON } from '../config';
 import { Sheet, TopBar, useToast } from '../ui';
 import type { UTNav } from '../UTRoot';
@@ -39,6 +40,14 @@ export function Store({ nav }: { nav: UTNav }) {
   const [info, setInfo] = useState<PackDef | null>(null);
   const [opening, setOpening] = useState<{ def: PackDef; results: PackResult[] } | null>(null);
   const [toast, say] = useToast();
+  // dev builds: window.__utOpen(['ICON-lomu', ...], 'tots') opens a pack with these cards (screenshots / tests)
+  if (import.meta.env.DEV)
+    Object.assign(window, {
+      __utOpen: (ids: string[], special?: OwnedCard['special']) => {
+        const cards = ids.map((id, i) => newCard(id, i === 0 && special ? { special } : {}));
+        setOpening({ def: packDef('ultimate'), results: [{ cards, best: cards[0], walkout: true, items: 0 }] });
+      },
+    });
   const mine = s.packs.reduce<Record<string, number>>((a, id) => ((a[id] = (a[id] ?? 0) + 1), a), {});
 
   const open = (ids: string[]) => {

@@ -46,12 +46,13 @@
 .utc-stats { position: absolute; left: 12%; right: 12%; top: 72%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px 4%; z-index: 2; font-size: calc(var(--w) * 0.064); font-weight: 700; }
 .utc-stats span { display: flex; gap: 3px; align-items: baseline; justify-content: center; white-space: nowrap; }
 .utc-stats b { font-size: calc(var(--w) * 0.092); font-weight: 900; }
-.utc.mini .utc-stats { display: none; }
-.utc.mini .utc-name { top: 70%; font-size: calc(var(--w) * 0.14); }
-.utc.mini .utc-sil { height: 58%; }
+.utc.utc-mini .utc-stats { display: none; }
+.utc.utc-mini .utc-name { top: 70%; font-size: calc(var(--w) * 0.14); }
+.utc.utc-mini .utc-sil { height: 58%; }
 .utc-corner { position: absolute; right: 8%; top: 9%; z-index: 3; font-style: normal; font-size: calc(var(--w) * 0.075); font-weight: 900; padding: 1px 5px; border-radius: 6px; background: #ff3d7f; color: #fff; }
 
 /* holographic shine: follows the finger (or the phone's tilt) */
+/* the shine sits over the art only, so names and numbers stay crisp */
 .utc-shine {
   position: absolute;
   inset: 0;
@@ -106,8 +107,6 @@
 .utc.sp-tots { --card-bg: #001a4d; --card-bg2: radial-gradient(circle at 50% 25%, #2f7cff, #0b3fa8 50%, #031646), #000; --edge: #ffd23a; --ink: #ffe680; --ink2: #ffd23a; --frame: rgba(255, 210, 58, 0.55); }
 .utc.sp-showdown { --card-bg: #000; --card-bg2: linear-gradient(115deg, #b3122e 0 49.5%, #fff 49.5% 50.5%, #0b4ea2 50.5%), #000; --edge: #ffffff; --ink: #fff; --ink2: #fff; --frame: rgba(255, 255, 255, 0.6); }
 .utc.sp-evo { --card-bg: #003b33; --card-bg2: repeating-radial-gradient(circle at 50% 35%, rgba(46, 230, 193, 0.14) 0 3px, transparent 3px 10px), linear-gradient(160deg, #0d6b5c, #053b33 60%, #021b17); --edge: #2ee6c1; --ink: #d6fff6; --ink2: #2ee6c1; --frame: rgba(46, 230, 193, 0.55); }
-.utc[class*='sp-'] .utc-sil ellipse, .utc[class*='sp-'] .utc-sil > path { fill: rgba(0, 0, 0, 0.55); }
-.utc.sp-icon .utc-sil ellipse, .utc.sp-icon .utc-sil > path { fill: rgba(60, 45, 10, 0.6); }
 [data-motion='reduce'] .utc-bg::before { animation: none; }
 [data-gfx='low'] .utc { filter: none; }
 
@@ -256,3 +255,7 @@
   .ut-hub { grid-template-columns: 1fr 1fr; }
   .ut-squad { grid-template-columns: 1fr; }
 }
+.utc-sil .sil-skin { fill: #14161f; }
+.utc-sil .sil-hair { fill: #07080c; }
+.utc.sp-icon .utc-sil .sil-skin { fill: #3c2d0c; }
+.utc.sp-icon .utc-sil .sil-hair { fill: #241a05; }

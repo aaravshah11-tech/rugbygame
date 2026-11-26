@@ -25,8 +25,11 @@ function Silhouette({ kit }: { kit: Kit }) {
           <stop offset="1" stopColor="#000" stopOpacity="0.35" />
         </linearGradient>
       </defs>
-      <ellipse cx="50" cy="38" rx="15" ry="18" fill="rgba(10,12,20,0.78)" />
-      <path d="M43 52 L57 52 L58 66 L42 66 Z" fill="rgba(10,12,20,0.78)" />
+      <path className="sil-skin" d="M41 50 L59 50 L60 66 L40 66 Z" />
+      <ellipse className="sil-skin" cx="35.5" cy="40" rx="2.6" ry="4.5" />
+      <ellipse className="sil-skin" cx="64.5" cy="40" rx="2.6" ry="4.5" />
+      <ellipse className="sil-skin" cx="50" cy="38" rx="14.5" ry="17.5" />
+      <path className="sil-hair" d="M35.5 36 C35 22 44 18 51 18 C60 18 66 24 64.5 36 C61 28 56 26 50 26 C43 26 38 29 35.5 36 Z" />
       <g clipPath="url(#sil-shirt)">
         <rect x="0" y="60" width="100" height="40" fill={kit.primary} />
         {kit.pattern === 'hoops' && [70, 82, 94].map((y) => <rect key={y} x="0" y={y} width="100" height="6" fill={stripe} />)}
@@ -77,7 +80,7 @@ export const UTCard = memo(function UTCard({
   return (
     <div
       ref={ref}
-      className={`utc ${cardStyle(v)} ${dim ? 'dim' : ''} ${size < 90 ? 'mini' : ''} ${onClick ? 'tappable' : ''}`}
+      className={`utc ${cardStyle(v)} ${dim ? 'dim' : ''} ${size < 90 ? 'utc-mini' : ''} ${onClick ? 'tappable' : ''}`}
       style={{ ['--w' as string]: `${size}px` }}
       onPointerMove={move}
       onPointerLeave={() => {

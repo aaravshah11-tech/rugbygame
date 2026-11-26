@@ -20,7 +20,7 @@ export function slotOvr(v: CardView, slot: number) {
   return Math.max(1, v.ovr - (same ? CHEM.outOfPosition.group : CHEM.outOfPosition.other));
 }
 
-const step = (n: number, t: number[]) => (n >= t[2] ? 3 : n >= t[1] ? 2 : n >= t[0] ? 1 : 0);
+const step = (n: number, t: number[]) => t.filter((x) => n >= x).length;
 
 /** Chemistry of each XV slot (0-3) and the team total (max 45). */
 export function chemistry(xv: (CardView | null)[]): { each: number[]; total: number } {
@@ -179,6 +179,8 @@ export function aiSquad(seed: string, target: number, rngIn?: Rng): AiSquad {
   const id = 'AI' + (hashString(seed) % 100000);
   const short = name.split(' ')[0].slice(0, 3).toUpperCase();
   const ovr = Math.round(cards.slice(0, 15).reduce((a, c) => a + c.ovr, 0) / 15);
+  // registered now so their badge and kit show in lists before the match
+  registerTeam({ id, name, short, strength: ovr, region: 'anglo', kit });
   return { id, name, short, kit, cards, ovr };
 }
 

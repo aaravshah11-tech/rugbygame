@@ -199,7 +199,7 @@ export function view(card: OwnedCard): CardView {
     TKL: r.tackling,
     WRK: clamp(Math.round(r.tackling * 0.4 + r.strength * 0.25 + r.pace * 0.35 + WRK_BASE[g] - 4), 1, 99),
   };
-  const special = card.special ?? (card.evo ? 'evo' : undefined);
+  const special = card.special ?? (base.league === 'ICON' ? 'icon' : card.evo ? 'evo' : undefined);
   const v: CardView = {
     card, base, player: base.player, ratings: r, ovr, pos, tier: tierOf(ovr), rare: base.rare || !!special, special,
     face, team: base.team, nation: base.nation, league: base.league, name: cardName(base.player),

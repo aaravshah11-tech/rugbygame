@@ -34,7 +34,7 @@ export class WalkoutScene {
     this.scene.fog = new THREE.Fog('#05070f', 14, 60);
 
     // pitch and tunnel
-    const pitch = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: '#16391f', roughness: 0.95 }));
+    const pitch = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: '#0d2614', roughness: 0.95 }));
     pitch.rotation.x = -Math.PI / 2;
     this.scene.add(pitch);
     const tunnel = new THREE.Mesh(new THREE.BoxGeometry(5, 3.4, 2), new THREE.MeshStandardMaterial({ color: '#0a0c12', roughness: 0.6 }));
@@ -86,7 +86,7 @@ export class WalkoutScene {
       this.smoke.push(s);
     }
     for (let i = 0; i < 4; i++) {
-      const l = new THREE.PointLight(glowCol, 6, 9, 2);
+      const l = new THREE.PointLight(glowCol, 4, 6, 2);
       l.position.set(i % 2 ? 2.6 : -2.6, 0.6, -10 + Math.floor(i / 2) * 6);
       this.scene.add(l);
       this.flares.push(l);
@@ -111,7 +111,8 @@ export class WalkoutScene {
       const av: Visual = asset ? new Avatar(asset, makeTeamKit(kit), { num: opts.num, forward: opts.forward, skin: 1 + (opts.num % 4), hair: opts.num % 5, scrumCap: false, size: opts.size }) : new LegacyVisual(kit, 1, opts.forward);
       av.setBase('walk', 0.9);
       av.root.position.set(0, 0, -12.5);
-      av.root.rotation.y = 0;
+      // the model faces +x: turn him to walk towards the camera (+z)
+      av.root.rotation.y = -Math.PI / 2;
       this.scene.add(av.root);
       this.av = av;
     });
@@ -128,7 +129,7 @@ export class WalkoutScene {
       if (av) {
         const z = av.root.position.z;
         if (z < -0.6) {
-          av.root.position.z = Math.min(-0.6, z + dt * 2.4);
+          av.root.position.z = Math.min(-0.6, z + dt * 3.2);
         } else if (!arrived) {
           arrived = true;
           av.setBase('idle');
@@ -146,7 +147,7 @@ export class WalkoutScene {
         if (s.position.y > 3.5) s.position.y = 0.5;
         (s.material as THREE.SpriteMaterial).opacity = 0.18 + 0.1 * Math.sin(this.t * 2 + i);
       });
-      this.flares.forEach((l, i) => (l.intensity = 5 + Math.sin(this.t * 13 + i * 2) * 2 + Math.random() * 1.5));
+      this.flares.forEach((l, i) => (l.intensity = 3.5 + Math.sin(this.t * 13 + i * 2) * 1.5 + Math.random()));
       this.beams.forEach((b, i) => (b.rotation.z = Math.sin(this.t * 0.7 + i) * 0.35));
       this.renderer.render(this.scene, this.camera);
     };
