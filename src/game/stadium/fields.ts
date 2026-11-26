@@ -290,40 +290,42 @@ function pavilion() {
     ch.position.set(cx, H + 3.2, cz);
     g.add(ch);
   }
-  // raised curved terrace round the pitch side with a white railing and steps down
-  const tz = D / 2;
-  const R = 17;
-  const terrace = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 1.2, 48, 1, false, -Math.PI / 2, Math.PI), stone);
-  terrace.scale.set(1, 1, 0.5);
-  terrace.position.set(0, 0.6, tz);
-  g.add(terrace);
-  const wallRing = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.05, R + 0.05, 1.2, 48, 1, true, -Math.PI / 2, Math.PI), brickDark);
-  wallRing.scale.set(1, 1, 0.5);
-  wallRing.position.set(0, 0.6, tz);
-  g.add(wallRing);
+  // first-floor balcony along the pitch side: a slab on posts with a white railing
+  const bz = D / 2 + 1.4; // in front of the gable bays
+  const bd = 2.4; // depth
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.3, bd), stone);
+  slab.position.set(0, 3.45, bz + bd / 2);
+  g.add(slab);
   const railMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.4 });
-  for (const y of [1.6, 2.2]) {
-    const rail = new THREE.Mesh(new THREE.TorusGeometry(R - 0.2, 0.05, 4, 48, Math.PI), railMat);
-    rail.rotation.x = Math.PI / 2;
-    rail.rotation.z = Math.PI;
-    rail.scale.set(1, 0.5, 1);
-    rail.position.set(0, y, tz);
-    g.add(rail);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.08, 0.08), railMat);
+  top.position.set(0, 4.6, bz + bd - 0.05);
+  const mid = top.clone();
+  mid.position.y = 4.1;
+  g.add(top, mid);
+  for (const sx of [-1, 1]) {
+    const side = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, bd), railMat);
+    side.position.set(sx * (W / 2 + 0.45), 4.6, bz + bd / 2);
+    g.add(side);
   }
-  const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.04, 0.04, 1, 4), railMat, 26);
+  const balusters = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 1, 0.05), railMat, 34);
   const m4 = new THREE.Matrix4();
-  for (let i = 0; i < 26; i++) {
-    const a = -Math.PI / 2 + (i / 25) * Math.PI;
-    m4.makeTranslation(Math.sin(a) * (R - 0.2), 1.7, tz + Math.cos(a) * (R - 0.2) * 0.5);
-    posts.setMatrixAt(i, m4);
+  for (let i = 0; i < 34; i++) {
+    m4.makeTranslation(-(W + 1) / 2 + (i / 33) * (W + 1), 4.1, bz + bd - 0.05);
+    balusters.setMatrixAt(i, m4);
   }
-  g.add(posts);
-  // steps down at the front centre
-  for (let i = 0; i < 3; i++) {
-    const st = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 0.6), stone);
-    st.position.set(0, 1 - i * 0.4, tz + R * 0.5 + 0.3 + i * 0.6);
-    g.add(st);
+  g.add(balusters);
+  // posts holding it up
+  for (let i = 0; i < 7; i++) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.3, 0.3), frame);
+    post.position.set(-W / 2 + i * (W / 6), 1.65, bz + bd - 0.2);
+    g.add(post);
   }
+  // glass doors out onto the balcony
+  for (const x of [-8, 0, 8]) win(2.2, 2.2, x, 4.6, bz + 0.02);
+  // paved patio below
+  const patio = new THREE.Mesh(new THREE.BoxGeometry(W + 3, 0.1, bd + 2.5), stone);
+  patio.position.set(0, 0.05, bz + bd / 2 + 0.6);
+  g.add(patio);
   g.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) {
       o.castShadow = true;
