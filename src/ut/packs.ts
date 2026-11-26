@@ -3,7 +3,7 @@
  * adds the 5% walkout, and works out duplicates.
  */
 import { makeRng, hashString, type Rng } from '../util/rng';
-import { PACKS, QUICK_SELL, WALKOUT, type PackDef, type SpecialType } from './config';
+import { BGS_PULL, PACKS, QUICK_SELL, WALKOUT, type PackDef, type SpecialType } from './config';
 import { cardPool, view, type BaseCard, type OwnedCard } from './pool';
 import { newCard, weekKey, type UTState } from './store';
 import { marketPrice } from './market';
@@ -133,6 +133,19 @@ export function openPack(def: PackDef, seed = Date.now() ^ Math.floor(Math.rando
     const b = pickBand(rng, def.fill[0], Math.min(def.fill[1], cap), used, { rare: needRare });
     if (!b) break;
     cards.push(newCard(b.id));
+  }
+  // BGS U16 boost: a school player in place of the weakest card
+  if (def.guarantee !== 'icon' && def.count > 1 && rng.chance(BGS_PULL.chance)) {
+    const bgs = cardPool().filter((c) => c.team === BGS_PULL.team && !used.has(c.id));
+    const shah = bgs.find((c) => c.id === BGS_PULL.shahId);
+    const others = bgs.filter((c) => c.id !== BGS_PULL.shahId);
+    const pickB = shah && (rng.chance(BGS_PULL.shahShare) || !others.length) ? shah : others.length ? rng.pick(others) : null;
+    if (pickB) {
+      used.add(pickB.id);
+      cards.sort((a, b) => view(b).ovr - view(a).ovr);
+      if (cards.length >= def.count) cards[cards.length - 1] = newCard(pickB.id);
+      else cards.push(newCard(pickB.id));
+    }
   }
   const sorted = cards.sort((a, b) => view(b).ovr - view(a).ovr);
   const top = sorted[0];

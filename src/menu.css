@@ -766,3 +766,41 @@ html[data-gfx='low'] .mlogo .l {
   gap: 8px;
   margin-top: -6px;
 }
+
+/* ---------- Ultimate Team: the big button next to PLAY ---------- */
+.hero-row { display: flex; gap: 10px; align-items: stretch; margin-top: auto; align-self: flex-start; width: min(86%, 760px); }
+.hero-row .hero { margin-top: 0; flex: 1.55; width: auto; }
+.ut-hero {
+  position: relative;
+  flex: 1;
+  min-width: 170px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--r-xl, 20px);
+  padding: 10px 14px;
+  text-align: left;
+  color: #fff;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: radial-gradient(ellipse at 80% 20%, #4a3600 0%, transparent 60%), linear-gradient(150deg, #1a1400 0%, #0b0b0b 55%, #2a1e00 100%);
+  box-shadow: 0 0 0 2px #f2c94c, 0 10px 30px rgba(242, 201, 76, 0.35), inset 0 0 30px rgba(242, 201, 76, 0.15);
+  animation: utHeroPulse 2.6s ease-in-out infinite;
+}
+.ut-hero:active { transform: scale(0.97); }
+@keyframes utHeroPulse { 50% { box-shadow: 0 0 0 2px #ffe58a, 0 10px 40px rgba(242, 201, 76, 0.6), inset 0 0 40px rgba(242, 201, 76, 0.25); } }
+.ut-hero-rays { position: absolute; inset: -50%; background: repeating-conic-gradient(from 0deg at 75% 40%, rgba(242, 201, 76, 0.16) 0 5deg, transparent 5deg 14deg); animation: utHeroSpin 18s linear infinite; pointer-events: none; }
+@keyframes utHeroSpin { to { transform: rotate(360deg); } }
+.ut-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 240, 180, 0.35) 48%, transparent 60%); background-size: 260% 100%; animation: utHeroSweep 3s ease-in-out infinite; pointer-events: none; }
+@keyframes utHeroSweep { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+.ut-hero-cards { position: absolute; right: 10px; top: 8px; width: 74px; height: 70px; }
+.ut-hero-cards i { position: absolute; top: 0; width: 42px; height: 60px; border-radius: 5px; clip-path: polygon(50% 0, 64% 5%, 100% 5%, 100% 90%, 50% 100%, 0 90%, 0 5%, 36% 5%); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); }
+.ut-hero-cards i:nth-child(1) { left: 0; transform: rotate(-14deg); background: linear-gradient(160deg, #ffffff, #e2cf99); }
+.ut-hero-cards i:nth-child(2) { left: 16px; transform: rotate(-2deg); background: linear-gradient(160deg, #8d4dff, #1b0640); }
+.ut-hero-cards i:nth-child(3) { left: 32px; transform: rotate(12deg); background: repeating-conic-gradient(from 0deg at 50% 38%, rgba(255, 255, 255, 0.3) 0 6deg, transparent 6deg 12deg), linear-gradient(160deg, #fff7d0, #f7cf45 40%, #b77f00); }
+.ut-hero-new { position: absolute; top: 10px; left: 12px; padding: 2px 8px; border-radius: 999px; background: #ff3d7f; font-size: 10px; font-weight: 900; letter-spacing: 0.1em; z-index: 1; }
+.ut-hero-label { position: relative; font-size: 10px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #f2c94c; z-index: 1; }
+.ut-hero-title { position: relative; font-family: var(--font-display); font-style: italic; font-weight: 900; font-size: 30px; line-height: 0.9; text-transform: uppercase; z-index: 1; background: linear-gradient(180deg, #fff7d0, #f2c94c 60%, #c48d00); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); }
+.ut-hero-sub { position: relative; margin-top: 3px; font-size: 11px; color: rgba(255, 255, 255, 0.8); z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-motion='reduce'] .ut-hero, [data-motion='reduce'] .ut-hero-rays, [data-motion='reduce'] .ut-hero::after { animation: none; }

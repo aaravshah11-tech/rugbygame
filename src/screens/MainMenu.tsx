@@ -10,7 +10,7 @@ import { BrandLogo } from '../ui/BrandLogo';
 import { COMP_TITLE } from '../data/sponsors';
 import { pickMatchSponsors } from '../sponsors/manager';
 import { getUT } from '../ut/store';
-import { IconCards, IconCrown, IconGear, IconGift, IconGlobe, IconPosts, IconShield, IconTarget, IconTrophy, IconWhistle } from '../ui/icons';
+import { IconCrown, IconGear, IconGift, IconGlobe, IconPosts, IconShield, IconTarget, IconTrophy, IconWhistle } from '../ui/icons';
 import { audio } from '../util/audio';
 import { isStandalone } from '../util/device';
 
@@ -197,7 +197,6 @@ export function MainMenu({ go }: { go: Go }) {
     { key: 'six', title: 'Nations Championship', sub: 'Six nations', hint: compHint(p, 'six'), accent: 'var(--cyan)', icon: IconCrown, route: { name: 'comp', kind: 'six' } },
     { key: 'prem', title: 'The Prem', sub: '10 clubs', hint: compHint(p, 'prem'), accent: 'var(--gold)', icon: IconShield, route: { name: 'comp', kind: 'prem' } },
     { key: 'wc', title: 'World Cup', sub: 'Pools · knockouts', hint: wcHint(p), accent: '#5aa0ff', icon: IconTrophy, route: { name: 'worldcup' } },
-    { key: 'squad', title: 'Ultimate Team', sub: 'Packs · SBCs · Rivals', hint: getUT().started ? `${getUT().club.name} · ${getUT().cards.length} cards${getUT().packs.length ? ` · ${getUT().packs.length} packs to open` : ''}` : 'Start your club: 10,000 coins + starter pack', accent: 'var(--elite)', icon: IconCards, route: { name: 'ut' } },
     { key: 'ch', title: 'Challenges', sub: 'Daily scenarios', hint: scenDone >= 3 ? 'All done today' : `${3 - scenDone} challenge${3 - scenDone === 1 ? '' : 's'} left`, accent: '#ff8a3d', icon: IconTarget, route: { name: 'challenges' } },
     { key: 'kick', title: 'Kicking', sub: 'Easy → extreme', hint: `${kickPassed} of 5 levels passed`, accent: 'var(--neon)', icon: IconPosts, route: { name: 'kicking' } },
     { key: 'train', title: 'Training', sub: 'Tutorials', hint: drills >= 4 ? 'All drills cleared' : `${drills} of 4 drills cleared`, accent: '#7de3ff', icon: IconWhistle, route: { name: 'training' } },
@@ -303,6 +302,7 @@ export function MainMenu({ go }: { go: Go }) {
           </button>
         </header>
 
+        <div className="hero-row">
         <button className="hero" onClick={() => nav({ name: 'quick' })} style={{ '--h': H.kit.primary, '--a': A.kit.primary } as React.CSSProperties}>
           <span className="hero-glow" />
           <span className="hero-label">Quick Match · any team</span>
@@ -327,6 +327,24 @@ export function MainMenu({ go }: { go: Go }) {
             </span>
           )}
         </button>
+        {/* the big Ultimate Team button: its own gold-and-black panel next to PLAY */}
+        <button className="ut-hero" onClick={() => nav({ name: 'ut' })} aria-label="Ultimate Team">
+          <span className="ut-hero-rays" />
+          <span className="ut-hero-cards" aria-hidden>
+            <i />
+            <i />
+            <i />
+          </span>
+          <span className="ut-hero-new">{getUT().packs.length ? `${getUT().packs.length} PACK${getUT().packs.length > 1 ? 'S' : ''}` : 'NEW'}</span>
+          <span className="ut-hero-label">Packs · SBCs · Rivals</span>
+          <span className="ut-hero-title">
+            Ultimate
+            <br />
+            Team
+          </span>
+          <span className="ut-hero-sub">{getUT().started ? `${getUT().club.name} · ${getUT().cards.length} cards` : '10,000 coins + starter pack'}</span>
+        </button>
+        </div>
 
         <div className="rail" ref={rail} onScroll={onRail}>
           {tiles.map((t, i) => (

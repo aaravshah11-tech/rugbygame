@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { audio } from '../../util/audio';
-import { PACKS, WALKOUT, type PackDef } from '../config';
+import { BGS_PULL, PACKS, WALKOUT, type PackDef } from '../config';
 import { currentPromo, openPack, packDef, type PackResult } from '../packs';
 import { packName, recordEvent, addXp } from '../progress';
 import { newCard, spend, updateUT, useUT } from '../store';
@@ -24,6 +24,7 @@ function oddsLines(d: PackDef): string[] {
   if (d.guarantee === 'promo') out.push(`Guaranteed ${currentPromo().name} card`);
   if (d.items) out.push(`${d.items} position change item${d.items > 1 ? 's' : ''}`);
   out.push(`Walkout (an extra ${WALKOUT.minOvr}+ player): ${Math.round(WALKOUT.chance * 100)}%`);
+  if (d.guarantee !== 'icon' && d.count > 1) out.push(`BGS U16 player: ${Math.round(BGS_PULL.chance * 100)}% (A Shah: ${(BGS_PULL.chance * BGS_PULL.shahShare * 100).toFixed(1)}%)`);
   return out;
 }
 

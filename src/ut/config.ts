@@ -69,6 +69,12 @@ export interface PackDef {
 
 export const WALKOUT = { chance: 0.05, minOvr: 88 };
 
+/**
+ * BGS U16 boost: any pack (not Icon packs) has this chance of an extra BGS U16 player in place of
+ * its weakest card. A Shah (95) is rarer: when a BGS player drops, this share of the time it's him.
+ */
+export const BGS_PULL = { team: 'BGS', chance: 0.35, shahShare: 0.08, shahId: 'BGS-14' };
+
 export const PACKS: PackDef[] = [
   { id: 'bronze', name: 'Bronze Pack', price: 750, count: 6, rares: 1, best: [[65, 69, 0.15], [55, 64, 1]], fill: [52, 64], colors: ['#e0a77a', '#7a4520'], blurb: '6 players · Bronze', inStore: true },
   { id: 'silver', name: 'Silver Pack', price: 2_500, count: 6, rares: 1, best: [[75, 79, 0.2], [65, 74, 1]], fill: [65, 74], colors: ['#f4f6fa', '#7d8796'], blurb: '6 players · Silver', inStore: true },
