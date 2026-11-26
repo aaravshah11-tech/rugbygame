@@ -18,7 +18,8 @@ export function startChallenge(eng: MatchEngine) {
     // defend a scrum 8m from your own line
     eng.setupScrum(-d * (FIELD.tryX - 8), 6, 1);
   } else if (ch.startX !== undefined) {
-    eng.setupScrum(d * ch.startX, 0, 0);
+    if (ch.start === 'lineout') eng.setupLineout(d * ch.startX, 1, 0);
+    else eng.setupScrum(d * ch.startX, 0, 0);
   } else eng.setupKickoff(eng.firstKicker, 0);
   eng.say(ch.title, 'info', 'Challenge');
 }
@@ -45,6 +46,7 @@ export function startDrill(eng: MatchEngine) {
 
 export function drillNext(eng: MatchEngine, first = false) {
   const drill = eng.cfg.drill!;
+  if (drill === 'tutorial') return eng.tutorial?.drillNext();
   if (!first) eng.drillCount++;
   eng.resetStates();
   eng.camMode = 'game';

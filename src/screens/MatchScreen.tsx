@@ -13,7 +13,10 @@ import { COMP_TITLE, SPONSOR_BY_ID, TEAM_DEALS } from '../data/sponsors';
 import type { MatchSponsors } from '../sponsors/manager';
 import { TacticsPanel } from '../ui/tactics';
 import { CustomPlaysEditor } from '../ui/setplays';
-import { update, useProfile } from '../state/store';
+import { getProfile, update, useProfile } from '../state/store';
+import { MatchTip, TutorialOverlay, type TutState } from '../ui/tutorial';
+import type { TipId } from '../tutorial/steps';
+import { finishTutorial } from '../state/outcomes';
 import type { CameraMode } from '../state/types';
 
 export interface MatchOutcome {
@@ -40,11 +43,14 @@ export function MatchScreen({
   onFinish,
   onDrillDone,
   onExit,
+  onTutorialMatch,
 }: {
   cfg: MatchConfig;
   onFinish?: (r: EngineResult) => MatchOutcome;
   onDrillDone?: (score: number, total: number) => MatchOutcome;
   onExit: () => void;
+  /** tutorial: steps 1-9 done, start the mini match */
+  onTutorialMatch?: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<MatchEngine | null>(null);
@@ -88,6 +94,29 @@ export function MatchScreen({
   const [tryBanner, setTryBanner] = useState<{ id: number; scorer: string; team: string; user: boolean } | null>(null);
   const [replay, setReplay] = useState(false);
   const [howTo, setHowTo] = useState(false);
+  const [tut, setTut] = useState<TutState | null>(null);
+  // contextual tips: first 3 matches (or always in the tutorial mini match), each once
+  const tipsOn = cfg.tips === 'all' || (cfg.tips !== 'off' && !cfg.drill && !cfg.challenge && !cfg.kickChallenge && profile.stats.matches < 3);
+  const [tip, setTip] = useState<TipId | null>(null);
+  const tipsShown = useRef(new Set<string>());
+  const showTip = (id: TipId) => {
+    if (!tipsOn || tipsShown.current.has(id)) return;
+    if (cfg.tips !== 'all' && (getProfile().tipsSeen ?? []).includes(id)) return;
+    if (cfg.tips !== 'all' && !['penalty', 'lineout', 'maul', 'advantage', 'sinbin'].includes(id)) return;
+    tipsShown.current.add(id);
+    setTip(id);
+    if (cfg.tips !== 'all') update((p) => (p.tipsSeen = [...(p.tipsSeen ?? []), id]));
+  };
+  useEffect(() => {
+    if (!tipsOn || loading) return;
+    if (hud.phase === 'lineout') showTip('lineout');
+    else if (hud.phase === 'maul') showTip('maul');
+    else if (hud.phase === 'scrum') showTip('scrum');
+    else if (hud.ruck) showTip('ruck');
+    else if (hud.kickoffAim) showTip('kickoff');
+    if (hud.advantage) showTip('advantage');
+    if (hud.sinBin.length) showTip('sinbin');
+  }, [hud.phase, hud.ruck, hud.kickoffAim, hud.advantage, hud.sinBin.length, loading]); // eslint-disable-line react-hooks/exhaustive-deps
   // a penalty decision left too long goes to the obvious option
   usePromptTimeout(PROMPT_TIMEOUT.penaltyChoice, paused || howTo, () => {
     if (!penalty) return;
@@ -96,6 +125,8 @@ export function MatchScreen({
   }, !!penalty);
   const commId = useRef(0);
   const finished = useRef(false);
+  const showTipRef = useRef(showTip);
+  showTipRef.current = showTip;
 
   useEffect(() => {
     const onEvent = (e: EngineEvent) => {
@@ -123,6 +154,10 @@ export function MatchScreen({
           break;
         case 'penalty':
           setPenalty({ canKick: e.canKick, resolve: e.resolve });
+          showTipRef.current('penalty');
+          break;
+        case 'tutorial':
+          setTut({ step: e.step, task: e.task, stepDone: e.stepDone, finished: e.finished });
           break;
         case 'halftime':
           setTimeout(() => setHalftime(true), 1500);
@@ -182,7 +217,8 @@ export function MatchScreen({
       } catch {
         /* private mode */
       }
-      const firstTime = !cfg.drill && !cfg.challenge && !seen;
+      // the guided tutorial replaced the kick-off How to Play card (it is still in the pause menu)
+      const firstTime = false && !cfg.drill && !cfg.challenge && !seen;
       // first match: How to Play comes first; the intro only starts once it's closed
       eng.start(firstTime);
       if (firstTime) {
@@ -499,7 +535,7 @@ export function MatchScreen({
       {howTo && (
         <div className="sheet">
           <div className="card howto" style={{ textAlign: 'center' }}>
-            <h2>How to play</h2>
+            <h2>Controls</h2>
             <div className="howto-grid" style={{ textAlign: 'left' }}>
               <div>
                 <b>Run</b>The stick appears where your left thumb lands. Push it to the edge or hold SPRINT to sprint. STEP (or swipe up on the right) sidesteps; HAND-OFF lights up when a defender is close.
@@ -550,6 +586,20 @@ export function MatchScreen({
           </div>
         </div>
       )}
+
+      {tut && !outcome && !paused && (
+        <TutorialOverlay
+          s={tut}
+          onSkipStep={() => engine.current?.tutorial?.skip()}
+          onSkipAll={() => {
+            finished.current = true;
+            engine.current?.setPaused(true);
+            setOutcome(finishTutorial(null));
+          }}
+          onMiniMatch={() => onTutorialMatch?.()}
+        />
+      )}
+      {tip && !outcome && !paused && <MatchTip id={tip} onClose={() => setTip(null)} />}
 
       {plays && (
         <div className="sheet" onClick={() => setPlays(false)}>
@@ -710,7 +760,7 @@ export function MatchScreen({
                   setHowTo(true);
                 }}
               >
-                How to play
+                Controls
               </button>
               <button
                 className="btn danger"

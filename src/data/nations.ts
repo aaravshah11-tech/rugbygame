@@ -102,8 +102,16 @@ export const CLUB_NATION: Nation = {
   kit: { primary: '#101418', secondary: '#c6ff1a', accent: '#21e6c1', pattern: 'chevron', shorts: '#101418', socks: '#c6ff1a' },
 };
 
+/** Teams made at runtime (Ultimate Team clubs and AI opponents), so kits and names resolve anywhere. */
+const EXTRA = new Map<string, Nation>();
+export function registerTeam(n: Nation) {
+  EXTRA.set(n.id, n);
+}
+
 export function nationById(id: string): Nation {
   if (id === CLUB_ID) return CLUB_NATION;
+  const extra = EXTRA.get(id);
+  if (extra) return extra;
   return NATIONS.find((n) => n.id === id) ?? CLUBS.find((n) => n.id === id) ?? SCHOOLS.find((n) => n.id === id) ?? NATIONS[0];
 }
 

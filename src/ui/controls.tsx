@@ -98,7 +98,7 @@ export function setLayoutEditing(e: typeof LAYOUT.edit) {
 }
 const slotKey = (label: string, pos: { right: number; bottom: number }) => `${label}@${pos.right},${pos.bottom}`;
 
-function ActionButton({ label, sub, size, color, pos, onDown, onMove, onUp, children, hidden }: BtnProps & { hidden?: boolean }) {
+function ActionButton({ label, sub, size, color, pos, onDown, onMove, onUp, children, hidden, tk }: BtnProps & { hidden?: boolean; tk?: string }) {
   const [on, setOn] = useState(false);
   const pid = useRef<number | null>(null);
   const key = slotKey(label, pos);
@@ -133,6 +133,7 @@ function ActionButton({ label, sub, size, color, pos, onDown, onMove, onUp, chil
     <button
       className={`abtn ${size} c-${color} ${on ? 'on' : ''} ${hidden ? 'ctx-hidden' : ''}`}
       aria-hidden={hidden}
+      data-k={tk ?? label.toLowerCase().replace(/[^a-z]+/g, '-')}
       style={{ right: pos.right - lay.dx, bottom: pos.bottom - lay.dy, zoom: lay.s !== 1 ? lay.s : undefined }}
       onPointerDown={(e) => {
         if (pid.current !== null) return;
@@ -372,6 +373,7 @@ export function ActionButtons({
       {/* two PASS buttons, left and right, like a broadcast game pad; hold = long pass */}
       <ActionButton
         label={offload ? 'Offload' : 'Pass'}
+        tk="pass-left"
         sub={offload ? 'in the tackle' : 'hold = long'}
         size="big"
         color={offload ? 'gold' : 'neon'}
@@ -386,6 +388,7 @@ export function ActionButtons({
       </ActionButton>
       <ActionButton
         label={offload ? 'Offload' : 'Pass'}
+        tk="pass-right"
         sub={offload ? 'in the tackle' : 'hold = long'}
         size="big"
         color={offload ? 'gold' : 'neon'}
@@ -551,13 +554,19 @@ export function KickSwipe({ input, base, onClose }: { input: InputState; base: K
   const [trail, setTrail] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [kind, setKind] = useState<KickKind | null>(null);
   const longKind: KickKind = base === 'box' ? 'box' : 'punt';
+  // swipe length bands (fraction of screen height): grubber < CHIP <= chip < LONG <= long kick
+  const CHIP = 0.12;
+  const LONG = 0.26;
   const read = (x: number, y: number) => {
     const s0 = st.current!;
     const H = window.innerHeight;
     const up = s0.y - y;
-    const big = up > H * 0.22;
+    const f = up / H;
+    const k: KickKind = f >= LONG ? longKind : f >= CHIP ? 'chip' : 'grubber';
     const angle = Math.max(-60, Math.min(60, (Math.atan2(x - s0.x, Math.max(1, up)) * 180) / Math.PI));
-    return { up, big, angle, H };
+    // how far into its band the swipe reaches (0..1)
+    const amt = k === 'grubber' ? f / CHIP : k === 'chip' ? (f - CHIP) / (LONG - CHIP) : (f - LONG) / 0.4;
+    return { up, k, angle, amt: Math.max(0, Math.min(1, amt)) };
   };
   useEffect(() => {
     Object.assign(input.kickAim, { active: false, kind: 'grubber', dist: 15, angle: 0 });
@@ -578,10 +587,9 @@ export function KickSwipe({ input, base, onClose }: { input: InputState; base: K
         const r = read(e.clientX, e.clientY);
         setTrail({ x0: s0.x, y0: s0.y, x1: e.clientX, y1: e.clientY });
         if (r.up > 15) {
-          const k = r.big ? longKind : 'grubber';
-          setKind(k);
-          const spec = KICKS.find((x) => x.kind === k)!;
-          Object.assign(input.kickAim, { active: true, kind: k, angle: r.angle, dist: r.big ? spec.def + (spec.max - spec.def) * Math.min(1, (r.up - r.H * 0.22) / (r.H * 0.4)) : spec.min + (spec.def - spec.min) * Math.min(1, r.up / (r.H * 0.22)) });
+          setKind(r.k);
+          const spec = KICKS.find((x) => x.kind === r.k)!;
+          Object.assign(input.kickAim, { active: true, kind: r.k, angle: r.angle, dist: spec.min + (spec.max - spec.min) * r.amt });
         }
       }}
       onPointerUp={(e) => {
@@ -598,10 +606,11 @@ export function KickSwipe({ input, base, onClose }: { input: InputState; base: K
         }
         const now = performance.now();
         const vy = Math.max(s0.peak, r.up / Math.max(1, now - s0.t));
-        const spec = KICKS.find((k) => k.kind === (r.big ? longKind : 'grubber'))!;
-        const amt = r.big ? 0.45 * Math.min(1, (r.up - r.H * 0.22) / (r.H * 0.4)) + 0.55 * Math.min(1, Math.max(0, vy - 0.5) / 2.2) : Math.min(1, (r.up - 25) / (r.H * 0.22 - 25));
+        const spec = KICKS.find((k) => k.kind === r.k)!;
+        // long kicks: length and speed both add distance; grubbers and chips: length
+        const amt = r.k === longKind ? 0.45 * r.amt + 0.55 * Math.min(1, Math.max(0, vy - 0.5) / 2.2) : r.amt;
         const dist = spec.min + (spec.max - spec.min) * Math.max(0, Math.min(1, amt));
-        input.actions.push({ type: 'kick', kind: spec.kind, dist, angle: r.angle, power: r.big && vy > 3.4 ? 1.12 : 0.85 });
+        input.actions.push({ type: 'kick', kind: spec.kind, dist, angle: r.angle, power: r.k === longKind && vy > 3.4 ? 1.12 : 0.85 });
         input.kickAim.active = false;
         haptic('tackle');
         onClose();
@@ -614,8 +623,8 @@ export function KickSwipe({ input, base, onClose }: { input: InputState; base: K
         </svg>
       )}
       <div className="kick-aim-hud">
-        <b>{kind === 'grubber' ? 'GRUBBER' : kind ? (kind === 'box' ? 'BOX KICK' : 'LONG KICK') : 'KICK'}</b>
-        <small>Swipe like a conversion · little swipe = grubber · big swipe = long kick</small>
+        <b>{kind === 'grubber' ? 'GRUBBER' : kind === 'chip' ? 'CHIP' : kind ? (kind === 'box' ? 'BOX KICK' : 'LONG KICK') : 'KICK'}</b>
+        <small>Swipe like a conversion · little = grubber · medium = chip · big = long kick</small>
       </div>
       <button
         className="kick-chip cancel kick-aim-cancel"

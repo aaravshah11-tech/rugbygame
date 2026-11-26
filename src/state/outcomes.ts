@@ -135,7 +135,7 @@ export function finishSeason(cfg: MatchConfig, fixtureId: string, r: EngineResul
   return { title: verdict(r), lines, coins: coins + bonus };
 }
 
-const DRILL_NAMES: Record<Drill, string> = { passing: 'Passing', kicking: 'Kicking', tackling: 'Tackling', setpieces: 'Set Pieces' };
+const DRILL_NAMES: Record<Drill, string> = { passing: 'Passing', kicking: 'Kicking', tackling: 'Tackling', setpieces: 'Set Pieces', tutorial: 'Tutorial' };
 
 export function finishDrill(drill: Drill, score: number, total: number): MatchOutcome {
   const first = !getProfile().trainingDone[drill];
@@ -185,4 +185,21 @@ export function finishCompMatch(cfg: MatchConfig, kind: CompKind, fixtureId: str
     }
   });
   return { title: verdict(r), lines, coins: coins + bonus };
+}
+
+/** Tutorial reward (first completion only): coins and a free Gold pack waiting in Ultimate Team. */
+export const TUTORIAL_REWARD = { coins: 2500, pack: 'gold' };
+
+export function finishTutorial(r: EngineResult | null): MatchOutcome {
+  const first = !getProfile().tutorial?.rewarded;
+  update((p) => {
+    p.tutorial = { done: true, rewarded: true };
+    if (first) {
+      p.coins += TUTORIAL_REWARD.coins;
+      p.freePacks = [...(p.freePacks ?? []), TUTORIAL_REWARD.pack];
+    }
+  });
+  const lines = r ? [`Mini match: ${r.userScore} - ${r.cpuScore}`] : [];
+  lines.push(first ? 'Tutorial complete! Your reward: coins and a FREE Gold pack in Ultimate Team.' : 'Tutorial complete. Rewards were already claimed.');
+  return { title: 'Tutorial complete', lines, coins: first ? TUTORIAL_REWARD.coins : 0 };
 }

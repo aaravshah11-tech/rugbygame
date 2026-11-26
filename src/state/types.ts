@@ -155,6 +155,12 @@ export interface Profile {
   recent?: RecentResult[];
   /** teams last picked in Quick Match (menu hero tile, menu player kit) */
   lastQuick?: { home: string; away: string };
+  /** guided tutorial: finished (or skipped through) and its reward claimed */
+  tutorial?: { done: boolean; rewarded: boolean };
+  /** contextual match tips already shown */
+  tipsSeen?: string[];
+  /** packs waiting to be opened in Ultimate Team (e.g. the tutorial reward) */
+  freePacks?: string[];
   updatedAt: number;
 }
 

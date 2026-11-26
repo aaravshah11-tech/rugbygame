@@ -24,7 +24,7 @@ export interface SquadLine {
   off: boolean;
 }
 
-export type Drill = 'passing' | 'kicking' | 'tackling' | 'setpieces';
+export type Drill = 'passing' | 'kicking' | 'tackling' | 'setpieces' | 'tutorial';
 
 export interface MatchConfig {
   user: TeamSetup;
@@ -53,6 +53,10 @@ export interface MatchConfig {
   kickChallenge?: { level: string; spots: [number, number][]; windKmh: number };
   /** scenario overrides (daily challenges) */
   challenge?: ChallengeSetup;
+  /** play at this team's ground instead of the home side's (Ultimate Team home stadium) */
+  venue?: string;
+  /** contextual tips: 'first' = first 3 matches only (the default), 'all' = always (tutorial mini match), 'off' */
+  tips?: 'first' | 'all' | 'off';
 }
 
 export interface ChallengeSetup {
@@ -64,6 +68,8 @@ export interface ChallengeSetup {
   secondHalfAt?: number;
   /** user starts with the ball at this x (metres from halfway, + = attacking) */
   startX?: number;
+  /** how play starts at startX: a scrum (default) or your lineout */
+  start?: 'scrum' | 'lineout';
   goal: 'win' | 'tryFromOwn22' | 'holdOut' | 'scoreTries';
   target?: number;
 }
@@ -156,6 +162,8 @@ export interface EngineResult {
   match?: MatchStats;
   /** challenge completed (undefined outside challenges) */
   challenge?: boolean;
+  /** the user's players: card / player id, shirt, tries and tackles */
+  players?: { id: string; num: number; tries: number; tackles: number }[];
 }
 
 /** Team stats, index 0 = user, 1 = CPU. */
@@ -189,7 +197,8 @@ export type EngineEvent =
   | { type: 'pop'; text: string; tone: 'good' | 'bad' | 'big' }
   | { type: 'tmo'; stage: 'check' | 'try' | 'notry' }
   | { type: 'intro'; on: boolean; title: string; sub: string }
-  | { type: 'drillDone'; score: number; total: number };
+  | { type: 'drillDone'; score: number; total: number }
+  | { type: 'tutorial'; step: number; task: number; stepDone: boolean; finished: boolean };
 
 export type InputAction =
   | { type: 'pass'; long: boolean; dir: -1 | 0 | 1 }

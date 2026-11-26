@@ -128,3 +128,15 @@ export function buildMatch(user: TeamSetup, cpu: TeamSetup, userIsHome: boolean,
     customPlays: p.settings.customPlays ?? [],
   };
 }
+
+/** The guided tutorial: England v Italy at Twickenham, the director runs the scenes. */
+export function tutorialConfig(p: Profile): MatchConfig {
+  const cfg = buildMatch(nationTeam('ENG'), nationTeam('ITA'), true, p, 'tutorial');
+  return { ...cfg, timeOfDay: 'afternoon', weather: 'dry', difficulty: 'easy', competition: 'training' };
+}
+
+/** Tutorial step 10: a 3-minute match against an Easy side, tips on for everything. */
+export function tutorialMatchConfig(p: Profile): MatchConfig {
+  const cfg = buildMatch(nationTeam('ENG'), nationTeam('ITA'), true, p);
+  return { ...cfg, halfMinutes: 1.5, difficulty: 'easy', tips: 'all', competition: 'training', importance: 0.75 };
+}

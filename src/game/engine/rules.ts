@@ -243,7 +243,8 @@ export function continueSecondHalf(eng: MatchEngine) {
 }
 
 export function result(eng: MatchEngine): EngineResult {
-  return { userScore: eng.score[0], cpuScore: eng.score[1], userTries: eng.tries[0], cpuTries: eng.tries[1], user: { ...eng.stats }, match: eng.matchStats(), challenge: eng.challengeResult() };
+  const players = eng.teams[0].map((p) => ({ id: p.data.id, num: p.num, tries: eng.ps(p).tries, tackles: eng.ps(p).tackles }));
+  return { userScore: eng.score[0], cpuScore: eng.score[1], userTries: eng.tries[0], cpuTries: eng.tries[1], user: { ...eng.stats }, match: eng.matchStats(), challenge: eng.challengeResult(), players };
 }
 
 // ---------------------------------------------------------------- penalties

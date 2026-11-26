@@ -107,7 +107,7 @@ export function generatePlayer(rng: Rng, nation: Nation, position: number, level
 }
 
 /** Normalise a generated player so its OVR lands near a target value. */
-function tuneToOvr(p: Player, target: number) {
+export function tuneToOvr(p: Player, target: number) {
   for (let i = 0; i < 6; i++) {
     const diff = target - ovrFor(p.ratings, p.position);
     if (Math.abs(diff) < 1) break;

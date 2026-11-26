@@ -4,11 +4,11 @@ import { MainMenu } from './screens/MainMenu';
 import { QuickMatch } from './screens/QuickMatch';
 import { Championship } from './screens/Championship';
 import { WorldCup } from './screens/WorldCup';
-import { SquadBuilder } from './screens/SquadBuilder';
 import { Challenges } from './screens/Challenges';
 import { KickChallenge } from './screens/KickChallenge';
 import { ControlsEditor } from './screens/ControlsEditor';
 import { Training } from './screens/Training';
+import { UTRoot } from './ut/UTRoot';
 import { Settings } from './screens/Settings';
 import { SquadViewer } from './screens/SquadViewer';
 import { Stadiums } from './screens/Stadiums';
@@ -18,7 +18,8 @@ import { loadPlayerAsset } from './game/view/assets';
 import { MatchScreen, type MatchOutcome } from './screens/MatchScreen';
 import type { EngineResult, MatchConfig } from './game/types';
 import { applySettings, getProfile, restoreFromIdb, runDailyCheck } from './state/store';
-import { buildMatch, nationTeam } from './state/teams';
+import { buildMatch, nationTeam, tutorialConfig, tutorialMatchConfig } from './state/teams';
+import { finishTutorial } from './state/outcomes';
 import { unlockAudio } from './util/audio';
 
 export type Route =
@@ -28,6 +29,8 @@ export type Route =
   | { name: 'worldcup' }
   | { name: 'squad'; tab?: string }
   | { name: 'training' }
+  | { name: 'tutorial' }
+  | { name: 'ut'; page?: string }
   | { name: 'challenges' }
   | { name: 'kicking' }
   | { name: 'controls' }
@@ -47,8 +50,15 @@ export type Go = (r: Route) => void;
 
 /** Dev builds: ?devmatch=ENG starts a match at that team's ground straight away (stadium checks). */
 function devRoute(): Route {
-  const id = import.meta.env.DEV ? new URLSearchParams(location.search).get('devmatch') : null;
-  if (!id) return { name: 'menu' };
+  const q0 = new URLSearchParams(location.search);
+  const id = import.meta.env.DEV ? q0.get('devmatch') : null;
+  if (!id) {
+    // first time the game is opened: the guided tutorial (?notut skips it, for tests)
+    const p = getProfile();
+    if (!p.tutorial?.done && p.stats.matches === 0 && !q0.has('notut')) return { name: 'tutorial' };
+    if (import.meta.env.DEV && q0.has('tutorial')) return { name: 'tutorial' };
+    return { name: 'menu' };
+  }
   const opp = id === 'NZL' ? 'ENG' : 'NZL';
   const q = new URLSearchParams(location.search);
   const cfg = buildMatch(nationTeam(id), nationTeam(opp), true, getProfile());
@@ -96,11 +106,25 @@ export function App() {
       screen = <WorldCup go={go} />;
       break;
     case 'squad':
-      screen = <SquadBuilder go={go} initialTab={route.tab} />;
+    case 'ut':
+      // the old Squad mode grew into Ultimate Team (its cards are migrated on first open)
+      screen = <UTRoot key="ut" go={go} page={route.name === 'ut' ? route.page : undefined} />;
       break;
     case 'training':
       screen = <Training go={go} />;
       break;
+    case 'tutorial': {
+      const p = getProfile();
+      screen = (
+        <MatchScreen
+          key="tutorial"
+          cfg={tutorialConfig(p)}
+          onExit={() => go({ name: 'menu' })}
+          onTutorialMatch={() => go({ name: 'match', cfg: tutorialMatchConfig(p), back: { name: 'menu' }, onFinish: (r) => finishTutorial(r) })}
+        />
+      );
+      break;
+    }
     case 'challenges':
       screen = <Challenges go={go} />;
       break;

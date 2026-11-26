@@ -330,3 +330,62 @@ html[data-gfx='low'] .actions .abtn {
   text-transform: uppercase;
   color: var(--muted);
 }
+
+/* ---------- guided tutorial ---------- */
+.tut { position: absolute; inset: 0; pointer-events: none; z-index: 40; }
+.tut .sheet, .tut .tut-skip, .tut .tut-card { pointer-events: auto; }
+.tut-progress { position: absolute; top: calc(var(--sat, 0px) + 6px); left: 50%; transform: translateX(-50%); display: flex; gap: 4px; width: min(420px, 60vw); }
+.tut-progress i { flex: 1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); }
+.tut-progress i.done { background: var(--neon, #c6ff1a); }
+.tut-progress i.cur { background: #fff; animation: tutPulse 1.2s ease-in-out infinite; }
+.tut-card { position: absolute; top: calc(var(--sat, 0px) + 18px); left: 50%; transform: translateX(-50%); width: min(520px, 64vw); padding: 8px 12px 10px; border-radius: 14px; background: rgba(8, 12, 22, 0.88); border: 1px solid rgba(198, 255, 26, 0.45); box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5); animation: tutIn 0.35s ease-out; }
+.tut-card.done { border-color: var(--neon, #c6ff1a); }
+.tut-head { display: flex; align-items: center; gap: 8px; }
+.tut-head small { color: var(--neon, #c6ff1a); font-weight: 800; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.tut-head b { flex: 1; font-style: italic; font-weight: 900; text-transform: uppercase; font-size: 14px; }
+.tut-card p { margin: 4px 0 0; font-size: 13px; line-height: 1.35; color: #e8edf6; }
+.tut-skip { border: 0; border-radius: 999px; padding: 4px 12px; background: rgba(255, 255, 255, 0.12); color: #fff; font: inherit; font-size: 11px; font-weight: 800; }
+.tut-tick { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); font-size: 96px; font-weight: 900; color: var(--neon, #c6ff1a); text-shadow: 0 0 40px rgba(198, 255, 26, 0.8); animation: tutTick 0.9s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes tutIn { from { opacity: 0; transform: translate(-50%, -10px); } }
+@keyframes tutPulse { 50% { opacity: 0.45; } }
+@keyframes tutTick { from { transform: translate(-50%, -50%) scale(0.2); opacity: 0; } }
+
+/* buttons the current step is about */
+[data-tut-glow~="joystick"] .joy-base { opacity: 1 !important; box-shadow: 0 0 0 4px rgba(198, 255, 26, 0.9), 0 0 30px 8px rgba(198, 255, 26, 0.6); animation: tutGlow 1s ease-in-out infinite; }
+[data-tut-glow~="sprint"] .abtn[data-k="sprint"], [data-tut-glow~="pass"] .abtn[data-k="pass"], [data-tut-glow~="pass-left"] .abtn[data-k="pass-left"], [data-tut-glow~="pass-right"] .abtn[data-k="pass-right"],
+[data-tut-glow~="step"] .abtn[data-k="step"], [data-tut-glow~="hand-off"] .abtn[data-k="hand-off"], [data-tut-glow~="kick"] .abtn[data-k="kick"],
+[data-tut-glow~="tackle"] .abtn[data-k="tackle"], [data-tut-glow~="dive"] .abtn[data-k="dive"], [data-tut-glow~="switch"] .abtn[data-k="switch"],
+[data-tut-glow~="add-player"] .abtn[data-k="add-player"], [data-tut-glow~="contest"] .abtn[data-k="contest"], [data-tut-glow~="fan-out"] .abtn[data-k="fan-out"] {
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.95), 0 0 34px 10px rgba(198, 255, 26, 0.75) !important;
+  animation: tutGlow 1s ease-in-out infinite;
+  z-index: 5;
+}
+@keyframes tutGlow { 50% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.6), 0 0 48px 16px rgba(198, 255, 26, 0.95); } }
+
+/* ghost finger */
+.ghost-finger { position: fixed; left: 0; top: 0; width: 40px; height: 52px; margin: -6px 0 0 -14px; pointer-events: none; z-index: 60; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6)); opacity: 0.92; transform: translate(var(--x0), var(--y0)); }
+.ghost-finger .gf-ring { position: absolute; left: 4px; top: -4px; width: 22px; height: 22px; border-radius: 50%; border: 3px solid #fff; opacity: 0; }
+.gf-tap { animation: gfTap 1.3s ease-in-out infinite; }
+.gf-tap .gf-ring, .gf-mash .gf-ring { animation: gfRing 1.3s ease-out infinite; }
+.gf-mash { animation: gfTap 0.32s ease-in-out infinite; }
+.gf-mash .gf-ring { animation-duration: 0.32s; }
+.gf-hold { animation: gfHold 2s ease-in-out infinite; }
+.gf-hold .gf-ring { animation: gfHoldRing 2s ease-in-out infinite; }
+.gf-drag, .gf-swipe { animation: gfDrag 1.6s ease-in-out infinite; }
+@keyframes gfTap { 0%, 100% { transform: translate(var(--x0), var(--y0)) translate(10px, 16px); } 40% { transform: translate(var(--x0), var(--y0)) scale(0.9); } }
+@keyframes gfRing { 0%, 30% { opacity: 0; transform: scale(0.4); } 45% { opacity: 1; } 100% { opacity: 0; transform: scale(2.2); } }
+@keyframes gfHold { 0% { transform: translate(var(--x0), var(--y0)) translate(10px, 16px); } 20%, 80% { transform: translate(var(--x0), var(--y0)) scale(0.9); } 100% { transform: translate(var(--x0), var(--y0)) translate(10px, 16px); } }
+@keyframes gfHoldRing { 0%, 20% { opacity: 0; transform: scale(0.5); } 30%, 80% { opacity: 1; transform: scale(1.6); } 100% { opacity: 0; } }
+@keyframes gfDrag { 0%, 15% { transform: translate(var(--x0), var(--y0)); opacity: 0; } 25% { opacity: 0.92; transform: translate(var(--x0), var(--y0)); } 75% { transform: translate(var(--x1), var(--y1)); opacity: 0.92; } 90%, 100% { transform: translate(var(--x1), var(--y1)); opacity: 0; } }
+
+/* confetti for the first try */
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; animation: confettiFall linear forwards; }
+@keyframes confettiFall { to { top: 110%; transform: rotate(720deg) translateX(40px); } }
+
+/* contextual match tips */
+.match-tip { position: absolute; top: calc(var(--sat, 0px) + 54px); left: 50%; transform: translateX(-50%); z-index: 35; display: flex; align-items: flex-start; gap: 8px; width: min(460px, 62vw); padding: 8px 10px 8px 12px; border-radius: 12px; background: rgba(46, 230, 255, 0.16); border: 1px solid rgba(46, 230, 255, 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: tutIn 0.3s ease-out; pointer-events: auto; }
+.match-tip b { white-space: nowrap; color: #2ee6ff; font-size: 11px; font-weight: 900; letter-spacing: 0.06em; }
+.match-tip span { flex: 1; font-size: 12px; line-height: 1.3; color: #eaf6fb; }
+.match-tip button { border: 0; background: none; color: #fff; font-size: 14px; padding: 0 2px; }
+[data-motion="reduce"] .ghost-finger, [data-motion="reduce"] .confetti { animation: none; }

@@ -27,7 +27,7 @@ const DRILLS: { id: Drill; name: string; desc: string; tips: string[]; accent: s
     id: 'kicking',
     name: 'Kicking',
     desc: 'Five place kicks from around the 22.',
-    tips: ['Swipe from the ball to the posts to kick', 'Swipe direction aims; swipe speed is power', 'Curve your swipe to bend the ball against the wind', 'In open play: hold KICK, slide to aim, swipe up fast'],
+    tips: ['Swipe from the ball to the posts to kick', 'Swipe direction aims; swipe speed is power', 'Curve your swipe to bend the ball against the wind', 'In open play: tap KICK, then swipe: little = grubber, medium = chip, big = long kick'],
     accent: 'var(--gold)',
   },
   {
@@ -55,6 +55,11 @@ export function Training({ go }: { go: Go }) {
         </div>
       )}
       <div className="scroll">
+        <button className="tile tut-tile" style={{ '--accent': 'var(--neon)', width: '100%', marginBottom: 10, minHeight: 0 } as React.CSSProperties} onClick={() => (audio.click(), go({ name: 'tutorial' }))}>
+          <span className="tag">{p.tutorial?.done ? 'Replay' : 'Start here'}</span>
+          <h3>Guided tutorial</h3>
+          <p>Ten steps on the real pitch: running, passing, tries, kicking, defence, rucks and set pieces, then a mini match.</p>
+        </button>
         <div className="nation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
           {DRILLS.map((d) => (
             <button key={d.id} className="tile" style={{ '--accent': d.accent, minHeight: 170, justifyContent: 'flex-start' } as React.CSSProperties} onClick={() => start(d.id)}>

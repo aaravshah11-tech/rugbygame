@@ -29,6 +29,7 @@ import * as BallPlay from './engine/ball';
 import * as Rules from './engine/rules';
 import * as SetPieces from './engine/setpieces';
 import * as Drills from './engine/drills';
+import { TutorialDirector } from './engine/tutorial';
 import * as View from './engine/view';
 
 /**
@@ -237,11 +238,12 @@ export class MatchEngine {
     this.resizeObs.observe(host);
 
     // the home side's ground; the crowd is mostly in home colours
-    this.venue = venueFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id);
+    const ground = cfg.venue ?? (cfg.userIsHome ? cfg.user.id : cfg.cpu.id);
+    this.venue = venueFor(ground);
     const home = cfg.userIsHome ? cfg.user.kit : cfg.cpu.kit;
     const away = cfg.userIsHome ? cfg.cpu.kit : cfg.user.kit;
     // The user's team defends the -x end, so those posts wear the user's colours.
-    const spec = stadiumFor(cfg.userIsHome ? cfg.user.id : cfg.cpu.id);
+    const spec = stadiumFor(ground);
     const homeId = cfg.userIsHome ? cfg.user.id : cfg.cpu.id;
     const awayId = cfg.userIsHome ? cfg.cpu.id : cfg.user.id;
     this.sponsors = cfg.realSponsors !== false ? pickMatchSponsors(cfg.competition ?? 'quick', homeId, awayId) : null;
@@ -492,7 +494,10 @@ export class MatchEngine {
       this.frame(dt);
     };
     this.raf = requestAnimationFrame(loop);
-    if (this.cfg.drill) this.startDrill();
+    if (this.cfg.drill === 'tutorial') {
+      this.tutorial = new TutorialDirector(this);
+      this.tutorial.start();
+    } else if (this.cfg.drill) this.startDrill();
     else if (this.cfg.challenge) this.startChallenge();
     else if (holdIntro) {
       this.setupKickoff(this.firstKicker, 0);
@@ -502,6 +507,8 @@ export class MatchEngine {
   }
 
   introHeld = false;
+  /** guided tutorial (drill 'tutorial') */
+  tutorial: TutorialDirector | null = null;
   /** How to Play was closed: now run the walk-out and stadium sweep. */
   beginIntro() {
     if (!this.introHeld) return;
@@ -707,6 +714,7 @@ export class MatchEngine {
       this.gameSec += dt * this.clockScale * (2400 / (this.cfg.halfMinutes * 60));
     }
     this.handleActions();
+    this.tutorial?.tick(dt);
 
     switch (this.phase) {
       case 'kickoff':
