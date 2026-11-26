@@ -19,27 +19,29 @@ export const REAL_SQUADS: Record<string, string> = {
   // BGS U16A, latest team sheet. Standbys go on the bench; HT Searle (standby) plays 8.
   // A Shah starts at 14: the biggest, strongest and fastest player in the game.
   // OF Ketterer (14 on the sheet) and AA Reavley (8) are on the bench.
+  // Ratings are spread by role so each player plays differently: Searle the big carrier, Webber
+  // the leader in midfield, Hargreaves and Reavley the tacklers, Davis and Ketterer the kickers.
   // LJ Vanstone is a liability (drops it, misses tackles, wild passes); SE Davis is very quick (second to Shah).
   BGS: `
-MA Wright|71|S
-GL Collinson|70|||VC
-JD Millard|71|S
-B Collier|70|
-TJ Hargreaves|72|T||VC
-T Garner|71|T
-HJ Want|71|T
-HT Searle|74|S
+MA Wright|66|pace=45 strength=82 passing=48 kicking=30 tackling=60 handling=50
+GL Collinson|72|pace=52 strength=74 passing=72 kicking=30 tackling=76 handling=70||VC
+JD Millard|70|pace=36 strength=90 passing=44 kicking=25 tackling=64 handling=52
+B Collier|64|pace=50 strength=70 passing=52 kicking=35 tackling=62 handling=66
+TJ Hargreaves|75|pace=62 strength=78 passing=64 kicking=36 tackling=81 handling=74||VC
+T Garner|71|pace=64 strength=74 passing=58 kicking=40 tackling=80 handling=66
+HJ Want|73|pace=78 strength=64 passing=62 kicking=44 tackling=80 handling=76
+HT Searle|78|pace=72 strength=88 passing=66 kicking=40 tackling=78 handling=78
 LJ Vanstone|38|pace=34 strength=30 passing=24 kicking=22 tackling=20 handling=22||VC
-SE Davis|72|K pace=87||VC
-AO Griffiths|73||11
-B Webber|71|||C
-LR Durrance|71|P
+SE Davis|75|pace=87 strength=54 passing=78 kicking=80 tackling=50 handling=70||VC
+AO Griffiths|74|pace=86 strength=58 passing=62 kicking=62 tackling=60 handling=80|11
+B Webber|76|pace=70 strength=80 passing=76 kicking=62 tackling=80 handling=76||C
+LR Durrance|69|pace=80 strength=62 passing=64 kicking=48 tackling=64 handling=76
 A Shah|94|PS pace=99 strength=99 tackling=90 handling=92 size=1.14
-HA Vieten-Kay|71|K
-MP Medwell|68|
-AA Reavley|72|T|8|VC
-OF Ketterer|73|K|15
-C Ellis|67||4`,
+HA Vieten-Kay|68|pace=70 strength=60 passing=62 kicking=78 tackling=58 handling=70
+MP Medwell|64|pace=44 strength=70 passing=56 kicking=28 tackling=66 handling=58
+AA Reavley|73|pace=66 strength=70 passing=56 kicking=45 tackling=86 handling=70|8|VC
+OF Ketterer|74|pace=78 strength=64 passing=66 kicking=82 tackling=62 handling=76|15
+C Ellis|63|pace=52 strength=72 passing=50 kicking=30 tackling=60 handling=62|4`,
   ENG: `
 Fin Baxter|81|
 Jamie George|83|
