@@ -32,7 +32,7 @@ export function buildSchoolGround(group: THREE.Group, q: QualityPreset, crowdCol
   // ---------- the pavilion: on the west touchline, halfway along, facing the pitch
   const pav = pavilion();
   pav.position.set(-4, 0, -60);
-  pav.rotation.y = Math.PI; // faces +z, onto the pitch
+  pav.rotation.y = 0; // its front (+z) faces the pitch
   group.add(pav);
   // car park: north-west of the pavilion and round its back, with a minibus by the door
   const tarmac = '#55595f';
@@ -195,53 +195,135 @@ export function buildSchoolGround(group: THREE.Group, q: QualityPreset, crowdCol
 // ---------------------------------------------------------------- pieces
 
 function pavilion() {
+  // BGS pavilion (from the photos): red-brick two-storey clubhouse, dark red tiled hipped roof
+  // with three cross-gables facing the pitch, chimneys, and a raised curved terrace with a
+  // white railing wrapped round the pitch side. Front (+z) faces the pitch.
   const g = new THREE.Group();
-  const wall = new THREE.MeshStandardMaterial({ color: '#d8c3a5', roughness: 0.85 });
-  const brick = new THREE.MeshStandardMaterial({ color: '#9a5a3c', roughness: 0.9 });
-  const tile = new THREE.MeshStandardMaterial({ color: '#a8502f', roughness: 0.8 });
-  const glass = new THREE.MeshStandardMaterial({ color: '#1c2a36', roughness: 0.2, metalness: 0.4 });
-  const cream = new THREE.MeshStandardMaterial({ color: '#efe7da', roughness: 0.7 });
-  // two storeys, 30m x 16m
-  const base = new THREE.Mesh(new THREE.BoxGeometry(30, 1.2, 16), brick);
-  base.position.y = 0.6;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(30, 6.4, 16), wall);
-  body.position.y = 4.4;
-  g.add(base, body);
-  // window bands front and back
-  for (const z of [8.05, -8.05]) {
-    for (const y of [2.6, 5.6]) {
-      const w = new THREE.Mesh(new THREE.BoxGeometry(26, 1.4, 0.1), glass);
-      w.position.set(0, y, z);
-      g.add(w);
+  const brick = new THREE.MeshStandardMaterial({ color: '#a4533a', roughness: 0.92 });
+  const brickDark = new THREE.MeshStandardMaterial({ color: '#7e3c29', roughness: 0.95 });
+  const tile = new THREE.MeshStandardMaterial({ color: '#6e2a20', roughness: 0.8, side: THREE.DoubleSide });
+  const glass = new THREE.MeshStandardMaterial({ color: '#22303c', roughness: 0.15, metalness: 0.5 });
+  const frame = new THREE.MeshStandardMaterial({ color: '#f2f0ea', roughness: 0.6 });
+  const stone = new THREE.MeshStandardMaterial({ color: '#d9d2c3', roughness: 0.9 });
+  const W = 26; // length along the pitch
+  const D = 13; // depth
+  const H = 6.8; // eaves height
+  // plinth and walls
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, 0.6, D + 0.4), brickDark);
+  plinth.position.y = 0.3;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), brick);
+  body.position.y = H / 2;
+  g.add(plinth, body);
+  // string course between the floors
+  const band = new THREE.Mesh(new THREE.BoxGeometry(W + 0.15, 0.25, D + 0.15), stone);
+  band.position.y = 3.4;
+  g.add(band);
+  // windows: tall glazing to the terrace on the ground floor, smaller ones upstairs, all four sides
+  const win = (w: number, h: number, x: number, y: number, z: number, ry = 0) => {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(w + 0.25, h + 0.25, 0.12), frame);
+    const gl = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.14), glass);
+    for (const m of [f, gl]) {
+      m.position.set(x, y, z);
+      m.rotation.y = ry;
+      g.add(m);
     }
+  };
+  for (let i = 0; i < 6; i++) {
+    const x = -W / 2 + 2.6 + i * ((W - 5.2) / 5);
+    win(2.4, 2.4, x, 1.75, D / 2 + 0.02); // ground floor onto the terrace
+    win(1.4, 1.5, x, 5.1, D / 2 + 0.02);
+    win(1.3, 1.4, x, 1.9, -D / 2 - 0.02);
+    win(1.3, 1.4, x, 5.1, -D / 2 - 0.02);
   }
-  // hipped roof: a four-sided "pyramid" stretched along the building
-  const roofGeo = new THREE.ConeGeometry(1, 1, 4, 1);
-  roofGeo.rotateY(Math.PI / 4);
+  for (const sx of [-1, 1]) for (const z of [-3, 3]) {
+    win(1.3, 1.4, sx * (W / 2 + 0.02), 1.9, z, Math.PI / 2);
+    win(1.3, 1.4, sx * (W / 2 + 0.02), 5.1, z, Math.PI / 2);
+  }
+  // hipped roof with a ridge: a box-ish prism built from vertices, eaves overhanging
+  const ov = 0.7;
+  const rw = W / 2 + ov;
+  const rd = D / 2 + ov;
+  const rh = 4.6;
+  const ridge = rw - rd; // hip ends slope at the same pitch as the sides
+  const roofGeo = new THREE.BufferGeometry();
+  const v = [
+    -rw, 0, -rd, rw, 0, -rd, rw, 0, rd, -rw, 0, rd, // eaves corners 0-3
+    -ridge, rh, 0, ridge, rh, 0, // ridge ends 4-5
+  ];
+  const idx = [0, 4, 5, 0, 5, 1, 2, 5, 4, 2, 4, 3, 3, 4, 0, 1, 5, 2];
+  roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  roofGeo.setIndex(idx);
+  roofGeo.computeVertexNormals();
   const roof = new THREE.Mesh(roofGeo, tile);
-  roof.scale.set(23, 5, 12.5);
-  roof.position.y = 7.6 + 2.5;
-  roof.castShadow = true;
+  roof.position.y = H;
   g.add(roof);
-  // three gables over the pitch-side front
-  for (const x of [-8, 0, 8]) {
-    const gable = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4, 1), tile);
-    gable.geometry.rotateY(Math.PI / 4);
-    gable.scale.set(3.4, 3.6, 3.4);
-    gable.position.set(x, 9.4, 6.8);
-    g.add(gable);
+  // three cross-gables on the pitch side: a pitched roof running forward with a brick triangle face
+  const gableRoof = (x: number, w: number, depth: number, h: number) => {
+    const hw = w / 2 + 0.35;
+    const geo = new THREE.BufferGeometry();
+    const z0 = 0;
+    const z1 = depth;
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([-hw, 0, z0, 0, h, z0, hw, 0, z0, -hw, 0, z1, 0, h, z1, hw, 0, z1], 3));
+    geo.setIndex([0, 1, 4, 0, 4, 3, 2, 5, 4, 2, 4, 1]);
+    geo.computeVertexNormals();
+    const r = new THREE.Mesh(geo, tile);
+    r.position.set(x, H, D / 2 - depth + 1.4);
+    g.add(r);
+    // brick gable end (triangle) just behind the roof edge
+    const tri = new THREE.Shape([new THREE.Vector2(-w / 2, 0), new THREE.Vector2(w / 2, 0), new THREE.Vector2(0, h - 0.15)]);
+    const face = new THREE.Mesh(new THREE.ShapeGeometry(tri), brick);
+    face.position.set(x, H, D / 2 + 1.35);
+    g.add(face);
+    // a wall box under it so the gable projects
+    const bay = new THREE.Mesh(new THREE.BoxGeometry(w, H, 1.4), brick);
+    bay.position.set(x, H / 2, D / 2 + 0.7);
+    g.add(bay);
+    win(w * 0.55, 1.6, x, 5.1, D / 2 + 1.42);
+    win(w * 0.7, 2.4, x, 1.75, D / 2 + 1.42);
+  };
+  gableRoof(-8, 5.4, 6, 3.6);
+  gableRoof(0, 6.2, 7, 4.2);
+  gableRoof(8, 5.4, 6, 3.6);
+  // chimneys
+  for (const [cx, cz] of [[-6, -2.5], [6.5, -2.5]]) {
+    const ch = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), brickDark);
+    ch.position.set(cx, H + 3.2, cz);
+    g.add(ch);
   }
-  // the curved terrace with its white railing, looking onto the pitch
-  const terrace = new THREE.Mesh(new THREE.CylinderGeometry(19, 19, 1.1, 40, 1, false, -Math.PI / 2, Math.PI), cream);
-  terrace.scale.set(1, 1, 0.55);
-  terrace.position.set(0, 0.55, 8);
+  // raised curved terrace round the pitch side with a white railing and steps down
+  const tz = D / 2;
+  const R = 17;
+  const terrace = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 1.2, 48, 1, false, -Math.PI / 2, Math.PI), stone);
+  terrace.scale.set(1, 1, 0.5);
+  terrace.position.set(0, 0.6, tz);
   g.add(terrace);
-  const rail = new THREE.Mesh(new THREE.TorusGeometry(19, 0.06, 4, 40, Math.PI), new THREE.MeshStandardMaterial({ color: '#ffffff' }));
-  rail.rotation.x = Math.PI / 2;
-  rail.rotation.z = Math.PI;
-  rail.scale.set(1, 0.55, 1);
-  rail.position.set(0, 2.1, 8);
-  g.add(rail);
+  const wallRing = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.05, R + 0.05, 1.2, 48, 1, true, -Math.PI / 2, Math.PI), brickDark);
+  wallRing.scale.set(1, 1, 0.5);
+  wallRing.position.set(0, 0.6, tz);
+  g.add(wallRing);
+  const railMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.4 });
+  for (const y of [1.6, 2.2]) {
+    const rail = new THREE.Mesh(new THREE.TorusGeometry(R - 0.2, 0.05, 4, 48, Math.PI), railMat);
+    rail.rotation.x = Math.PI / 2;
+    rail.rotation.z = Math.PI;
+    rail.scale.set(1, 0.5, 1);
+    rail.position.set(0, y, tz);
+    g.add(rail);
+  }
+  const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.04, 0.04, 1, 4), railMat, 26);
+  const m4 = new THREE.Matrix4();
+  for (let i = 0; i < 26; i++) {
+    const a = -Math.PI / 2 + (i / 25) * Math.PI;
+    m4.makeTranslation(Math.sin(a) * (R - 0.2), 1.7, tz + Math.cos(a) * (R - 0.2) * 0.5);
+    posts.setMatrixAt(i, m4);
+  }
+  g.add(posts);
+  // steps down at the front centre
+  for (let i = 0; i < 3; i++) {
+    const st = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 0.6), stone);
+    st.position.set(0, 1 - i * 0.4, tz + R * 0.5 + 0.3 + i * 0.6);
+    g.add(st);
+  }
   g.traverse((o) => {
     if ((o as THREE.Mesh).isMesh) {
       o.castShadow = true;
