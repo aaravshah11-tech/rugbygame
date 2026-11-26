@@ -293,6 +293,10 @@ export function MainMenu({ go }: { go: Go }) {
             </span>
           </div>
           <div className="grow" />
+          <button className="mchip" onClick={() => nav({ name: 'setplays' })} aria-label="Set plays">
+            <IconPlaybook className="ic" />
+            <span>Set plays</span>
+          </button>
           <button className="mchip" onClick={() => (audio.click(), setSaveOpen(true))} aria-label="Save game">
             <IconSave className="ic" />
             <span>Save</span>
