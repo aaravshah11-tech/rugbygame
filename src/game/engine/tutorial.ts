@@ -234,9 +234,13 @@ export class TutorialDirector {
       case 'try': {
         this.off(1);
         this.attackLine(10, FIELD.tryX - 22, -6);
-        // two slow covering defenders to beat
-        this.on(eng.teams[1][1], FIELD.tryX - 8, 4);
-        this.on(eng.teams[1][2], FIELD.tryX - 12, -16);
+        // two slow covering defenders: they chase, but a first-timer can beat them
+        for (const [i, x, z] of [[1, FIELD.tryX - 6, 10], [2, FIELD.tryX - 10, -20]] as const) {
+          const d = eng.teams[1][i];
+          this.on(d, x, z);
+          d.r = { ...d.r, pace: 38, tackling: 20 };
+          d.urgency = 0.25;
+        }
         break;
       }
       case 'convert': {
@@ -244,7 +248,7 @@ export class TutorialDirector {
         // different spot (a fresh kick screen)
         eng.wind = { x: 0, z: 2.2 };
         eng.setupPlaceKick(0, 'drill', FIELD.tryX - 16 + this.kicks * 2, -8 + this.kicks * 4);
-        break;
+        return this.emit();
       }
       case 'defend': {
         this.off(0);
