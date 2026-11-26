@@ -9,7 +9,7 @@ import { MiniGame, PlaceKickUI, PROMPT_TIMEOUT, ScoreBug, ScrumBattle, usePrompt
 import { audio } from '../util/audio';
 import { TeamLogo } from '../ui/logos';
 import { BrandLogo } from '../ui/BrandLogo';
-import { COMP_TITLE, SPONSOR_BY_ID, TEAM_DEALS } from '../data/sponsors';
+import { COMP_TITLE, GROUND_TITLE, SPONSOR_BY_ID, TEAM_DEALS } from '../data/sponsors';
 import type { MatchSponsors } from '../sponsors/manager';
 import { TacticsPanel } from '../ui/tactics';
 import { BUILTIN_DIAGRAMS, CustomPlaysEditor, customDiagram, PlayDiagram } from '../ui/setplays';
@@ -82,7 +82,7 @@ export function MatchScreen({
   const loadingBrands = useMemo(() => {
     if (cfg.realSponsors === false) return [];
     const home = cfg.userIsHome ? cfg.user.id : cfg.cpu.id;
-    const ids = [COMP_TITLE[cfg.competition ?? 'quick'], ...(TEAM_DEALS[home]?.partners ?? [])].filter((id, i, a) => id && a.indexOf(id) === i);
+    const ids = [GROUND_TITLE[home] ?? COMP_TITLE[cfg.competition ?? 'quick'], ...(TEAM_DEALS[home]?.partners ?? [])].filter((id, i, a) => id && a.indexOf(id) === i);
     return ids.map((id) => SPONSOR_BY_ID[id]).filter(Boolean);
   }, [cfg]);
   const [brandI, setBrandI] = useState(0);

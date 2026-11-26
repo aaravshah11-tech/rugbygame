@@ -1,4 +1,4 @@
-import { COMP_TITLE, SPONSORS, SPONSOR_BY_ID, TEAM_DEALS, type Placement, type Sponsor } from '../data/sponsors';
+import { COMP_TITLE, GROUND_TITLE, SPONSORS, SPONSOR_BY_ID, TEAM_DEALS, type Placement, type Sponsor } from '../data/sponsors';
 
 export type Competition = 'quick' | 'six' | 'league' | 'prem' | 'wc' | 'club' | 'kick' | 'challenge' | 'training';
 
@@ -44,7 +44,7 @@ function deal(teamId: string): KitDeal {
  * likely, "cool extras" sprinkled in) so no two matches look quite the same.
  */
 export function pickMatchSponsors(comp: Competition, homeId: string, awayId: string, r: () => number = Math.random): MatchSponsors {
-  const title = SPONSOR_BY_ID[COMP_TITLE[comp] ?? 'allianz'];
+  const title = SPONSOR_BY_ID[GROUND_TITLE[homeId] ?? COMP_TITLE[comp] ?? 'allianz'];
   const homeDeal = TEAM_DEALS[homeId];
   const partners = (homeDeal?.partners ?? []).map((id) => SPONSOR_BY_ID[id]).filter(Boolean);
   const local = SPONSORS.filter((s) => s.local?.includes(homeId) && !partners.includes(s));

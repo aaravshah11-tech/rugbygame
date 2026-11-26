@@ -7,7 +7,7 @@ import { claimChallenge, claimLoginReward, LOGIN_REWARDS, reduceMotion, update, 
 import type { Profile } from '../state/types';
 import { TeamLogo } from '../ui/logos';
 import { BrandLogo } from '../ui/BrandLogo';
-import { COMP_TITLE } from '../data/sponsors';
+import { GROUND_TITLE, COMP_TITLE } from '../data/sponsors';
 import { pickMatchSponsors } from '../sponsors/manager';
 import { getUT } from '../ut/store';
 import { SaveSheet } from '../ui/SaveSheet';
@@ -336,7 +336,7 @@ export function MainMenu({ go }: { go: Go }) {
           <span className="hero-venue">{venueFor(home).name}</span>
           {sponsored && (
             <span className="hero-sponsor">
-              <small>in association with</small> <BrandLogo id={COMP_TITLE.quick} height={14} />
+              <small>in association with</small> <BrandLogo id={GROUND_TITLE[home] ?? COMP_TITLE.quick} height={14} />
             </span>
           )}
         </button>

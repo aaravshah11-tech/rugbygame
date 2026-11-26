@@ -176,6 +176,9 @@ export const COMP_TITLE: Record<string, string> = {
 };
 
 /** Kit makers and front-of-shirt sponsors (in the spirit of the real deals; game choices). */
+/** Grounds with their own main sponsor, replacing the competition's title sponsor there. */
+export const GROUND_TITLE: Record<string, string> = { BGS: 'bmw' };
+
 export const TEAM_DEALS: Record<string, { kit: string; shirt?: string; sleeve?: string; partners: string[] }> = {
   ENG: { kit: 'castore', shirt: 'o2', sleeve: 'allianz', partners: ['o2', 'landrover', 'britishairways', 'hsbc', 'lucozade', 'barclays', 'jaguar'] },
   WAL: { kit: 'macron', shirt: 'vodafone', partners: ['vodafone', 'lucozade', 'heineken'] },
