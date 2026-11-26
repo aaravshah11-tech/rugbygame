@@ -43,8 +43,8 @@ export function Store({ nav }: { nav: UTNav }) {
   // dev builds: window.__utOpen(['ICON-lomu', ...], 'tots') opens a pack with these cards (screenshots / tests)
   if (import.meta.env.DEV)
     Object.assign(window, {
-      __utOpen: (ids: string[], special?: OwnedCard['special']) => {
-        const cards = ids.map((id, i) => newCard(id, i === 0 && special ? { special } : {}));
+      __utOpen: (ids: (string | [string, OwnedCard['special']])[], special?: OwnedCard['special']) => {
+        const cards = ids.map((id, i) => (Array.isArray(id) ? newCard(id[0], { special: id[1] }) : newCard(id, i === 0 && special ? { special } : {})));
         setOpening({ def: packDef('ultimate'), results: [{ cards, best: cards[0], walkout: true, items: 0 }] });
       },
     });

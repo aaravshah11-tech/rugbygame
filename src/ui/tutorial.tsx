@@ -121,7 +121,7 @@ export function TutorialOverlay({ s, onSkipStep, onSkipAll, onMiniMatch }: { s: 
         ))}
       </div>
       {!last && (
-        <div className={`tut-card ${s.stepDone ? 'done' : ''}`} key={`${s.step}-${s.task}`}>
+        <div className={`tut-card ${s.stepDone ? 'done' : ''}`}>
           <div className="tut-head">
             <small>
               Step {s.step + 1} / {TUT_STEPS.length}
@@ -132,7 +132,9 @@ export function TutorialOverlay({ s, onSkipStep, onSkipAll, onMiniMatch }: { s: 
               Skip
             </button>
           </div>
-          <p>{s.stepDone ? '✓ Step complete!' : task?.text}</p>
+          <p className="tut-text" key={`${s.step}-${s.task}-${s.stepDone}`}>
+            {s.stepDone ? '✓ Step complete!' : task?.text}
+          </p>
         </div>
       )}
       {!last && !s.stepDone && task && <GhostFinger key={`${s.step}-${s.task}`} g={task.gesture} />}

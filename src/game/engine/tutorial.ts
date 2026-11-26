@@ -202,6 +202,8 @@ export class TutorialDirector {
     const s = this.cur();
     const task = s.tasks[this.task]?.id;
     eng.emit({ type: 'minigameCancel' });
+    // close any kick-at-goal screen left from the conversion
+    eng.emit({ type: 'placekickDone' });
     eng.resetStates();
     eng.camMode = 'game';
     eng.timeScale = 1;
@@ -238,10 +240,10 @@ export class TutorialDirector {
         break;
       }
       case 'convert': {
-        this.kicks = 0;
-        // a gentle crosswind so the arrow means something
+        // a gentle crosswind so the arrow means something; each retry from a slightly
+        // different spot (a fresh kick screen)
         eng.wind = { x: 0, z: 2.2 };
-        eng.setupPlaceKick(0, 'drill', FIELD.tryX - 16, -8);
+        eng.setupPlaceKick(0, 'drill', FIELD.tryX - 16 + this.kicks * 2, -8 + this.kicks * 4);
         break;
       }
       case 'defend': {
