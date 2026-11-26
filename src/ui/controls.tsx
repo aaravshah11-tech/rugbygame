@@ -595,9 +595,10 @@ export function KickSwipe({ input, base, onClose }: { input: InputState; base: K
       onPointerUp={(e) => {
         const s0 = st.current;
         if (!s0 || s0.id !== e.pointerId) return;
+        // read the swipe before forgetting where it started
+        const r = read(e.clientX, e.clientY);
         st.current = null;
         setTrail(null);
-        const r = read(e.clientX, e.clientY);
         if (r.up < 25) {
           // not a swipe: try again
           setKind(null);
