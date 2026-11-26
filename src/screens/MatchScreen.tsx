@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type KickKind, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
-import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker } from '../ui/controls';
+import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker, KickSwipe } from '../ui/controls';
 import { MiniGame, PlaceKickUI, PROMPT_TIMEOUT, ScoreBug, ScrumBattle, usePromptTimeout, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { TeamLogo } from '../ui/logos';
@@ -215,6 +215,15 @@ export function MatchScreen({
   const userSide = { id: cfg.user.id, short: cfg.user.short, color: cfg.user.kit.primary, score: hud.userScore };
   const cpuSide = { id: cfg.cpu.id, short: cfg.cpu.short, color: cfg.cpu.kit.primary, score: hud.cpuScore };
   const showControls = !loading && !howTo && !replay && !tryBanner && hud.phase !== 'dead' && hud.phase !== 'maul' && hud.phase !== 'scrum' && hud.phase !== 'lineout' && !pk && !(mini && mini.blocking) && !penalty && !halftime && !outcome && cfg.drill !== 'kicking' && cfg.drill !== 'setpieces';
+  // swipe kick: slow motion while the swipe layer is up; it closes if the moment passes
+  const swipeKick = kickMenu && (profile.settings.kickControls ?? 'swipe') === 'swipe';
+  const swipeLive = swipeKick && showControls && hud.attacking;
+  useEffect(() => {
+    if (!swipeKick) return;
+    if (!swipeLive) setKickMenu(false);
+    engine.current?.setKickHold(swipeLive);
+    return () => engine.current?.setKickHold(false);
+  }, [swipeKick, swipeLive]);
 
   return (
     <div className={`match-root ${profile.settings.leftHanded ? 'left-handed' : ''}`} style={{ ['--btn-scale' as string]: profile.settings.buttonScale ?? 1 }}>
@@ -361,6 +370,9 @@ export function MatchScreen({
             {p.text}
           </div>
         ))}
+        {kickMenu && showControls && hud.attacking && (profile.settings.kickControls ?? 'swipe') === 'swipe' && (
+          <KickSwipe input={input.current} base={kickKind} onClose={() => setKickMenu(false)} />
+        )}
         {kickMenu && hud.attacking && profile.settings.kickControls === 'aim' && (
           <KickPicker
             input={input.current}
@@ -472,12 +484,12 @@ export function MatchScreen({
               if (k) setKickKind(k);
               setKickMenu(true);
               if (profile.settings.kickControls === 'aim') engine.current?.setAimFreeze(true);
+              else engine.current?.setKickHold(true);
             }}
             kickMode={profile.settings.kickControls ?? 'swipe'}
             passMode={profile.settings.passButtons ?? 'two'}
-            onKickHold={(on) => engine.current?.setKickHold(on)}
             kickKind={kickKind}
-            kickLabel={(profile.settings.kickControls ?? 'swipe') === 'swipe' ? 'hold · swipe' : KICKS.find((k) => k.kind === kickKind)?.label}
+            kickLabel={(profile.settings.kickControls ?? 'swipe') === 'swipe' ? 'tap · swipe' : KICKS.find((k) => k.kind === kickKind)?.label}
             atBase={hud.atBase} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} paused={paused || howTo} onDone={() => setMini(null)} />}
@@ -503,7 +515,7 @@ export function MatchScreen({
                 <b>Kick</b>
                 {profile.settings.kickControls === 'aim'
                   ? 'KICK pauses play: pick the kick, touch where it should land, hold to fill the power bar into the green, let go. '
-                  : 'Hold KICK and the game goes into slow motion; slide to aim, then swipe up. A little swipe grubbers it along the ground, a big swipe kicks it long. '}
+                  : 'Tap KICK and the game goes into slow motion, then swipe anywhere like a conversion: the direction aims it, a little swipe grubbers it along the ground, a big swipe kicks it long. '}
                 DROP GOAL appears in range.
               </div>
               <div>

@@ -239,7 +239,6 @@ export function ActionButtons({
   ruckDef = 'none',
   ruckBall = null,
   onKick,
-  onKickHold,
   kickKind,
   kickLabel,
   kickMode = 'swipe',
@@ -255,8 +254,6 @@ export function ActionButtons({
   ruckDef?: 'none' | 'contest' | 'fan';
   ruckBall?: 'quick' | 'slow' | 'danger' | null;
   onKick?: (kind?: KickKind) => void;
-  /** KICK held down (slow motion while aiming) */
-  onKickHold?: (on: boolean) => void;
   kickKind?: KickKind;
   kickLabel?: string;
   /** 'aim': KICK opens the picker + aim/power screen instead of hold-and-swipe */
@@ -265,71 +262,14 @@ export function ActionButtons({
   atBase?: boolean;
 }) {
   const passStart = useRef(0);
-  const kickStart = useRef<{ x: number; y: number; t: number; pts: { y: number; t: number }[]; angle: number; locked: boolean; peak: number } | null>(null);
   const sprint = {
     onDown: () => (input.sprintHold = true),
     onUp: () => (input.sprintHold = false),
   };
   useEffect(() => () => void (input.sprintHold = false), [input]);
-  const kickButton = (kk: KickKind, label: string, sub: string, pos: { right: number; bottom: number }) =>
-    kickMode === 'aim' ? (
-      <ActionButton label={label} sub="aim · power" size="med" color="gold" pos={pos} onDown={() => onKick?.(kk)}>
-        <KickIcon />
-      </ActionButton>
-    ) : (
-  <ActionButton
-      label={label}
-      sub={sub}
-      size="med"
-      color="gold"
-      pos={pos}
-      onDown={(e) => {
-        kickStart.current = { x: e.clientX, y: e.clientY, t: performance.now(), pts: [{ y: e.clientY, t: performance.now() }], angle: 0, locked: false, peak: 0 };
-        Object.assign(input.kickAim, { active: true, kind: kk, dist: KICKS.find((k) => k.kind === (kk))?.def ?? 35, angle: 0 });
-        onKickHold?.(true);
-      }}
-      onMove={(e) => {
-        const k0 = kickStart.current;
-        if (!k0) return;
-        const now = performance.now();
-        k0.pts.push({ y: e.clientY, t: now });
-        while (k0.pts.length > 2 && now - k0.pts[0].t > 120) k0.pts.shift();
-        // once the upward swipe starts, the aim is locked where it was
-        const vy = (k0.pts[0].y - e.clientY) / Math.max(1, now - k0.pts[0].t);
-        k0.peak = Math.max(k0.peak, vy);
-        if (!k0.locked && vy > 0.6 && k0.y - e.clientY > 25) k0.locked = true;
-        input.kickAim.kind = k0.y - e.clientY > window.innerHeight * 0.22 ? (kk === 'box' ? 'box' : 'punt') : 'grubber';
-        if (!k0.locked) {
-          k0.angle = Math.max(-60, Math.min(60, (e.clientX - k0.x) / 2.2));
-          input.kickAim.angle = k0.angle;
-        }
-      }}
-      onUp={(e, cancelled) => {
-        const k0 = kickStart.current;
-        kickStart.current = null;
-        onKickHold?.(false);
-        input.kickAim.active = false;
-        if (!k0 || cancelled) return;
-        const now = performance.now();
-        const up = k0.y - e.clientY;
-        const first = k0.pts[0];
-        // fastest point of the swipe (px per ms, + = up), so a pause before lifting doesn't kill it
-        const vy = Math.max(k0.peak, (first.y - e.clientY) / Math.max(1, now - first.t));
-        const moved = Math.hypot(e.clientX - k0.x, up);
-        if (moved < 12 && now - k0.t < 260) return; // a tap: no kick, play carries on
-        if (up < 25 || vy < 0.35) return; // no swipe: cancelled
-        // swipe length picks the kick: a little flick grubbers it along the ground, a big swipe
-        // launches it long. Within each, a longer / faster swipe goes further.
-        const H = window.innerHeight;
-        const big = up > H * 0.22;
-        const spec = KICKS.find((k) => k.kind === (big ? (kk === 'box' ? 'box' : 'punt') : 'grubber'))!;
-        const amt = big ? Math.min(1, 0.45 * Math.min(1, (up - H * 0.22) / (H * 0.4)) + 0.55 * Math.min(1, (vy - 0.5) / 2.2)) : Math.min(1, (up - 25) / (H * 0.22 - 25));
-        const dist = spec.min + (spec.max - spec.min) * Math.max(0, amt);
-        const power = big && vy > 3.4 ? 1.12 : 0.85; // an all-out flick sprays it
-        input.actions.push({ type: 'kick', kind: spec.kind, dist, angle: k0.angle, power });
-        haptic('tackle');
-      }}
-    >
+  // tap KICK: play drops into slow motion and you swipe anywhere, like a conversion (KickSwipe)
+  const kickButton = (kk: KickKind, label: string, sub: string, pos: { right: number; bottom: number }) => (
+    <ActionButton label={label} sub={kickMode === 'aim' ? 'aim · power' : sub} size="med" color="gold" pos={pos} onDown={() => onKick?.(kk)}>
       <KickIcon />
     </ActionButton>
   );
@@ -402,7 +342,7 @@ export function ActionButtons({
         <ActionButton label="Pass" sub="spin right" size="big" color="neon" pos={{ right: 0, bottom: 40 }} onDown={() => input.actions.push({ type: 'basePass', dir: 1 })}>
           <PassIcon dir={1} />
         </ActionButton>
-        {kickButton('box', 'Box kick', 'hold · swipe up', { right: 14, bottom: 150 })}
+        {kickButton('box', 'Box kick', 'tap · swipe', { right: 14, bottom: 150 })}
         <ActionButton label="Pick & go" size="sm" color="pink" pos={{ right: 112, bottom: 104 }} onDown={() => input.actions.push({ type: 'pickGo' })} />
         <ActionButton label="Snipe" size="sm" color="cyan" pos={{ right: 200, bottom: 12 }} onDown={() => input.actions.push({ type: 'snipe' })} />
       </div>
@@ -461,7 +401,7 @@ export function ActionButtons({
         </>
       )}
       <ActionButton label="Sprint" size="sm" color="cyan" pos={{ right: 104, bottom: 104 }} {...sprint} />
-      {kickButton(kickKind ?? 'punt', 'Kick', kickLabel ?? 'hold · swipe up', { right: 8, bottom: 112 })}
+      {kickButton(kickKind ?? 'punt', 'Kick', kickLabel ?? 'tap · swipe', { right: 8, bottom: 112 })}
       <ActionButton label="Hand-off" size="sm" color="pink" hidden={!nearDef} pos={{ right: 186, bottom: 14 }} onDown={() => input.actions.push({ type: 'handoff' })} />
       <ActionButton label="Step" sub="sidestep" size="sm" color="cyan" pos={{ right: 186, bottom: 86 }} onDown={() => input.actions.push({ type: 'sidestep' })} />
       <ActionButton label="Drop goal" size="sm" color="cyan" hidden={!canDrop} pos={{ right: 196, bottom: 160 }} onDown={() => input.actions.push({ type: 'dropgoal' })} />
@@ -597,6 +537,96 @@ export function KickPicker({
           ✕
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Swipe kick: play is in slow motion; swipe anywhere on screen like a conversion. The swipe's
+ * direction aims it; a little swipe grubbers it along the ground, a big swipe kicks it long
+ * (longer and faster = further). From the base, a big swipe is a box kick.
+ */
+export function KickSwipe({ input, base, onClose }: { input: InputState; base: KickKind; onClose: () => void }) {
+  const st = useRef<{ id: number; x: number; y: number; t: number; peak: number; last: { y: number; t: number } } | null>(null);
+  const [trail, setTrail] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [kind, setKind] = useState<KickKind | null>(null);
+  const longKind: KickKind = base === 'box' ? 'box' : 'punt';
+  const read = (x: number, y: number) => {
+    const s0 = st.current!;
+    const H = window.innerHeight;
+    const up = s0.y - y;
+    const big = up > H * 0.22;
+    const angle = Math.max(-60, Math.min(60, (Math.atan2(x - s0.x, Math.max(1, up)) * 180) / Math.PI));
+    return { up, big, angle, H };
+  };
+  useEffect(() => {
+    Object.assign(input.kickAim, { active: false, kind: 'grubber', dist: 15, angle: 0 });
+    return () => void (input.kickAim.active = false);
+  }, [input]);
+  return (
+    <div
+      className="kick-aim kick-swipe"
+      onPointerDown={(e) => {
+        st.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), peak: 0, last: { y: e.clientY, t: performance.now() } };
+      }}
+      onPointerMove={(e) => {
+        const s0 = st.current;
+        if (!s0 || s0.id !== e.pointerId) return;
+        const now = performance.now();
+        s0.peak = Math.max(s0.peak, (s0.last.y - e.clientY) / Math.max(1, now - s0.last.t));
+        s0.last = { y: e.clientY, t: now };
+        const r = read(e.clientX, e.clientY);
+        setTrail({ x0: s0.x, y0: s0.y, x1: e.clientX, y1: e.clientY });
+        if (r.up > 15) {
+          const k = r.big ? longKind : 'grubber';
+          setKind(k);
+          const spec = KICKS.find((x) => x.kind === k)!;
+          Object.assign(input.kickAim, { active: true, kind: k, angle: r.angle, dist: r.big ? spec.def + (spec.max - spec.def) * Math.min(1, (r.up - r.H * 0.22) / (r.H * 0.4)) : spec.min + (spec.def - spec.min) * Math.min(1, r.up / (r.H * 0.22)) });
+        }
+      }}
+      onPointerUp={(e) => {
+        const s0 = st.current;
+        if (!s0 || s0.id !== e.pointerId) return;
+        st.current = null;
+        setTrail(null);
+        const r = read(e.clientX, e.clientY);
+        if (r.up < 25) {
+          // not a swipe: try again
+          setKind(null);
+          input.kickAim.active = false;
+          return;
+        }
+        const now = performance.now();
+        const vy = Math.max(s0.peak, r.up / Math.max(1, now - s0.t));
+        const spec = KICKS.find((k) => k.kind === (r.big ? longKind : 'grubber'))!;
+        const amt = r.big ? 0.45 * Math.min(1, (r.up - r.H * 0.22) / (r.H * 0.4)) + 0.55 * Math.min(1, Math.max(0, vy - 0.5) / 2.2) : Math.min(1, (r.up - 25) / (r.H * 0.22 - 25));
+        const dist = spec.min + (spec.max - spec.min) * Math.max(0, Math.min(1, amt));
+        input.actions.push({ type: 'kick', kind: spec.kind, dist, angle: r.angle, power: r.big && vy > 3.4 ? 1.12 : 0.85 });
+        input.kickAim.active = false;
+        haptic('tackle');
+        onClose();
+      }}
+    >
+      {trail && (
+        <svg className="flick-trail" width="100%" height="100%">
+          <line x1={trail.x0} y1={trail.y0} x2={trail.x1} y2={trail.y1} />
+          <circle cx={trail.x0} cy={trail.y0} r={10} />
+        </svg>
+      )}
+      <div className="kick-aim-hud">
+        <b>{kind === 'grubber' ? 'GRUBBER' : kind ? (kind === 'box' ? 'BOX KICK' : 'LONG KICK') : 'KICK'}</b>
+        <small>Swipe like a conversion · little swipe = grubber · big swipe = long kick</small>
+      </div>
+      <button
+        className="kick-chip cancel kick-aim-cancel"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          input.kickAim.active = false;
+          onClose();
+        }}
+      >
+        ✕
+      </button>
     </div>
   );
 }
