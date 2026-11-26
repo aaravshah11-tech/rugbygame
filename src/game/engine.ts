@@ -606,12 +606,12 @@ export class MatchEngine {
   }
 
   /** Your XV and bench for the substitutions screen. */
-  squad(): { field: import('./types').SquadLine[]; bench: { idx: number; name: string; pos: number; ovr: number }[] } {
+  squad(): { field: import('./types').SquadLine[]; bench: { idx: number; name: string; pos: number; ovr: number; r: import('../data/players').Ratings }[] } {
     const used = this.subsUsed;
     return {
-      field: this.teams[0].map((p) => ({ num: p.num, name: p.name, stamina: p.stamina, ovr: Math.round((p.r.pace + p.r.strength + p.r.passing + p.r.tackling + p.r.handling) / 5), off: p.state === 'off' })),
+      field: this.teams[0].map((p) => ({ num: p.num, name: p.name, stamina: p.stamina, ovr: Math.round(playerOvr(p.data, p.num, this.cfg.user.boost ?? {})), r: { ...p.r }, off: p.state === 'off' })),
       bench: (this.cfg.user.bench ?? [])
-        .map((pl, idx) => ({ idx, name: displayName(pl), pos: pl.position, ovr: Math.round(playerOvr(pl)) }))
+        .map((pl, idx) => ({ idx, name: displayName(pl), pos: pl.position, ovr: Math.round(playerOvr(pl, pl.position, this.cfg.user.boost ?? {})), r: effectiveRatings(pl, this.cfg.user.boost ?? {}) }))
         .filter((b) => !used.has(b.idx)),
     };
   }

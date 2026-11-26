@@ -1,9 +1,10 @@
+import { posInfo, RATING_KEYS, RATING_LABEL } from '../data/players';
 import { rand } from '../util/rng';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MatchEngine } from '../game/engine';
 import { loadPlayerAsset } from '../game/view/assets';
 import { createInput, type KickKind, type EngineEvent, type EngineResult, type HudState, type MatchConfig, type MiniGameRequest, type PenaltyChoice, type PlaceKickRequest, type SetPlayId } from '../game/types';
-import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker, KickTypeChooser } from '../ui/controls';
+import { ActionButtons, setControlLayout, CatchButton, DodgeLayer, Joystick, KICKS, KickPicker } from '../ui/controls';
 import { MiniGame, PlaceKickUI, PROMPT_TIMEOUT, ScoreBug, ScrumBattle, usePromptTimeout, type Comm } from '../ui/overlays';
 import { audio } from '../util/audio';
 import { TeamLogo } from '../ui/logos';
@@ -360,9 +361,6 @@ export function MatchScreen({
             {p.text}
           </div>
         ))}
-        {kickMenu && hud.attacking && (profile.settings.kickControls ?? 'swipe') === 'swipe' && (
-          <KickTypeChooser kind={kickKind} isNine={hud.isNine} onPick={(k) => (setKickKind(k), setKickMenu(false))} onClose={() => setKickMenu(false)} />
-        )}
         {kickMenu && hud.attacking && profile.settings.kickControls === 'aim' && (
           <KickPicker
             input={input.current}
@@ -479,7 +477,7 @@ export function MatchScreen({
             passMode={profile.settings.passButtons ?? 'two'}
             onKickHold={(on) => engine.current?.setKickHold(on)}
             kickKind={kickKind}
-            kickLabel={kickKind === 'punt' ? 'hold · swipe up' : KICKS.find((k) => k.kind === kickKind)?.label}
+            kickLabel={(profile.settings.kickControls ?? 'swipe') === 'swipe' ? 'hold · swipe' : KICKS.find((k) => k.kind === kickKind)?.label}
             atBase={hud.atBase} canDrop={hud.canDrop} nearDef={hud.nearDef} offload={hud.offload} />}
         {showControls && !cfg.drill && <div className="mph">{hud.mph}<small>mph</small></div>}
         {mini && <MiniGame key={mini.id} req={mini} difficulty={cfg.difficulty} paused={paused || howTo} onDone={() => setMini(null)} />}
@@ -505,7 +503,7 @@ export function MatchScreen({
                 <b>Kick</b>
                 {profile.settings.kickControls === 'aim'
                   ? 'KICK pauses play: pick the kick, touch where it should land, hold to fill the power bar into the green, let go. '
-                  : 'Hold KICK, slide to aim, then swipe up fast: the faster the swipe, the longer the kick. Tap KICK to choose the kick type. '}
+                  : 'Hold KICK and the game goes into slow motion; slide to aim, then swipe up. A little swipe grubbers it along the ground, a big swipe kicks it long. '}
                 DROP GOAL appears in range.
               </div>
               <div>
@@ -755,7 +753,18 @@ export function MatchScreen({
   );
 }
 
-/** Pick a tired player, then a replacement from the bench. */
+const Ovr = ({ v }: { v: number }) => <em className={`sub-ovr ${v >= 85 ? 'gold' : v >= 70 ? 'silver' : v < 45 ? 'poor' : 'bronze'}`}>{v}</em>;
+const RatingLine = ({ r }: { r: import('../data/players').Ratings }) => (
+  <small className="sub-stats">
+    {RATING_KEYS.map((k) => (
+      <i key={k} className={r[k] >= 85 ? 'hi' : r[k] < 45 ? 'lo' : ''}>
+        {RATING_LABEL[k]} {Math.round(r[k])}
+      </i>
+    ))}
+  </small>
+);
+
+/** Pick a tired player, then a replacement from the bench. Every player shows OVR and ratings. */
 function SubsPanel({ engine }: { engine: MatchEngine }) {
   const [sel, setSel] = useState<number | null>(null);
   const [, force] = useState(0);
@@ -768,7 +777,11 @@ function SubsPanel({ engine }: { engine: MatchEngine }) {
           {sq.field.map((f) => (
             <button key={f.num} className="sub-row" disabled={f.off} onClick={() => setSel(f.num)}>
               <b>{f.num}</b>
-              <span>{f.name}</span>
+              <span>
+                {f.name}
+                <RatingLine r={f.r} />
+              </span>
+              <Ovr v={f.ovr} />
               <i className="stam" style={{ width: `${Math.round(f.stamina * 100)}%`, background: f.stamina < 0.4 ? '#ff3d5e' : f.stamina < 0.7 ? '#ffb020' : '#7dff3a' }} />
             </button>
           ))}
@@ -786,9 +799,12 @@ function SubsPanel({ engine }: { engine: MatchEngine }) {
                 force((x) => x + 1);
               }}
             >
-              <b>{b.pos}</b>
-              <span>{b.name}</span>
-              <small>OVR {b.ovr}</small>
+              <b>{posInfo(b.pos)?.short ?? b.pos}</b>
+              <span>
+                {b.name}
+                <RatingLine r={b.r} />
+              </span>
+              <Ovr v={b.ovr} />
             </button>
           ))}
           <button className="btn ghost" onClick={() => setSel(null)}>

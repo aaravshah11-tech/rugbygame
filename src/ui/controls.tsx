@@ -298,6 +298,7 @@ export function ActionButtons({
         const vy = (k0.pts[0].y - e.clientY) / Math.max(1, now - k0.pts[0].t);
         k0.peak = Math.max(k0.peak, vy);
         if (!k0.locked && vy > 0.6 && k0.y - e.clientY > 25) k0.locked = true;
+        input.kickAim.kind = k0.y - e.clientY > window.innerHeight * 0.22 ? (kk === 'box' ? 'box' : 'punt') : 'grubber';
         if (!k0.locked) {
           k0.angle = Math.max(-60, Math.min(60, (e.clientX - k0.x) / 2.2));
           input.kickAim.angle = k0.angle;
@@ -315,15 +316,16 @@ export function ActionButtons({
         // fastest point of the swipe (px per ms, + = up), so a pause before lifting doesn't kill it
         const vy = Math.max(k0.peak, (first.y - e.clientY) / Math.max(1, now - first.t));
         const moved = Math.hypot(e.clientX - k0.x, up);
-        if (moved < 12 && now - k0.t < 260) {
-          onKick?.(); // a tap picks the kick type
-          return;
-        }
-        if (up < 40 || vy < 0.5) return; // no swipe: cancelled
-        const spec = KICKS.find((k) => k.kind === (kk))!;
-        const speed = Math.min(1, (vy - 0.5) / 2.2);
-        const dist = spec.min + (spec.max - spec.min) * speed;
-        const power = vy > 3.4 ? 1.12 : 0.85; // an all-out flick sprays it
+        if (moved < 12 && now - k0.t < 260) return; // a tap: no kick, play carries on
+        if (up < 25 || vy < 0.35) return; // no swipe: cancelled
+        // swipe length picks the kick: a little flick grubbers it along the ground, a big swipe
+        // launches it long. Within each, a longer / faster swipe goes further.
+        const H = window.innerHeight;
+        const big = up > H * 0.22;
+        const spec = KICKS.find((k) => k.kind === (big ? (kk === 'box' ? 'box' : 'punt') : 'grubber'))!;
+        const amt = big ? Math.min(1, 0.45 * Math.min(1, (up - H * 0.22) / (H * 0.4)) + 0.55 * Math.min(1, (vy - 0.5) / 2.2)) : Math.min(1, (up - 25) / (H * 0.22 - 25));
+        const dist = spec.min + (spec.max - spec.min) * Math.max(0, amt);
+        const power = big && vy > 3.4 ? 1.12 : 0.85; // an all-out flick sprays it
         input.actions.push({ type: 'kick', kind: spec.kind, dist, angle: k0.angle, power });
         haptic('tackle');
       }}

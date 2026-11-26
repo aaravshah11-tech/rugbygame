@@ -19,6 +19,8 @@ export interface SquadLine {
   name: string;
   stamina: number;
   ovr: number;
+  /** effective ratings (PAC STR PAS KIC TKL HAN) */
+  r: Ratings;
   off: boolean;
 }
 

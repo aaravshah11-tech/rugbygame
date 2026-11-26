@@ -266,7 +266,7 @@ export function isUserDriving(eng: MatchEngine, p: P) {
 /** Slow motion while KICK is held and the user lines it up. */
 export function setKickHold(eng: MatchEngine, on: boolean) {
   if (eng.offload) return;
-  eng.timeScale = on ? 0.4 : 1;
+  eng.timeScale = on ? 0.3 : 1;
   if (on) eng.kickTarget = null;
 }
 
