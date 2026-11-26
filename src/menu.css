@@ -804,3 +804,9 @@ html[data-gfx='low'] .mlogo .l {
 .ut-hero-title { position: relative; font-family: var(--font-display); font-style: italic; font-weight: 900; font-size: 30px; line-height: 0.9; text-transform: uppercase; z-index: 1; background: linear-gradient(180deg, #fff7d0, #f2c94c 60%, #c48d00); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); }
 .ut-hero-sub { position: relative; margin-top: 3px; font-size: 11px; color: rgba(255, 255, 255, 0.8); z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 [data-motion='reduce'] .ut-hero, [data-motion='reduce'] .ut-hero-rays, [data-motion='reduce'] .ut-hero::after { animation: none; }
+
+/* save sheet */
+.save-list { list-style: none; padding: 0; margin: 6px 0 14px; display: grid; gap: 6px; font-size: 13px; }
+.save-list li { padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: #cfd6e3; }
+.save-list b { color: #fff; margin-right: 6px; }
+.save-msg { margin: 10px 0 0; text-align: center; color: var(--neon); font-weight: 700; font-size: 13px; }

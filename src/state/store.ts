@@ -158,6 +158,21 @@ function persist() {
   }, 250);
 }
 
+/** Write the save straight away (the Save button), instead of waiting for the next tick. */
+export function saveNow() {
+  if (saveTimer !== null) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const raw = JSON.stringify(profile);
+  try {
+    localStorage.setItem(KEY, raw);
+  } catch {
+    /* storage full or blocked: IndexedDB still has it */
+  }
+  void idbPut(raw);
+}
+
 function emit() {
   for (const l of listeners) l();
 }

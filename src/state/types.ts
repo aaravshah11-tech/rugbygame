@@ -46,6 +46,8 @@ export interface Settings {
   /** action button size multiplier */
   buttonScale: number;
   customPlays?: CustomPlay[];
+  /** set plays starred in the playbook: shown first in the match MOVES strip */
+  favPlays?: string[];
   /** 'swipe' = hold KICK, aim, swipe up; 'aim' = pick kick, touch the landing spot, hold for power */
   kickControls?: 'swipe' | 'aim';
   /** two PASS buttons (left/right) or one smart PASS */
@@ -156,7 +158,7 @@ export interface Profile {
   /** teams last picked in Quick Match (menu hero tile, menu player kit) */
   lastQuick?: { home: string; away: string };
   /** guided tutorial: finished (or skipped through) and its reward claimed */
-  tutorial?: { done: boolean; rewarded: boolean };
+  tutorial?: { done: boolean; rewarded: boolean; offered?: boolean };
   /** contextual match tips already shown */
   tipsSeen?: string[];
   /** packs waiting to be opened in Ultimate Team (e.g. the tutorial reward) */

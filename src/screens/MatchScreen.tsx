@@ -12,7 +12,7 @@ import { BrandLogo } from '../ui/BrandLogo';
 import { COMP_TITLE, SPONSOR_BY_ID, TEAM_DEALS } from '../data/sponsors';
 import type { MatchSponsors } from '../sponsors/manager';
 import { TacticsPanel } from '../ui/tactics';
-import { CustomPlaysEditor } from '../ui/setplays';
+import { BUILTIN_DIAGRAMS, CustomPlaysEditor, customDiagram, PlayDiagram } from '../ui/setplays';
 import { getProfile, update, useProfile } from '../state/store';
 import { MatchTip, TutorialOverlay, type TutState } from '../ui/tutorial';
 import type { TipId } from '../tutorial/steps';
@@ -362,7 +362,10 @@ export function MatchScreen({
               { id: 'miss' as SetPlayId, name: 'Skip' },
               { id: 'switch' as SetPlayId, name: 'Switch' },
               ...(cfg.customPlays ?? []).map((cp) => ({ id: `custom:${cp.id}` as SetPlayId, name: cp.name })),
-            ].map((m) => (
+            ]
+              // starred plays (Set Plays screen) come first
+              .sort((a, b) => Number((profile.settings.favPlays ?? []).includes(b.id)) - Number((profile.settings.favPlays ?? []).includes(a.id)))
+              .map((m) => (
               <button
                 key={m.id}
                 onPointerDown={(e) => {
@@ -371,6 +374,7 @@ export function MatchScreen({
                   input.current.actions.push({ type: 'setplay', id: m.id });
                 }}
               >
+                {(profile.settings.favPlays ?? []).includes(m.id) ? '★ ' : ''}
                 {m.name}
               </button>
             ))}
@@ -614,7 +618,8 @@ export function MatchScreen({
                     setPlays(false);
                   }}
                 >
-                  <b>{sp.name}</b>
+                  <PlayDiagram d={sp.id.startsWith('custom:') ? customDiagram((cfg.customPlays ?? []).find((c) => 'custom:' + c.id === sp.id)!) : BUILTIN_DIAGRAMS[sp.id]} w={150} />
+                  <b>{(profile.settings.favPlays ?? []).includes(sp.id) ? '★ ' : ''}{sp.name}</b>
                   <small>{sp.desc}</small>
                 </button>
               ))}

@@ -80,3 +80,20 @@ export const IconGift = (p: IconProps) => (
     <path d="M6 16h52v8H6zM32 16v38M32 16c-4-10-16-10-14-2 1 3 8 2 14 2M32 16c4-10 16-10 14-2-1 3-8 2-14 2" />
   </S>
 );
+
+/** Save: a floppy disk. */
+export const IconSave = (p: IconProps) => (
+  <S {...p}>
+    <path d="M12 10h32l10 10v32a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2z" />
+    <path d="M20 10v14h22V10M18 54V38h28v16" />
+  </S>
+);
+
+/** Set plays: a coach's board with a run line and an X. */
+export const IconPlaybook = (p: IconProps) => (
+  <S {...p}>
+    <rect x="8" y="10" width="48" height="44" rx="4" />
+    <circle cx="20" cy="40" r="4" />
+    <path d="M22 36c6-10 14-14 24-12M42 20l4 4-4 4M40 40l8 8M48 40l-8 8" />
+  </S>
+);

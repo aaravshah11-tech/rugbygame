@@ -722,3 +722,20 @@ table.t tr.me td:first-child {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* set plays */
+.play-diagram { display: block; border-radius: 12px; }
+.play-diagram .pd-run { fill: none; stroke: #c6ff1a; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 400; stroke-dashoffset: 400; animation: pdDraw 1.2s ease-out forwards infinite alternate; }
+.play-diagram .pd-pass { stroke: #2ee6ff; stroke-width: 4; stroke-dasharray: 10 8; opacity: 0; animation: pdFade 0.6s ease-out forwards; }
+.play-diagram .pd-kick { fill: none; stroke: #ffcf3a; stroke-width: 4; stroke-dasharray: 8 8; }
+@keyframes pdDraw { to { stroke-dashoffset: 0; } }
+@keyframes pdFade { to { opacity: 0.95; } }
+.playbook { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.play-card { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); }
+.play-card.fav { border-color: var(--neon); box-shadow: 0 0 0 1px var(--neon) inset; }
+.play-card h3 { margin: 0; font-family: var(--font-display); font-style: italic; text-transform: uppercase; font-size: 18px; }
+.play-card p { margin: 0; font-size: 12px; color: #cfd6e3; }
+.play-card .row { gap: 6px; }
+[data-motion='reduce'] .play-diagram .pd-run, [data-motion='reduce'] .play-diagram .pd-pass { animation: none; stroke-dashoffset: 0; opacity: 1; }
+.section-title { margin: 6px 0 10px; font-family: var(--font-display); font-style: italic; font-weight: 900; text-transform: uppercase; font-size: 18px; letter-spacing: 0.02em; display: flex; gap: 8px; align-items: baseline; }
+.section-title small { font-family: var(--font-body); font-style: normal; font-weight: 600; text-transform: none; font-size: 12px; }

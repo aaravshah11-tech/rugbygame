@@ -24,59 +24,129 @@ export function buildSchoolGround(group: THREE.Group, q: QualityPreset, crowdCol
   field.receiveShadow = true;
   group.add(field);
 
-  // ---------- the pavilion: cream walls, terracotta hipped roof with gables, curved terrace
+  /*
+   * Layout from the aerial photo of Failand (about 0.3 m per pixel). The 1st team pitch runs
+   * north-south; in game coordinates +x is north, +z is east, and the broadcast camera is on the
+   * east touchline looking west, so the pavilion sits behind the far touchline.
+   */
+  // ---------- the pavilion: on the west touchline, halfway along, facing the pitch
   const pav = pavilion();
-  pav.position.set(-86, 0, 10);
-  pav.rotation.y = -Math.PI / 2; // faces +x, up the pitch
+  pav.position.set(-4, 0, -60);
+  pav.rotation.y = Math.PI; // faces +z, onto the pitch
   group.add(pav);
-  // the car park and sports hall behind it
-  group.add(flat(-130, 0, 70, 46, '#5c6066', 0.01));
-  const hall = new THREE.Mesh(new THREE.BoxGeometry(34, 9, 60), new THREE.MeshStandardMaterial({ color: '#d9dde2', roughness: 0.7 }));
-  hall.position.set(-150, 4.5, -60);
-  group.add(hall);
+  // car park: north-west of the pavilion and round its back, with a minibus by the door
+  const tarmac = '#55595f';
+  group.add(flat(14, -92, 96, 44, tarmac, 0.01));
+  group.add(flat(-28, -74, 26, 30, tarmac, 0.012));
+  const bayMat = new THREE.MeshBasicMaterial({ color: '#d8d8d2' });
+  const bays = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.12, 4.6), bayMat, 44);
+  const m4 = new THREE.Matrix4();
+  const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+  for (let i = 0; i < 44; i++) {
+    const row = i < 22 ? 0 : 1;
+    m4.compose(new THREE.Vector3(-30 + (i % 22) * 2.6 + 30, 0.02, row ? -104 : -80), qx, new THREE.Vector3(1, 1, 1));
+    bays.setMatrixAt(i, m4);
+  }
+  group.add(bays);
+  const carCols = ['#1d2330', '#c9ccd2', '#8a1c1c', '#2b4a7a', '#f0f0ee', '#3a3d42', '#6b7a8a', '#14161a'];
+  const carN = q.crowdDensity > 0.6 ? 28 : 16;
+  const cars = new THREE.InstancedMesh(new THREE.BoxGeometry(1.8, 1.4, 4.3), new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.5 }), carN);
+  const col = new THREE.Color();
+  for (let i = 0; i < carN; i++) {
+    const row = rnd() < 0.5 ? -80 : -104;
+    m4.compose(new THREE.Vector3(1.3 + Math.floor(rnd() * 21) * 2.6, 0.7, row + (row < -90 ? -2.4 : 2.4)), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+    cars.setMatrixAt(i, m4);
+    cars.setColorAt(i, col.set(carCols[Math.floor(rnd() * carCols.length)]));
+  }
+  cars.castShadow = q.shadows;
+  group.add(cars);
+  const bus = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.8, 7.5), new THREE.MeshStandardMaterial({ color: '#f2f2ef', roughness: 0.5 }));
+  bus.position.set(-24, 1.4, -78);
+  group.add(bus);
 
-  // ---------- floodlight poles along the touchline next to the 3G
-  const poleMat = new THREE.MeshStandardMaterial({ color: '#b9bec6', roughness: 0.4, metalness: 0.7 });
-  const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 3.2, 3) });
-  for (const x of [-48, -16, 16, 48]) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.3, 16, 8), poleMat);
-    pole.position.set(x, 8, -42);
-    pole.castShadow = q.shadows;
-    group.add(pole);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 0.5), lampMat);
-    head.position.set(x, 16.2, -41.6);
-    head.rotation.x = -0.35;
-    group.add(head);
+  // ---------- the lane to the west, with trees both sides, and the sports hall beyond it
+  group.add(flat(0, -132, 600, 6, '#4a4d52', 0.012));
+  const hall = new THREE.Mesh(new THREE.BoxGeometry(62, 10, 26), new THREE.MeshStandardMaterial({ color: '#e2e5e9', roughness: 0.7 }));
+  hall.position.set(165, 5, -160);
+  group.add(hall);
+  // football pitches over the lane (lined grass)
+  for (const [fx, fz] of [[110, -230], [20, -230], [-70, -230]]) {
+    const fp = flat(fx, fz, 80, 52, '#3f8a3a', 0.005);
+    group.add(fp);
+    const lines = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(72, 46)),
+      new THREE.LineBasicMaterial({ color: '#e8efe6', transparent: true, opacity: 0.6 }),
+    );
+    lines.rotation.x = -Math.PI / 2;
+    lines.position.set(fx, 0.03, fz);
+    group.add(lines);
   }
 
-  // ---------- 3G pitch beyond the floodlights: dark green, red surround, white lines, posts
-  const g3 = artificialPitch(108, 72, '#2f6a3a', '#9b2b22', true);
-  g3.position.set(0, 0.01, -90);
+  // ---------- 3G (floodlit) to the south-west, long side east-west
+  const g3 = artificialPitch(120, 72, '#2f6a3a', '#9b2b22', true);
+  g3.rotation.y = Math.PI / 2;
+  g3.position.set(-114, 0.01, -42);
   group.add(g3);
-  // hockey astro (bright green) and the netball / tennis courts beyond the other touchline
-  const astro = artificialPitch(96, 58, '#58b25a', '#c94a2c', false);
-  astro.position.set(-10, 0.01, 78);
-  group.add(astro);
-  const courts = courtsBlock(60, 40);
-  courts.position.set(78, 0.01, 72);
-  group.add(courts);
+  const poleMat = new THREE.MeshStandardMaterial({ color: '#b9bec6', roughness: 0.4, metalness: 0.7 });
+  const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 3.2, 3) });
+  for (const [px, pz, face] of [[-75, -95, -1], [-75, -42, -1], [-75, 11, -1], [-153, -95, 1], [-153, -42, 1], [-153, 11, 1]] as const) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.3, 16, 8), poleMat);
+    pole.position.set(px, 8, pz);
+    pole.castShadow = q.shadows;
+    group.add(pole);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 2.2), lampMat);
+    head.position.set(px + face * 0.4, 16.2, pz);
+    group.add(head);
+  }
+  // the blue covered seats by the 3G
+  const blue = new THREE.MeshStandardMaterial({ color: '#2b4fa8', roughness: 0.5 });
+  for (let i = 0; i < 4; i++) {
+    const shelter = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 6), blue);
+    shelter.position.set(-56 - i * 7, 1.2, -116);
+    group.add(shelter);
+  }
 
-  // ---------- edges: woods past the far end, hedges, the wheat field
-  const wheat = flat(40, -170, 260, 90, '#c9b468', 0.0);
-  group.add(wheat);
+  // ---------- hockey astro and netball courts to the north
+  const astro = artificialPitch(104, 64, '#4fa84f', '#c4532d', false);
+  astro.rotation.y = Math.PI / 2;
+  astro.position.set(134, 0.01, 14);
+  group.add(astro);
+  const courts = courtsBlock(72, 60);
+  courts.rotation.z = Math.PI / 2; // in-plane: the mesh is already laid flat
+  courts.position.set(128, 0.01, 108);
+  group.add(courts);
+  // the clubhouse beyond the courts
+  const house = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 16), new THREE.MeshStandardMaterial({ color: '#d8cdb8', roughness: 0.8 }));
+  house.position.set(190, 3, 2);
+  group.add(house);
+  const hroof = new THREE.Mesh(new THREE.ConeGeometry(10, 4, 4), new THREE.MeshStandardMaterial({ color: '#8c4a32', roughness: 0.8 }));
+  hroof.rotation.y = Math.PI / 4;
+  hroof.scale.set(0.75, 1, 1.15);
+  hroof.position.set(190, 8, 2);
+  group.add(hroof);
+
+  // ---------- the big mown field to the east with cricket squares, path along the south
+  const sq = '#cdbf8e';
+  for (const [cx, cz, n] of [[2, 58, 2], [56, 66, 2], [-28, 158, 1], [-110, 142, 2], [70, -14, 2], [-126, 50, 1]] as const) {
+    for (let i = 0; i < n; i++) group.add(flat(cx, cz + i * 3.6, 20, 3, sq, 0.008));
+  }
+  group.add(flat(-160, 60, 4, 330, '#b9b2a2', 0.009)); // the path along the bottom edge
+
+  // ---------- edges: the tree belt to the east, the lane's trees, hedges to the south
   const trees: { x: number; z: number; s: number }[] = [];
   const band = (x0: number, x1: number, z0: number, z1: number, n: number, s0 = 4, s1 = 8) => {
     for (let i = 0; i < n; i++) trees.push({ x: x0 + rnd() * (x1 - x0), z: z0 + rnd() * (z1 - z0), s: s0 + rnd() * (s1 - s0) });
   };
-  band(96, 190, -140, 150, q.crowdDensity > 0.6 ? 260 : 150, 5, 10); // woodland behind the far dead-ball line
-  band(-120, 96, 112, 140, 70, 4, 8); // tree line beyond the courts
-  band(-120, 96, -128, -118, 50, 3, 5); // hedge line by the wheat field
-  band(-110, -96, -40, 60, 14, 3, 6); // trees round the pavilion
+  band(-170, 230, 178, 260, q.crowdDensity > 0.6 ? 300 : 170, 6, 11); // the tree belt along the east side
+  band(-160, 230, -142, -122, q.crowdDensity > 0.6 ? 90 : 50, 4, 8); // trees along the lane
+  band(172, 230, 40, 175, 40, 5, 9); // beyond the courts
+  band(-40, 40, -78, -68, 8, 3, 5); // round the pavilion
+  band(-175, -165, -100, 200, 50, 3, 5); // hedgerow along the path
   group.add(treeMesh(trees, rnd));
   const hedgeMat = new THREE.MeshStandardMaterial({ color: '#2c4a22', roughness: 1 });
   for (const [x, z, w, d] of [
-    [0, -128, 230, 3],
-    [0, 112, 230, 3],
+    [-168, 60, 3, 330],
+    [80, -122, 300, 2.5],
   ]) {
     const h = new THREE.Mesh(new THREE.BoxGeometry(w, 2.4, d), hedgeMat);
     h.position.set(x, 1.2, z);
@@ -99,10 +169,10 @@ export function buildSchoolGround(group: THREE.Group, q: QualityPreset, crowdCol
   const crowdN = Math.round(V.fill * 600 * Math.min(1, q.crowdDensity + 0.3));
   for (let i = 0; i < crowdN; i++) {
     const r = rnd();
-    if (r < 0.55) person(-52 + rnd() * 104, 39 + rnd() * 3.5); // the near touchline, standing in a loose line
-    else if (r < 0.75) person(-52 + rnd() * 104, -39 - rnd() * 1.8); // in front of the floodlights
-    else if (r < 0.92) person(-74 - rnd() * 6, -6 + rnd() * 30); // on the pavilion terrace
-    else person(56 + rnd() * 6, -30 + rnd() * 60); // behind the far posts
+    if (r < 0.45) person(-50 + rnd() * 100, -39 - rnd() * 3.5); // in front of the pavilion, the far touchline
+    else if (r < 0.62) person(-14 + rnd() * 22, -46 - rnd() * 4); // on the pavilion terrace
+    else if (r < 0.9) person(-50 + rnd() * 100, 39 + rnd() * 2.5); // the near (east) touchline
+    else person((rnd() < 0.5 ? -1 : 1) * (56 + rnd() * 5), -30 + rnd() * 60); // behind the posts
   }
   const { mesh: crowd, uniforms } = makeCrowd(offsets, colors, params);
   group.add(crowd);
@@ -256,7 +326,7 @@ function artificialPitch(w: number, d: number, carpet: string, surround: string,
   return g;
 }
 
-/** Netball / tennis courts: grey-blue courts split by red strips. */
+/** Netball courts: pale green courts split by red strips (as at Failand). */
 function courtsBlock(w: number, d: number) {
   const c = document.createElement('canvas');
   c.width = 512;
@@ -264,7 +334,7 @@ function courtsBlock(w: number, d: number) {
   const x = c.getContext('2d')!;
   x.fillStyle = '#c94a2c';
   x.fillRect(0, 0, c.width, c.height);
-  x.fillStyle = '#6f7d8a';
+  x.fillStyle = '#9fbf7c';
   const cols = 3;
   const rows = 2;
   const gap = 10;

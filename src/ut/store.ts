@@ -188,6 +188,21 @@ function persist() {
     void idbPut(raw);
   }, 300);
 }
+/** Write the club straight away (the Save button). */
+export function saveUTNow() {
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  const raw = JSON.stringify(state);
+  try {
+    localStorage.setItem(KEY, raw);
+  } catch {
+    /* storage full: IndexedDB still has it */
+  }
+  void idbPut(raw);
+}
+
 function emit() {
   for (const l of listeners) l();
 }

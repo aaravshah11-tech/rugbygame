@@ -55,7 +55,7 @@ export function CustomPlaysEditor({ plays, onChange }: { plays: CustomPlay[]; on
 }
 
 /** Where everyone stands just after a breakdown (metres from the ruck: x forward, z towards the open side). */
-const START: Record<number, { x: number; z: number }> = {
+export const START: Record<number, { x: number; z: number }> = {
   9: { x: -2.1, z: 0 },
   10: { x: -6, z: 8 },
   12: { x: -7.5, z: 14 },
@@ -199,3 +199,79 @@ export function PitchPlayEditor({ play, onChange }: { play: CustomPlay; onChange
     </div>
   );
 }
+
+// ---------------------------------------------------------------- playbook diagrams
+export interface PlayDiagramDef {
+  /** who gets each pass, in order (from the 9) */
+  passes: number[];
+  /** where runners go (metres from the ruck) */
+  runs: { num: number; dx: number; dz: number }[];
+  /** a kick from the last passer to here */
+  kick?: { dx: number; dz: number };
+}
+
+/** The built-in moves as diagrams (they match what the engine does with them). */
+export const BUILTIN_DIAGRAMS: Record<string, PlayDiagramDef> = {
+  crash: { passes: [10, 12], runs: [{ num: 12, dx: 4, dz: 10 }] },
+  loop: { passes: [10, 12, 10], runs: [{ num: 10, dx: -3, dz: 20 }, { num: 12, dx: -5, dz: 13 }] },
+  miss: { passes: [10, 13], runs: [{ num: 13, dx: 2, dz: 22 }, { num: 14, dx: 6, dz: 31 }] },
+  switch: { passes: [10, 13], runs: [{ num: 13, dx: 3, dz: 12 }, { num: 12, dx: 1, dz: 17 }] },
+  upandunder: { passes: [10], runs: [{ num: 11, dx: 10, dz: -6 }, { num: 14, dx: 10, dz: 22 }, { num: 13, dx: 8, dz: 12 }], kick: { dx: 18, dz: 8 } },
+};
+
+/** A small animated pitch diagram of a set play: passes dashed, runs as arrows. */
+export function PlayDiagram({ d, w = 220 }: { d: PlayDiagramDef; w?: number }) {
+  const at = (num: number) => {
+    const r = d.runs.find((x) => x.num === num);
+    return r ? { x: r.dx, z: r.dz } : START[num];
+  };
+  const pts = [9, ...d.passes];
+  return (
+    <svg viewBox="-200 -230 560 420" width={w} height={(w * 420) / 560} className="play-diagram" aria-hidden>
+      <rect x={-200} y={-230} width={560} height={420} rx={18} fill="#2f6b2a" />
+      {Array.from({ length: 8 }, (_, i) => (
+        <rect key={i} x={-200} y={-230 + i * 52} width={560} height={26} fill="#2a6226" />
+      ))}
+      <line x1={-200} x2={360} y1={0} y2={0} stroke="#fff" strokeDasharray="6 6" opacity={0.3} />
+      <ellipse cx={0} cy={-2} rx={16} ry={12} fill="#14181f" opacity={0.75} />
+      {Object.entries(START).map(([n, p]) => {
+        const num = Number(n);
+        const busy = pts.includes(num) || d.runs.some((r) => r.num === num);
+        const c = toSvg(p);
+        return <circle key={n} cx={c.cx} cy={c.cy} r={busy ? 10 : 7} fill={busy ? '#ffffff' : 'rgba(255,255,255,0.35)'} />;
+      })}
+      {d.runs.map((r, i) => {
+        const a = toSvg(START[r.num]);
+        const b = toSvg({ x: r.dx, z: r.dz });
+        return <path key={r.num} className="pd-run" style={{ animationDelay: `${0.4 + i * 0.3}s` }} d={`M${a.cx},${a.cy} Q${(a.cx + b.cx) / 2 + 20},${(a.cy + b.cy) / 2} ${b.cx},${b.cy}`} />;
+      })}
+      {pts.slice(1).map((num, i) => {
+        const a = toSvg(i === 0 ? START[9] : at(pts[i]));
+        const b = toSvg(at(num));
+        return <line key={i} className="pd-pass" style={{ animationDelay: `${1 + i * 0.5}s` }} x1={a.cx} y1={a.cy} x2={b.cx} y2={b.cy} />;
+      })}
+      {d.kick && (() => {
+        const a = toSvg(at(pts[pts.length - 1]));
+        const b = toSvg({ x: d.kick.dx, z: d.kick.dz });
+        return <path className="pd-kick" d={`M${a.cx},${a.cy} Q${(a.cx + b.cx) / 2},${Math.min(a.cy, b.cy) - 80} ${b.cx},${b.cy}`} />;
+      })()}
+      {d.runs.map((r) => {
+        const b = toSvg({ x: r.dx, z: r.dz });
+        return (
+          <g key={r.num}>
+            <circle cx={b.cx} cy={b.cy} r={13} fill="#c6ff1a" />
+            <text x={b.cx} y={b.cy + 5} textAnchor="middle" fontSize={14} fontWeight={900} fill="#0b0f1a">
+              {r.num}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Diagram for one of your own plays. */
+export const customDiagram = (p: CustomPlay): PlayDiagramDef => ({
+  passes: p.steps.map((s) => s.num),
+  runs: p.runs?.length ? p.runs.map((r) => ({ num: r.num, dx: r.dx, dz: r.dz })) : p.steps.map((s) => ({ num: s.num, dx: START[s.num].x + 4, dz: START[s.num].z + (s.line === 'switch' ? -4 : 4) })),
+});

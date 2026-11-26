@@ -9,6 +9,7 @@ import { KickChallenge } from './screens/KickChallenge';
 import { ControlsEditor } from './screens/ControlsEditor';
 import { Training } from './screens/Training';
 import { UTRoot } from './ut/UTRoot';
+import { SetPlays } from './screens/SetPlays';
 import { Settings } from './screens/Settings';
 import { SquadViewer } from './screens/SquadViewer';
 import { Stadiums } from './screens/Stadiums';
@@ -30,6 +31,7 @@ export type Route =
   | { name: 'squad'; tab?: string }
   | { name: 'training' }
   | { name: 'tutorial' }
+  | { name: 'setplays' }
   | { name: 'ut'; page?: string }
   | { name: 'challenges' }
   | { name: 'kicking' }
@@ -53,9 +55,7 @@ function devRoute(): Route {
   const q0 = new URLSearchParams(location.search);
   const id = import.meta.env.DEV ? q0.get('devmatch') : null;
   if (!id) {
-    // first time the game is opened: the guided tutorial (?notut skips it, for tests)
-    const p = getProfile();
-    if (!p.tutorial?.done && p.stats.matches === 0 && !q0.has('notut')) return { name: 'tutorial' };
+    // the tutorial is offered on the menu after the launch intro (never forced)
     if (import.meta.env.DEV && q0.has('tutorial')) return { name: 'tutorial' };
     return { name: 'menu' };
   }
@@ -112,6 +112,9 @@ export function App() {
       break;
     case 'training':
       screen = <Training go={go} />;
+      break;
+    case 'setplays':
+      screen = <SetPlays go={go} />;
       break;
     case 'tutorial': {
       const p = getProfile();

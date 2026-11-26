@@ -3,14 +3,15 @@ import type { Go, Route } from '../App';
 import { MenuScene } from '../game/menuScene';
 import { CLUB_NATION, nationById } from '../data/nations';
 import { venueFor } from '../data/venues';
-import { claimChallenge, claimLoginReward, LOGIN_REWARDS, reduceMotion, useProfile } from '../state/store';
+import { claimChallenge, claimLoginReward, LOGIN_REWARDS, reduceMotion, update, useProfile } from '../state/store';
 import type { Profile } from '../state/types';
 import { TeamLogo } from '../ui/logos';
 import { BrandLogo } from '../ui/BrandLogo';
 import { COMP_TITLE } from '../data/sponsors';
 import { pickMatchSponsors } from '../sponsors/manager';
 import { getUT } from '../ut/store';
-import { IconCrown, IconGear, IconGift, IconGlobe, IconPosts, IconShield, IconTarget, IconTrophy, IconWhistle } from '../ui/icons';
+import { SaveSheet } from '../ui/SaveSheet';
+import { IconCrown, IconGear, IconGift, IconPlaybook, IconSave, IconGlobe, IconPosts, IconShield, IconTarget, IconTrophy, IconWhistle } from '../ui/icons';
 import { audio } from '../util/audio';
 import { isStandalone } from '../util/device';
 
@@ -123,6 +124,9 @@ export function MainMenu({ go }: { go: Go }) {
   const motion = !reduceMotion();
   const [intro, setIntro] = useState(!introPlayed && motion);
   const [daily, setDaily] = useState(false);
+  // first launch: offer the tutorial once the intro has finished (never forced)
+  const [tutOffer, setTutOffer] = useState(() => !p.tutorial?.done && !p.tutorial?.offered && p.stats.matches === 0);
+  const [saveOpen, setSaveOpen] = useState(false);
   const [installTip, setInstallTip] = useState(!isStandalone() && !sessionStorage.getItem('tl-install-tip'));
   const fav = nationById(p.lastQuick?.home ?? CLUB_NATION.id);
   const favKit = (p.lastQuick ? fav : CLUB_NATION).kit;
@@ -161,7 +165,7 @@ export function MainMenu({ go }: { go: Go }) {
 
   // Daily Rewards opens by itself at most once per day (after the intro); after that it's behind the DAILY button.
   useEffect(() => {
-    if (intro || p.daily.pendingReward <= 0 || dailyShown) return;
+    if (intro || tutOffer || p.daily.pendingReward <= 0 || dailyShown) return;
     dailyShown = true;
     const d = new Date().toISOString().slice(0, 10);
     let last = '';
@@ -172,7 +176,7 @@ export function MainMenu({ go }: { go: Go }) {
       /* private mode */
     }
     if (last !== d) setDaily(true);
-  }, [p.daily.pendingReward, intro]);
+  }, [p.daily.pendingReward, intro, tutOffer]);
 
   const nav = (r: Route) => {
     audio.click();
@@ -193,6 +197,7 @@ export function MainMenu({ go }: { go: Go }) {
   const kickPassed = Object.values(p.kickLevels ?? {}).filter((k) => k.passed).length;
   const drills = Object.keys(p.trainingDone).length;
   const tiles: ModeTile[] = [
+    { key: 'plays', title: 'Set Plays', sub: 'Playbook · design', hint: `${(p.settings.customPlays ?? []).length} of your own · ${(p.settings.favPlays ?? []).length} starred`, accent: '#c6ff1a', icon: IconPlaybook, route: { name: 'setplays' } },
     { key: 'league', title: 'Nations League', sub: 'North v South', hint: compHint(p, 'league'), accent: 'var(--pink)', icon: IconGlobe, route: { name: 'comp', kind: 'league' } },
     { key: 'six', title: 'Nations Championship', sub: 'Six nations', hint: compHint(p, 'six'), accent: 'var(--cyan)', icon: IconCrown, route: { name: 'comp', kind: 'six' } },
     { key: 'prem', title: 'The Prem', sub: '10 clubs', hint: compHint(p, 'prem'), accent: 'var(--gold)', icon: IconShield, route: { name: 'comp', kind: 'prem' } },
@@ -288,6 +293,10 @@ export function MainMenu({ go }: { go: Go }) {
             </span>
           </div>
           <div className="grow" />
+          <button className="mchip" onClick={() => (audio.click(), setSaveOpen(true))} aria-label="Save game">
+            <IconSave className="ic" />
+            <span>Save</span>
+          </button>
           <button className="mchip" onClick={() => (audio.click(), setDaily(true))} aria-label="Daily rewards">
             <IconGift className="ic" />
             <span>Daily</span>
@@ -380,6 +389,41 @@ export function MainMenu({ go }: { go: Go }) {
       </div>
 
       {intro && <LaunchIntro onDone={endIntro} />}
+
+      {saveOpen && <SaveSheet onClose={() => setSaveOpen(false)} />}
+
+      {tutOffer && !intro && (
+        <div className="sheet">
+          <div className="card tut-offer" style={{ textAlign: 'center', maxWidth: 460 }}>
+            <small className="muted" style={{ letterSpacing: '0.18em', fontWeight: 800 }}>WELCOME TO TRY LINE</small>
+            <h2>New here? Play the tutorial</h2>
+            <p className="muted">Ten quick steps on the real pitch: running, passing, your first try, kicking, defence, rucks and set pieces, then a mini match. Finish it for 2,500 coins and a free Gold pack.</p>
+            <div className="row" style={{ justifyContent: 'center' }}>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  update((q) => (q.tutorial = { done: false, rewarded: !!q.tutorial?.rewarded, offered: true }));
+                  setTutOffer(false);
+                  nav({ name: 'tutorial' });
+                }}
+              >
+                Play tutorial
+              </button>
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  audio.click();
+                  update((q) => (q.tutorial = { done: false, rewarded: !!q.tutorial?.rewarded, offered: true }));
+                  setTutOffer(false);
+                }}
+              >
+                Not now
+              </button>
+            </div>
+            <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>You can play it any time from Settings or Training.</p>
+          </div>
+        </div>
+      )}
 
       {installTip && !daily && !intro && (
         <div className="toast" onClick={() => (sessionStorage.setItem('tl-install-tip', '1'), setInstallTip(false))}>
