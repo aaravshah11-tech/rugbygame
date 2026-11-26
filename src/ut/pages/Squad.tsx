@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { posInfo } from '../../data/players';
 import { audio } from '../../util/audio';
 import { haptic } from '../../util/haptics';
@@ -12,8 +12,12 @@ import type { UTNav } from '../UTRoot';
 
 /** Rugby formation on a landscape pitch (percent): forwards left, back three right. */
 const SPOT: Record<number, [number, number]> = {
-  1: [9, 22], 2: [9, 50], 3: [9, 78], 4: [22, 38], 5: [22, 62], 6: [34, 15], 7: [34, 85], 8: [37, 50],
-  9: [50, 50], 10: [62, 36], 12: [73, 26], 13: [81, 56], 11: [86, 10], 14: [89, 90], 15: [94, 50],
+  // the classic rugby line-up diagram: forwards on top in three rows, backs fanning down to 15
+  1: [14, 9], 2: [36, 9], 3: [58, 9],
+  4: [25, 22], 5: [47, 22],
+  6: [11, 35], 8: [33, 38], 7: [58, 35],
+  9: [42, 53], 10: [55, 60], 12: [68, 67], 13: [81, 74],
+  11: [11, 80], 14: [91, 82], 15: [50, 91],
 };
 
 type Where = { kind: 'xv' | 'bench'; i: number } | { kind: 'res'; uid: string };
@@ -40,6 +44,16 @@ export function SquadPage({ nav }: { nav: UTNav }) {
     [s.cards, s.xv, s.bench, resSort], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const longPress = useRef<number | null>(null);
+  // cards scale with the pitch so the rows never overlap
+  const pitchRef = useRef<HTMLDivElement>(null);
+  const [cardW, setCardW] = useState(56);
+  useEffect(() => {
+    const el = pitchRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setCardW(Math.max(40, Math.min(74, Math.round(el.clientHeight * 0.085)))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const uidAt = (w: Where) => ('uid' in w ? w.uid : w.kind === 'xv' ? s.xv[w.i] : s.bench[w.i]);
   const swap = (a: Where, b: Where) => {
@@ -149,8 +163,13 @@ export function SquadPage({ nav }: { nav: UTNav }) {
       <div className="ut-body">
         <div className="ut-squad">
           <div>
-            <div className="ut-pitch">
-              {xv.map((v, i) => slotEl({ kind: 'xv', i }, v, 50, String(i + 1), chem.each[i], !!v && v.pos !== i + 1))}
+            <div className="ut-pitch" ref={pitchRef}>
+              <span className="ut-pitch-tag fw">FORWARDS</span>
+              <span className="ut-pitch-tag bk">BACKS</span>
+              <span className="ut-pitch-row" style={{ top: '9%' }}>FRONT ROW</span>
+              <span className="ut-pitch-row" style={{ top: '22%' }}>SECOND ROW</span>
+              <span className="ut-pitch-row" style={{ top: '36%' }}>BACK ROW</span>
+              {xv.map((v, i) => slotEl({ kind: 'xv', i }, v, cardW, String(i + 1), chem.each[i], !!v && v.pos !== i + 1))}
             </div>
             <div className="ut-h" style={{ marginTop: 8 }}>
               Bench <small>drag or tap two cards to swap · hold a card for details</small>
