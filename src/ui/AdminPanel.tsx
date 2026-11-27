@@ -13,10 +13,10 @@ import { packName } from '../ut/progress';
  * The code only stops casual players on this device: it is in the game's code, not a real lock.
  */
 const PASSCODE = '2011';
-const UNLOCK_KEY = 'tl-admin-ok';
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
-  const [ok, setOk] = useState(() => sessionStorage.getItem(UNLOCK_KEY) === '1');
+  // the code is asked for every time the panel opens
+  const [ok, setOk] = useState(false);
   const [code, setCode] = useState('');
   const [wrong, setWrong] = useState(false);
   if (!ok) {
@@ -45,7 +45,6 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   setCode(next);
                   if (next.length === 4) {
                     if (next === PASSCODE) {
-                      sessionStorage.setItem(UNLOCK_KEY, '1');
                       audio.coin();
                       setOk(true);
                     } else {
