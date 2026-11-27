@@ -810,3 +810,18 @@ html[data-gfx='low'] .mlogo .l {
 .save-list li { padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: #cfd6e3; }
 .save-list b { color: #fff; margin-right: 6px; }
 .save-msg { margin: 10px 0 0; text-align: center; color: var(--neon); font-weight: 700; font-size: 13px; }
+
+/* admin */
+.admin-dots { display: flex; gap: 12px; justify-content: center; margin: 10px 0; }
+.admin-dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.6); }
+.admin-dots i.on { background: var(--neon); border-color: var(--neon); }
+.admin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.admin-pad .btn { font-size: 20px; padding: 12px 0; }
+.admin-h { margin: 14px 0 6px; font-family: var(--font-display); font-style: italic; text-transform: uppercase; font-size: 15px; }
+.admin-input { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff; font: inherit; max-width: 140px; }
+.admin-input option { background: #10162a; }
+.admin-cards { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mball { border: 0; background: none; padding: 2px; margin-left: -6px; display: grid; place-items: center; cursor: pointer; animation: mballBob 3s ease-in-out infinite; -webkit-tap-highlight-color: transparent; }
+.mball:active { transform: scale(0.9); }
+@keyframes mballBob { 50% { transform: rotate(14deg) translateY(-2px); } }
+[data-motion='reduce'] .mball { animation: none; }

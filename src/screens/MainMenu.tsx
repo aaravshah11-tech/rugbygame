@@ -11,6 +11,7 @@ import { GROUND_TITLE, COMP_TITLE } from '../data/sponsors';
 import { pickMatchSponsors } from '../sponsors/manager';
 import { getUT } from '../ut/store';
 import { SaveSheet } from '../ui/SaveSheet';
+import { AdminPanel } from '../ui/AdminPanel';
 import { IconCrown, IconGear, IconGift, IconPlaybook, IconSave, IconGlobe, IconPosts, IconShield, IconTarget, IconTrophy, IconWhistle } from '../ui/icons';
 import { audio } from '../util/audio';
 import { isStandalone } from '../util/device';
@@ -127,6 +128,8 @@ export function MainMenu({ go }: { go: Go }) {
   // first launch: offer the tutorial once the intro has finished (never forced)
   const [tutOffer, setTutOffer] = useState(() => !p.tutorial?.done && !p.tutorial?.offered && p.stats.matches === 0);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [admin, setAdmin] = useState(false);
+  const lastBallTap = useRef(0);
   const [installTip, setInstallTip] = useState(!isStandalone() && !sessionStorage.getItem('tl-install-tip'));
   const fav = nationById(p.lastQuick?.home ?? CLUB_NATION.id);
   const favKit = (p.lastQuick ? fav : CLUB_NATION).kit;
@@ -269,7 +272,20 @@ export function MainMenu({ go }: { go: Go }) {
           if (Math.hypot(dx, dy) > 8) d.moved = true;
           scene.current?.dragParallax(dx / innerWidth, dy / innerHeight);
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
+          // double tap the ball: the passcode box for the admin panel
+          const b = scene.current?.ballScreen();
+          const onBall = !!b && Math.hypot(e.clientX - b.x, e.clientY - b.y) < 60;
+          if (drag.current && !drag.current.moved && onBall) {
+            const now = performance.now();
+            if (now - lastBallTap.current < 450) {
+              lastBallTap.current = 0;
+              drag.current = null;
+              setAdmin(true);
+              return;
+            }
+            lastBallTap.current = now;
+          }
           if (drag.current && !drag.current.moved) scene.current?.celebrate();
           drag.current = null;
           scene.current?.dragParallax(0, 0, true);
@@ -286,6 +302,24 @@ export function MainMenu({ go }: { go: Go }) {
             <span className="t">TRY</span>
             <span className="l">LINE</span>
           </div>
+          {/* the rugby ball: looks like decoration; double tap for the admin passcode */}
+          <button
+            className="mball"
+            aria-label="Rugby ball"
+            onClick={() => {
+              const now = performance.now();
+              if (now - lastBallTap.current < 450) {
+                lastBallTap.current = 0;
+                setAdmin(true);
+              } else lastBallTap.current = now;
+            }}
+          >
+            <svg viewBox="0 0 40 26" width="30" height="20" aria-hidden>
+              <ellipse cx="20" cy="13" rx="18" ry="11" fill="#f4efe3" stroke="#c9c0ac" strokeWidth="1.5" transform="rotate(-18 20 13)" />
+              <path d="M9 17 Q20 9 31 9" stroke="#b3122e" strokeWidth="2" fill="none" transform="rotate(-18 20 13)" />
+              <path d="M16 11.5 l2 3 M20 10.6 l2 3 M24 10 l2 3" stroke="#555" strokeWidth="1.3" transform="rotate(-18 20 13)" />
+            </svg>
+          </button>
           <div className="mlevel" title={`Level ${lv.level}`}>
             <b>LV {lv.level}</b>
             <span className="xp">
@@ -395,6 +429,7 @@ export function MainMenu({ go }: { go: Go }) {
       {intro && <LaunchIntro onDone={endIntro} />}
 
       {saveOpen && <SaveSheet onClose={() => setSaveOpen(false)} />}
+      {admin && <AdminPanel onClose={() => setAdmin(false)} />}
 
       {tutOffer && !intro && (
         <div className="sheet">

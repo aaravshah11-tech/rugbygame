@@ -133,6 +133,13 @@ export class MenuScene {
   }
 
   /** Tap on the player: a random celebration. */
+  /** Where the ball is on screen (client px), for tapping it. */
+  ballScreen(): { x: number; y: number } {
+    const v = this.ball.position.clone().project(this.camera);
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+  }
+
   celebrate() {
     const p = this.player;
     if (!p) return;
