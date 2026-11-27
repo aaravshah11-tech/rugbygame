@@ -21,27 +21,28 @@ export const REAL_SQUADS: Record<string, string> = {
   // OF Ketterer (14 on the sheet) and T Garner are on the bench; AA Reavley starts at 6.
   // Ratings are spread by role so each player plays differently: Searle the big carrier, Webber
   // the leader in midfield, Hargreaves and Reavley the tacklers, Davis and Ketterer the kickers.
-  // SE Davis is very quick (second to Shah).
+  // Ratings set with the player who knows them (Nov 2026). C Ellis is the liability; E Nagata (pace 75) is a bench back.
   BGS: `
-MA Wright|66|pace=45 strength=82 passing=48 kicking=30 tackling=60 handling=50
-GL Collinson|72|pace=52 strength=74 passing=72 kicking=30 tackling=76 handling=70||VC
-JD Millard|70|pace=36 strength=90 passing=44 kicking=25 tackling=64 handling=52
-B Collier|64|pace=50 strength=70 passing=52 kicking=35 tackling=62 handling=66
-TJ Hargreaves|75|pace=62 strength=78 passing=64 kicking=36 tackling=81 handling=74||VC
-AA Reavley|73|pace=66 strength=70 passing=56 kicking=45 tackling=86 handling=70|6|VC
-HJ Want|73|pace=78 strength=64 passing=62 kicking=44 tackling=80 handling=76
-HT Searle|78|pace=72 strength=88 passing=66 kicking=40 tackling=78 handling=78
-LJ Vanstone|73|pace=70 strength=52 passing=82 kicking=70 tackling=58 handling=74||VC
-SE Davis|75|pace=87 strength=54 passing=78 kicking=80 tackling=50 handling=70||VC
-AO Griffiths|74|pace=86 strength=58 passing=62 kicking=62 tackling=60 handling=80|11
-B Webber|80|pace=74 strength=84 passing=80 kicking=64 tackling=84 handling=80||C
-LR Durrance|69|pace=80 strength=62 passing=64 kicking=48 tackling=64 handling=76
+MA Wright|72|pace=58 strength=84 passing=55 kicking=32 tackling=68 handling=58
+GL Collinson|72|pace=66 strength=72 passing=74 kicking=20 tackling=72 handling=74||VC
+JD Millard|63|pace=30 strength=82 passing=45 kicking=20 tackling=58 handling=38
+B Collier|72|pace=32 strength=90 passing=55 kicking=25 tackling=72 handling=66
+TJ Hargreaves|75|pace=60 strength=86 passing=52 kicking=30 tackling=86 handling=58||VC
+AA Reavley|78|pace=68 strength=88 passing=45 kicking=35 tackling=84 handling=78|6|VC
+HJ Want|78|pace=84 strength=58 passing=76 kicking=42 tackling=86 handling=84
+HT Searle|83|pace=80 strength=92 passing=68 kicking=40 tackling=82 handling=82
+LJ Vanstone|73|pace=62 strength=48 passing=76 kicking=86 tackling=40 handling=74||VC
+SE Davis|80|pace=87 strength=62 passing=82 kicking=88 tackling=66 handling=76||VC
+AO Griffiths|79|pace=86 strength=68 passing=74 kicking=60 tackling=74 handling=84|11
+B Webber|84|pace=80 strength=90 passing=88 kicking=60 tackling=96 handling=72||C
+LR Durrance|68|pace=76 strength=70 passing=50 kicking=40 tackling=74 handling=76
 A Shah|94|PS pace=99 strength=99 tackling=90 handling=92 size=1.14
-HA Vieten-Kay|68|pace=70 strength=60 passing=62 kicking=78 tackling=58 handling=70
-MP Medwell|76|pace=56 strength=80 passing=70 kicking=30 tackling=80 handling=72
-T Garner|71|pace=64 strength=74 passing=58 kicking=40 tackling=80 handling=66|6
-OF Ketterer|74|pace=78 strength=64 passing=66 kicking=82 tackling=62 handling=76|15
-C Ellis|63|pace=52 strength=72 passing=50 kicking=30 tackling=60 handling=62|4`,
+HA Vieten-Kay|74|pace=78 strength=60 passing=66 kicking=72 tackling=48 handling=86
+MP Medwell|76|pace=66 strength=78 passing=68 kicking=25 tackling=80 handling=72
+T Garner|71|pace=64 strength=72 passing=58 kicking=30 tackling=82 handling=66|6
+OF Ketterer|78|pace=88 strength=64 passing=66 kicking=74 tackling=62 handling=82|15
+C Ellis|32|pace=34 strength=40 passing=28 kicking=20 tackling=26 handling=28|4
+E Nagata|70|pace=75 strength=64 passing=70 kicking=50 tackling=70 handling=74|13`,
   ENG: `
 Fin Baxter|81|
 Jamie George|83|
