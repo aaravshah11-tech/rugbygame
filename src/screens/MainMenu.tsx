@@ -302,7 +302,7 @@ export function MainMenu({ go }: { go: Go }) {
             <span className="t">TRY</span>
             <span className="l">LINE</span>
           </div>
-          {/* the rugby ball: looks like decoration; double tap for the admin passcode */}
+          {/* the rugby ball: looks like decoration; double tap for the dev panel passcode */}
           <button
             className="mball"
             aria-label="Rugby ball"

@@ -23,7 +23,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     return (
       <div className="sheet" onClick={onClose}>
         <div className="card admin-lock" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: 320 }}>
-          <h2>Admin</h2>
+          <h2>Dev Panel</h2>
           <p className="muted">Enter the passcode</p>
           <div className="admin-dots">
             {[0, 1, 2, 3].map((i) => (
@@ -88,7 +88,7 @@ function Admin({ onClose }: { onClose: () => void }) {
     <div className="sheet" onClick={onClose}>
       <div className="card admin" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', textAlign: 'left' }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0 }}>Admin</h2>
+          <h2 style={{ margin: 0 }}>Dev Panel</h2>
           <button className="btn ghost" aria-label="Close" onClick={onClose}>
             ✕
           </button>
